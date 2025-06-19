@@ -47,21 +47,21 @@ async def handle_callback(request: Request):
     except InvalidSignatureError:
         raise HTTPException(status_code=400, detail="Invalid signature")
 
+    await debug_event_record(body)
     for event in events:
         if not isinstance(event, MessageEvent):
             continue
         if not isinstance(event.message, TextMessageContent):
             continue
 
-        await debug_event_record(event)
         if re.search(pattern, event.message.text):
             await binding_phone_to_line(event)
 
     return 'OK'
 
 
-async def debug_event_record(event):
-    event_json = json.dumps(event)
+async def debug_event_record(body):
+    event_json = json.dumps(body)
     with psycopg.connect(os.getenv('DB')) as conn:
         with conn.cursor() as cur:
             stmt = """
