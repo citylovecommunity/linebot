@@ -66,7 +66,7 @@ async def debug_event_record(body):
         with conn.cursor() as cur:
             stmt = """
                 insert into events (event)
-                values %(event)s
+                values (%s)
             """
             cur.execute(stmt, (event_json,))
         conn.commit()
