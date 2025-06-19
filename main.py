@@ -63,10 +63,6 @@ async def binding_phone_to_line(event):
     phone_number = re.search(pattern, event.message.text).group(1)
     with psycopg.connect(os.getenv('DB')) as conn:
         with conn.cursor() as cur:
-            # 先檢查有無在db，若有發送已經綁定
-
-            # 若無，insert進db並發送註冊成功訊息
-            # TODO: 把db建出來
             stmt = """
                         insert into line_info (phone_number, user_id)
                         values %(phone_number)s, %(user_id)s
@@ -79,6 +75,7 @@ async def binding_phone_to_line(event):
                 reply = '綁定成功🎉'
             else:
                 reply = '已綁定過，若要更換號碼，請聯絡客服'
+        conn.commit()
 
     await line_bot_api.reply_message(
         ReplyMessageRequest(
