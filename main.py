@@ -88,7 +88,7 @@ async def binding_phone_to_line(event):
 
     await line_bot_api.reply_message(
         ReplyMessageRequest(
-            reply_token=event["reply_token"],
+            reply_token=event["replyToken"],
             messages=[TextMessage(text=reply)]
         )
     )
