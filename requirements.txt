@@ -19,6 +19,7 @@ line-bot-sdk==3.17.1
 multidict==6.5.0
 propcache==0.3.2
 psycopg==3.2.9
+psycopg-binary==3.2.9
 pydantic==2.11.7
 pydantic-core==2.33.2
 python-dateutil==2.9.0.post0
