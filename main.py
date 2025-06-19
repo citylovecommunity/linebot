@@ -53,14 +53,14 @@ async def handle_callback(request: Request):
         if not isinstance(event.message, TextMessageContent):
             continue
 
-        if re.search(pattern, event.message):
+        if re.search(pattern, event.message.text):
             binding_phone_to_line(event)
 
     return 'OK'
 
 
 async def binding_phone_to_line(event):
-    phone_number = re.search(pattern, event.message).group(1)
+    phone_number = re.search(pattern, event.message.text).group(1)
     with psycopg.connect(os.getenv('DB')) as conn:
         with conn.cursor() as cur:
             # 先檢查有無在db，若有發送已經綁定
