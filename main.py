@@ -79,7 +79,7 @@ async def binding_phone_to_line(event):
                         returning user_id
                         """
             result = cur.execute(
-                stmt, {'phone': phone_number, 'user_id': event['source']['userId']})
+                stmt, {'phone_number': phone_number, 'user_id': event['source']['userId']})
             if result:
                 reply = '綁定成功🎉'
             else:
