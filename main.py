@@ -74,7 +74,7 @@ async def binding_phone_to_line(event):
         with conn.cursor() as cur:
             stmt = """
                         insert into line_info (phone_number, user_id)
-                        values %(phone_number)s, %(user_id)s
+                        values (%(phone_number)s, %(user_id)s)
                         on conflict (user_id) do nothing
                         returning user_id
                         """
