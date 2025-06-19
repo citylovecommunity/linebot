@@ -1,4 +1,4 @@
-
+import json
 import os
 import re
 import sys
@@ -53,10 +53,23 @@ async def handle_callback(request: Request):
         if not isinstance(event.message, TextMessageContent):
             continue
 
+        await debug_event_record(event)
         if re.search(pattern, event.message.text):
             await binding_phone_to_line(event)
 
     return 'OK'
+
+
+async def debug_event_record(event):
+    event_json = json.dumps(event)
+    with psycopg.connect(os.getenv('DB')) as conn:
+        with conn.cursor() as cur:
+            stmt = """
+                insert into events (event)
+                values %(event)
+            """
+            cur.execute(stmt, (event_json,))
+        conn.commit()
 
 
 async def binding_phone_to_line(event):
