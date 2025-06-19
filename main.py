@@ -36,25 +36,21 @@ pattern = r"綁定\s*(09\d{8})"
 
 @app.post("/")
 async def handle_callback(request: Request):
-    signature = request.headers['X-Line-Signature']
+    # signature = request.headers['X-Line-Signature']
 
     # get request body as text
     body = await request.body()
     body = body.decode()
 
-    try:
-        events = parser.parse(body, signature)
-    except InvalidSignatureError:
-        raise HTTPException(status_code=400, detail="Invalid signature")
+    # try:
+    #     events = parser.parse(body, signature)
+    # except InvalidSignatureError:
+    #     raise HTTPException(status_code=400, detail="Invalid signature")
 
-    await debug_event_record(body)
-    for event in events:
-        if not isinstance(event, MessageEvent):
-            continue
-        if not isinstance(event.message, TextMessageContent):
-            continue
-
-        if re.search(pattern, event.message.text):
+    webhook_body = json.loads(body)
+#    await debug_event_record(body)
+    for event in webhook_body['events']:
+        if re.search(pattern, event['message']['text']):
             await binding_phone_to_line(event)
 
     return 'OK'
@@ -73,17 +69,17 @@ async def debug_event_record(body):
 
 
 async def binding_phone_to_line(event):
-    phone_number = re.search(pattern, event.message.text).group(1)
+    phone_number = re.search(pattern, event['message']['text']).group(1)
     with psycopg.connect(os.getenv('DB')) as conn:
         with conn.cursor() as cur:
             stmt = """
                         insert into line_info (phone_number, user_id)
                         values %(phone_number)s, %(user_id)s
                         on conflict (user_id) do nothing
-                        returning user_id          
+                        returning user_id
                         """
             result = cur.execute(
-                stmt, {'phone': phone_number, 'user_id': event.source['userId']})
+                stmt, {'phone': phone_number, 'user_id': event['source']['userId']})
             if result:
                 reply = '綁定成功🎉'
             else:
@@ -92,7 +88,7 @@ async def binding_phone_to_line(event):
 
     await line_bot_api.reply_message(
         ReplyMessageRequest(
-            reply_token=event.reply_token,
+            reply_token=event["reply_token"],
             messages=[TextMessage(text=reply)]
         )
     )
