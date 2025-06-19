@@ -54,7 +54,7 @@ async def handle_callback(request: Request):
             continue
 
         if re.search(pattern, event.message.text):
-            binding_phone_to_line(event)
+            await binding_phone_to_line(event)
 
     return 'OK'
 
