@@ -322,6 +322,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "line-bot-sdk" },
     { name = "psycopg", extra = ["binary"] },
+    { name = "python-dotenv" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -330,6 +331,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115.13" },
     { name = "line-bot-sdk", specifier = ">=3.17.1" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.9" },
+    { name = "python-dotenv", specifier = ">=1.1.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34.3" },
 ]
 

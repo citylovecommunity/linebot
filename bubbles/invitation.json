@@ -1,0 +1,60 @@
+{
+    "type": "bubble",
+    "spacing": "md",
+    "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+            {
+                "type": "text",
+                "text": "配對推薦通知",
+                "weight": "bold",
+                "size": "xl"
+            },
+            {
+                "type": "text",
+                "text": "您好，本週為您推薦認識一位會員"
+            },
+            {
+                "type": "button",
+                "action": {
+                    "type": "uri",
+                    "label": "介紹頁連結❤️",
+                    "uri": "https://example.com"
+                },
+                "style": "link",
+                "color": "#dd0d3e"
+            },
+            {
+                "type": "separator",
+                "color": "#000000"
+            }
+        ]
+    },
+    "footer": {
+        "type": "box",
+        "spacing": "md",
+        "layout": "vertical",
+        "contents": [
+            {
+                "type": "button",
+                "action": {
+                    "type": "message",
+                    "label": "有興趣🫵🫵🫵🫵",
+                    "text": "好ㄛ"
+                },
+                "style": "primary",
+                "color": "#da8d5d"
+            },
+            {
+                "type": "button",
+                "action": {
+                    "type": "message",
+                    "label": "醜死了沒興趣🗿🗿🗿🗿",
+                    "text": "好ㄛ"
+                },
+                "style": "secondary"
+            }
+        ]
+    }
+}
