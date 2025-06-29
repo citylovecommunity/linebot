@@ -20,12 +20,10 @@ def load_bubble(name):
 
 
 def send_bubble(user_id, bubble, alt_text='酷喔'):
-
     flex_message = FlexSendMessage(
         alt_text=alt_text,
         contents=bubble
     )
-
     line_bot_api.push_message(user_id, flex_message)
 
 
