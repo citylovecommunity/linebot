@@ -1,49 +1,36 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-TW">
 
 <head>
-    <title>Submit Places</title>
+    <meta charset="UTF-8">
+    <title>提交地點</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 
 <body class="bg-light">
     <div class="container py-5">
-        <h2 class="text-center mb-4">Submit Google Maps Links</h2>
-
-        <form method="post" action="{{ url_for('submit_places') }}" class="mb-4">
+        <h2 class="text-center mb-4">{{session['sub_name']}}和{{session['obj_name']}}約會的餐廳和時間</h2>
+        <form method="post" action="{{ url_for('submit_places') }}">
             <div class="mb-3">
-                <label for="place1" class="form-label">Place 1 Google Maps URL</label>
+                <label for="place1" class="form-label">地點一 Google Maps 連結</label>
                 <input type="url" class="form-control" id="place1" name="place1" required>
             </div>
             <div class="mb-3">
-                <label for="place2" class="form-label">Place 2 Google Maps URL</label>
+                <label for="place2" class="form-label">地點二 Google Maps 連結</label>
                 <input type="url" class="form-control" id="place2" name="place2" required>
             </div>
-            <button type="submit" class="btn btn-primary">Preview</button>
-        </form>
 
-        {% if embed1 and embed2 %}
-        <div class="row">
-            <div class="col-md-6 mb-4">
-                <h5 class="text-center">Place 1</h5>
-                <iframe width="100%" height="300" style="border:0;" loading="lazy" allowfullscreen
-                    referrerpolicy="no-referrer-when-downgrade"
-                    src="https://www.google.com/maps?q={{ embed1 | url_encode }}&output=embed">
-                </iframe>
+            <div class="mb-3">
+                <label class="form-label">選擇三個時間</label>
+                <input type="datetime-local" class="form-control mb-2" name="time1" required>
+                <input type="datetime-local" class="form-control mb-2" name="time2" required>
+                <input type="datetime-local" class="form-control mb-2" name="time3" required>
             </div>
-            <div class="col-md-6 mb-4">
-                <h5 class="text-center">Place 2</h5>
-                <iframe width="100%" height="300" style="border:0;" loading="lazy" allowfullscreen
-                    referrerpolicy="no-referrer-when-downgrade"
-                    src="https://www.google.com/maps?q={{ embed2 | url_encode }}&output=embed">
-                </iframe>
-            </div>
-        </div>
 
-        <form method="post" action="{{ url_for('confirm_places') }}" class="text-center">
-            <button type="submit" class="btn btn-success">Confirm These Places</button>
+            <div class="text-center">
+                <button type="submit" class="btn btn-primary">預覽並確認</button>
+            </div>
         </form>
-        {% endif %}
     </div>
 </body>
 

@@ -10,10 +10,12 @@
     <div class="container py-5">
         <div class="card shadow-sm mx-auto" style="max-width: 500px;">
             <div class="card-body text-center">
-                <h2 class="card-title mb-4">Confirmation</h2>
-                <p class="card-text">{{ message }}</p>
-                <form method="post" action="{{ url_for('confirm_post') }}">
-                    <button type="submit" class="btn btn-primary">Confirm</button>
+                <h2 class="card-title mb-4">{{header}}</h2>
+                <p class="card-text">
+                    {{ message }}
+                </p>
+                <form method="post" action="{{ url_for(session['action']) }}">
+                    <button type="submit" class="btn btn-primary">確定！</button>
                 </form>
             </div>
         </div>
