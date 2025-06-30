@@ -2,8 +2,8 @@ import os
 
 import psycopg
 from dotenv import load_dotenv
+from psycopg.rows import namedtuple_row
 from util import get_user_id, load_bubble, send_bubble
-from psycopg import namedtuple_row
 
 # 1. 取得本次發送名單
 # 2. 包裝泡泡
@@ -35,7 +35,7 @@ def bubble_modifier(subject_id, object_id):
 def write_sent_to_db(matching_id):
     stmt = """
     update set current_state = 'invitation_waiting'
-    where id = %(s);
+    where id = %s;
     """
     with psycopg.connect(DB) as conn:
         with conn.cursor() as cur:
