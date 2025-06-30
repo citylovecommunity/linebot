@@ -13,23 +13,29 @@
         <form method="post" action="{{ url_for('rest_r1') }}">
             <div class="mb-3">
                 <label for="place1" class="form-label">地點一 Google Maps 連結</label>
-                <input type="url" class="form-control" id="place1" name="place1" required>
+                <input type="url" class="form-control" id="place1" name="place1" required
+                    value="{{ session['confirm_data']['place1_url'] if session.get('confirm_data') else '' }}">
             </div>
             <div class="mb-3">
                 <label for="place2" class="form-label">地點二 Google Maps 連結</label>
-                <input type="url" class="form-control" id="place2" name="place2" required>
+                <input type="url" class="form-control" id="place2" name="place2" required
+                    value="{{ session['confirm_data']['place2_url'] if session.get('confirm_data') else '' }}">
             </div>
 
             <div class="mb-3">
                 <label class="form-label">選擇三個時間</label>
-                <input type="datetime-local" class="form-control mb-2" name="time1" required>
-                <input type="datetime-local" class="form-control mb-2" name="time2" required>
-                <input type="datetime-local" class="form-control mb-2" name="time3" required>
+                <input type="datetime-local" class="form-control mb-2" name="time1" required
+                    value="{{ session['confirm_data']['time1'] if session.get('confirm_data') else '' }}">
+                <input type="datetime-local" class="form-control mb-2" name="time2" required
+                    value="{{ session['confirm_data']['time2'] if session.get('confirm_data') else '' }}">
+                <input type="datetime-local" class="form-control mb-2" name="time3" required
+                    value="{{ session['confirm_data']['time3'] if session.get('confirm_data') else '' }}">
             </div>
+
             <div class="mb-3">
                 <label for="comment" class="form-label">留言給對方（選填）</label>
                 <textarea class="form-control" id="comment" name="comment" rows="3"
-                    placeholder="輸入您想對對方說的話..."></textarea>
+                    placeholder="輸入您想對對方說的話...">{{ session['confirm_data']['comment'] if session.get('confirm_data') else '' }}</textarea>
             </div>
 
             <div class="text-center">

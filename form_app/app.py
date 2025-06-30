@@ -52,6 +52,17 @@ def get_r1_info(matching_id):
         return row
 
 
+def get_r2_info(matching_id):
+    conn = get_db()
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute("""
+            SELECT selected_place, time1, time2, time3, comment
+            FROM matching WHERE id = %s
+        """, (matching_id,))
+        row = cur.fetchone()
+        return row
+
+
 def change_state(current_state,
                  correct_state,
                  new_state,
@@ -99,6 +110,40 @@ def store_r2_info(confirm_data, matching_id, conn=None, commit=True):
         update matching set
         selected_place = %(selected_place)s,
         selected_time = %(selected_time)s,
+        where id = %(matching_id)s
+        """
+    with conn.cursor() as curr:
+        curr.execute(update_stmt, params)
+
+    if commit:
+        conn.commit()
+
+
+def store_r3_info(confirm_data, matching_id, conn=None, commit=True):
+    params = confirm_data.copy()
+    params['matching_id'] = matching_id
+    update_stmt = """
+        update matching set
+        selected_time = %(selected_time)s,
+        where id = %(matching_id)s
+        """
+    with conn.cursor() as curr:
+        curr.execute(update_stmt, params)
+
+    if commit:
+        conn.commit()
+
+
+def store_r2_reject_info(confirm_data, matching_id, conn=None, commit=True):
+    params = confirm_data.copy()
+    params['matching_id'] = matching_id
+    update_stmt = """
+        update matching set
+        selected_place = %(selected_place)s,
+        time1 = %(time1)s,
+        time2 = %(time2)s,
+        time3 = %(time3)s,
+        comment = %(comment)s,
         where id = %(matching_id)s
         """
     with conn.cursor() as curr:
@@ -194,6 +239,7 @@ def rest_r1():
         return render_template('confirm_places.html',
                                places=places,
                                times=times,
+                               comment=comment,
                                go_back_url=url_for('rest_r1'),
                                confirm_url=url_for('rest_r1_confirm'))
     return render_template('submit_places.html')
@@ -241,12 +287,10 @@ def rest_r2():
             'selected_place': selected_place,
             'selected_time': selected_time,
         }
-        places = [selected_place]
-        times = [selected_time]
 
         return render_template('confirm_places.html',
-                               places=places,
-                               times=times,
+                               places=[selected_place],
+                               times=[selected_time],
                                go_back_url=url_for('rest_r2'),
                                confirm_url=url_for('rest_r2_confirm'))
     return render_template('show_places.html',
@@ -260,14 +304,12 @@ def rest_r2():
 
 
 @app.route('/rest_r2/reject', methods=['GET', 'POST'])
-# TODO: 這邊要給用戶看到什麼，再討論
 def rest_r2_reject():
     matching_info = session.get('matching_info')
     r1_info = get_r1_info(matching_info['id'])
     if request.method == 'POST':
         # Get form data
-        url1 = request.form['place1']
-        url2 = request.form['place2']
+        selected_place = request.form['selected_place']
         time1 = request.form['time1']
         time2 = request.form['time2']
         time3 = request.form['time3']
@@ -275,8 +317,7 @@ def rest_r2_reject():
 
         # Store for confirmation step
         session['confirm_data'] = {
-            'place1_url': url1,
-            'place2_url': url2,
+            'selected_place': selected_place,
             'time1': time1,
             'time2': time2,
             'time3': time3,
@@ -284,22 +325,41 @@ def rest_r2_reject():
         }
 
         return render_template('confirm_places.html',
-                               place1_url=url1,
-                               place2_url=url2,
-                               time1=time1,
-                               time2=time2,
-                               time3=time3,
+                               places=[selected_place],
+                               times=[time1, time2, time3],
                                comment=comment,
-                               go_back_url=url_for('rest_r1'),
-                               confirm_url=url_for('rest_r1_confirm'))
-    return render_template('show_places.html',
+                               go_back_url=url_for('rest_r2_reject'),
+                               confirm_url=url_for('rest_r2_reject_confirm')
+                               )
+    return render_template('reject_submit_places.html',
                            place1_url=r1_info['place1_url'],
                            place2_url=r1_info['place2_url'],
-                           time1=r1_info['time1'],
-                           time2=r1_info['time2'],
-                           time3=r1_info['time3'],
-                           comment=r1_info['comment']
                            )
+
+
+@app.route('/rest_r2/reject/confirm', methods=['POST'])
+def rest_r2_reject_confirm():
+    data = session.get('confirm_data')
+    if not data:
+        return redirect(url_for('rest_r2_reject'))
+
+    matching_info = session.get('matching_info')
+    try:
+        conn = get_db()
+        change_state(matching_info['current_state'],
+                     'rest_r2_waiting',
+                     'rest_r3_sending',
+                     matching_info['id'],
+                     conn=conn, commit=False)
+        store_r2_reject_info(data, matching_info['id'],
+                             conn=conn, commit=False)
+        conn.commit()
+    except ValueError as e:
+        conn.rollback()
+        return render_template('error.html', message=str(e))
+
+    return render_template('thank_you.html',
+                           message='已傳送餐廳時間選項給對方')
 
 
 @app.route('/rest_r2/confirm', methods=['POST'])
@@ -325,6 +385,87 @@ def rest_r2_confirm():
 
     return render_template('thank_you.html',
                            message='已傳送餐廳時間選項給對方')
+
+
+@app.route('/rest_r3', methods=['GET', 'POST'])
+def rest_r3():
+    '''
+    第三輪，女方要勾的時間，沒了就沒了
+    '''
+    matching_info = session.get('matching_info')
+    r2_info = get_r2_info(matching_info['id'])
+    if request.method == 'POST':
+        # Get form data
+        selected_time = request.form['selected_time']
+
+        # Store for confirmation step
+        session['confirm_data'] = {
+
+            'selected_time': selected_time
+
+        }
+
+        places = [r2_info['selected_place']]
+        times = [selected_time]
+
+        return render_template('confirm_places.html',
+                               places=places,
+                               times=times,
+                               go_back_url=url_for('rest_r3'),
+                               confirm_url=url_for('rest_r3_confirm'))
+    return render_template('show_rejected_places.html',
+                           place=r2_info['selected_place'],
+                           time1=r2_info['time1'],
+                           time2=r2_info['time2'],
+                           time3=r2_info['time3'],
+                           comment=r2_info['comment'])
+
+
+@app.route('/rest_r3/confirm', methods=['POST'])
+def rest_r3_confirm():
+    data = session.get('confirm_data')
+    if not data:
+        return redirect(url_for('rest_r3'))
+
+    matching_info = session.get('matching_info')
+    try:
+        conn = get_db()
+        change_state(matching_info['current_state'],
+                     'rest_r3_waiting',
+                     'mission_sending',
+                     matching_info['id'],
+                     conn=conn, commit=False)
+        store_r3_info(data, matching_info['id'],
+                      conn=conn, commit=False)
+        conn.commit()
+    except ValueError as e:
+        conn.rollback()
+        return render_template('error.html', message=str(e))
+
+    return render_template('thank_you.html',
+                           message='已傳送餐廳時間選項給對方')
+
+
+@app.route('/rest_r3/reject', methods=['GET', 'POST'])
+def rest_r3_reject():
+    data = session.get('confirm_data')
+    if not data:
+        return redirect(url_for('rest_r3'))
+
+    matching_info = session.get('matching_info')
+    try:
+        conn = get_db()
+        change_state(matching_info['current_state'],
+                     'rest_r3_waiting',
+                     'abort_sending',
+                     matching_info['id'],
+                     conn=conn)
+    except ValueError as e:
+        conn.rollback()
+        return render_template('error.html', message=str(e))
+
+    return render_template('thank_you.html',
+                           message='流局！')
 
 
 if __name__ == '__main__':
