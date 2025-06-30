@@ -10,7 +10,7 @@
 <body class="bg-light">
     <div class="container py-5">
         <h2 class="text-center mb-4">{{session['sub_name']}}和{{session['obj_name']}}約會的餐廳和時間</h2>
-        <form method="post" action="{{ url_for('submit_places') }}">
+        <form method="post" action="{{ url_for('rest_r1') }}">
             <div class="mb-3">
                 <label for="place1" class="form-label">地點一 Google Maps 連結</label>
                 <input type="url" class="form-control" id="place1" name="place1" required>

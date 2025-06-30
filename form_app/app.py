@@ -7,7 +7,7 @@ from flask import Flask, redirect, render_template, request, session, url_for, g
 from psycopg.rows import dict_row
 
 app = Flask(__name__)
-app.secret_key = 'secret'
+app.secret_key = os.getenv('secret_key')
 DB = os.getenv('DB')
 
 
@@ -41,12 +41,25 @@ def get_name(member_id):
         return result
 
 
+def get_r1_info(matching_id):
+    conn = get_db()
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute("""
+            SELECT place1_url, place2_url, time1, time2, time3, comment
+            FROM matching WHERE id = %s
+        """, (matching_id,))
+        row = cur.fetchone()
+        return row
+
+
 def change_state(current_state,
                  correct_state,
                  new_state,
                  matching_id,
-                 conn=get_db(),
+                 conn=None,
                  commit=True):
+    if not conn:
+        conn = get_db()
     # check state，如果有人不在正確的state，本次操作取消
     if current_state != correct_state:
         raise ValueError('狀態錯誤❌')
@@ -59,8 +72,7 @@ def change_state(current_state,
         conn.commit()
 
 
-def store_r1_info(confirm_data, matching_id, conn=get_db(), commit=True):
-
+def store_r1_info(confirm_data, matching_id, conn=None, commit=True):
     params = confirm_data.copy()
     params['matching_id'] = matching_id
     update_stmt = """
@@ -71,6 +83,22 @@ def store_r1_info(confirm_data, matching_id, conn=get_db(), commit=True):
         time2 = %(time2)s,
         time3 = %(time3)s,
         comment = %(comment)s
+        where id = %(matching_id)s
+        """
+    with conn.cursor() as curr:
+        curr.execute(update_stmt, params)
+
+    if commit:
+        conn.commit()
+
+
+def store_r2_info(confirm_data, matching_id, conn=None, commit=True):
+    params = confirm_data.copy()
+    params['matching_id'] = matching_id
+    update_stmt = """
+        update matching set
+        selected_place = %(selected_place)s,
+        selected_time = %(selected_time)s,
         where id = %(matching_id)s
         """
     with conn.cursor() as curr:
@@ -160,13 +188,14 @@ def rest_r1():
             'comment': comment
         }
 
+        places = [url1, url2]
+        times = [time1, time2, time3]
+
         return render_template('confirm_places.html',
-                               place1_url=url1,
-                               place2_url=url2,
-                               time1=time1,
-                               time2=time2,
-                               time3=time3,
-                               comment=comment)
+                               places=places,
+                               times=times,
+                               go_back_url=url_for('rest_r1'),
+                               confirm_url=url_for('rest_r1_confirm'))
     return render_template('submit_places.html')
 
 
@@ -174,7 +203,7 @@ def rest_r1():
 def rest_r1_confirm():
     data = session.get('confirm_data')
     if not data:
-        return redirect(url_for('submit_places'))
+        return redirect(url_for('rest_r1'))
 
     matching_info = session.get('matching_info')
     try:
@@ -185,6 +214,109 @@ def rest_r1_confirm():
                      matching_info['id'],
                      conn=conn, commit=False)
         store_r1_info(data, matching_info['id'],
+                      conn=conn, commit=False)
+        conn.commit()
+    except ValueError as e:
+        conn.rollback()
+        return render_template('error.html', message=str(e))
+
+    return render_template('thank_you.html',
+                           message='已傳送餐廳時間選項給對方')
+
+
+@app.route('/rest_r2', methods=['GET', 'POST'])
+def rest_r2():
+    '''
+    第二輪，男方看到女生的提供的選項，要有勾選
+    '''
+    matching_info = session.get('matching_info')
+    r1_info = get_r1_info(matching_info['id'])
+    if request.method == 'POST':
+        # Get form data
+        selected_place = request.form['selected_place']
+        selected_time = request.form['selected_time']
+
+        # Store for confirmation step
+        session['confirm_data'] = {
+            'selected_place': selected_place,
+            'selected_time': selected_time,
+        }
+        places = [selected_place]
+        times = [selected_time]
+
+        return render_template('confirm_places.html',
+                               places=places,
+                               times=times,
+                               go_back_url=url_for('rest_r2'),
+                               confirm_url=url_for('rest_r2_confirm'))
+    return render_template('show_places.html',
+                           place1_url=r1_info['place1_url'],
+                           place2_url=r1_info['place2_url'],
+                           time1=r1_info['time1'],
+                           time2=r1_info['time2'],
+                           time3=r1_info['time3'],
+                           comment=r1_info['comment']
+                           )
+
+
+@app.route('/rest_r2/reject', methods=['GET', 'POST'])
+# TODO: 這邊要給用戶看到什麼，再討論
+def rest_r2_reject():
+    matching_info = session.get('matching_info')
+    r1_info = get_r1_info(matching_info['id'])
+    if request.method == 'POST':
+        # Get form data
+        url1 = request.form['place1']
+        url2 = request.form['place2']
+        time1 = request.form['time1']
+        time2 = request.form['time2']
+        time3 = request.form['time3']
+        comment = request.form.get('comment', '')
+
+        # Store for confirmation step
+        session['confirm_data'] = {
+            'place1_url': url1,
+            'place2_url': url2,
+            'time1': time1,
+            'time2': time2,
+            'time3': time3,
+            'comment': comment
+        }
+
+        return render_template('confirm_places.html',
+                               place1_url=url1,
+                               place2_url=url2,
+                               time1=time1,
+                               time2=time2,
+                               time3=time3,
+                               comment=comment,
+                               go_back_url=url_for('rest_r1'),
+                               confirm_url=url_for('rest_r1_confirm'))
+    return render_template('show_places.html',
+                           place1_url=r1_info['place1_url'],
+                           place2_url=r1_info['place2_url'],
+                           time1=r1_info['time1'],
+                           time2=r1_info['time2'],
+                           time3=r1_info['time3'],
+                           comment=r1_info['comment']
+                           )
+
+
+@app.route('/rest_r2/confirm', methods=['POST'])
+def rest_r2_confirm():
+    data = session.get('confirm_data')
+    if not data:
+        return redirect(url_for('rest_r2'))
+
+    matching_info = session.get('matching_info')
+    try:
+        conn = get_db()
+        change_state(matching_info['current_state'],
+                     'rest_r2_waiting',
+                     'mission_sending',
+                     matching_info['id'],
+                     conn=conn, commit=False)
+        store_r2_info(data, matching_info['id'],
                       conn=conn, commit=False)
         conn.commit()
     except ValueError as e:

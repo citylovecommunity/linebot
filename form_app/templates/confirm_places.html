@@ -14,15 +14,16 @@
                 <h4 class="card-title mb-4">請確認以下資訊</h4>
 
                 <p>
-                    📍 <a href="{{ place1_url }}" target="_blank">{{ place1_url }}</a><br>
-                    📍 <a href="{{ place2_url }}" target="_blank">{{ place2_url }}</a>
+                    {% for place in places %}
+                    📍 <a href="{{ place }}" target="_blank">{{ place }}</a><br>
+                    {% endfor %}
                 </p>
 
                 <p class="mt-4">
                     🕒 選擇的時間：<br>
-                    {{ time1 }}<br>
-                    {{ time2 }}<br>
-                    {{ time3 }}
+                    {% for time in times%}
+                    {{ time }}<br>
+                    {% endfor %}
                 </p>
 
                 {% if comment %}
@@ -32,9 +33,9 @@
                 </p>
                 {% endif %}
 
-                <form method="post" action="{{ url_for('confirm_places') }}">
+                <form method="post" action="{{ confirm_url }}">
                     <button type="submit" class="btn btn-success me-2">確認送出</button>
-                    <a href="{{ url_for('submit_places') }}" class="btn btn-outline-secondary">返回修改</a>
+                    <a href="{{ go_back_url }}" class="btn btn-outline-secondary">返回修改</a>
                 </form>
             </div>
         </div>
