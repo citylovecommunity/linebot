@@ -70,7 +70,14 @@
                     {% endif %}
                     <div class="text-center">
                         <button type="submit" class="btn btn-primary me-2">確認選擇</button>
-                        <a href="{{ url_for('rest_r2_reject') }}" class="btn btn-outline-danger">時間都不行</a>
+                        {% if cannot_url %}
+                        <a href="{{ cannot_url }}" class="btn btn-outline-danger">時間或地點不行</a>
+                        {% endif %}
+
+                        {% if bye_bye_url %}
+                        <a href="{{ bye_bye_url }}" class="btn btn-outline-danger"
+                            onclick="return confirm('確定要拒絕嗎？這將結束此次配對流程。');">仍然不行</a>
+                        {% endif %}
                     </div>
                 </form>
             </div>

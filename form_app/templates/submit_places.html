@@ -10,7 +10,7 @@
 <body class="bg-light">
     <div class="container py-5">
         <h2 class="text-center mb-4">{{session['sub_name']}}和{{session['obj_name']}}約會的餐廳和時間</h2>
-        <form method="post" action="{{ url_for('rest_r1') }}">
+        <form method="post" action="{{ post_to }}">
             <div class="mb-3">
                 <label for="place1" class="form-label">地點一 Google Maps 連結</label>
                 <input type="url" class="form-control" id="place1" name="place1" required
@@ -39,7 +39,10 @@
             </div>
 
             <div class="text-center">
-                <button type="submit" class="btn btn-primary">預覽並確認</button>
+                <button type="submit" class="btn btn-success me-2">確認送出</button>
+                {% if go_back_url %}
+                <a href="{{ go_back_url }}" class="btn btn-outline-secondary">返回上頁</a>
+                {% endif %}
             </div>
         </form>
     </div>

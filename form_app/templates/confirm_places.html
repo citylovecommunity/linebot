@@ -33,9 +33,23 @@
                 </p>
                 {% endif %}
 
+
                 <form method="post" action="{{ confirm_url }}">
+                    {% if new_message %}
+                    <div class="mb-3">
+                        <label for="comment" class="form-label">留言給對方（選填）</label>
+                        <textarea class="form-control" id="comment" name="comment" rows="3"
+                            placeholder="輸入您想對對方說的話..."></textarea>
+                    </div>
+                    {% endif %}
                     <button type="submit" class="btn btn-success me-2">確認送出</button>
+                    {% if go_back_url %}
                     <a href="{{ go_back_url }}" class="btn btn-outline-secondary">返回修改</a>
+                    {% endif %}
+                    {% if cannot_url %}
+                    <a href="{{ cannot_url }}" class="btn btn-outline-danger"
+                        onclick="return confirm('確定要拒絕嗎？這將結束此次配對流程。');">仍舊不行</a>
+                    {% endif %}
                 </form>
             </div>
         </div>
