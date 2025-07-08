@@ -52,17 +52,6 @@ def get_r1_info(matching_id):
         return row
 
 
-def get_r2_info(matching_id):
-    conn = get_db()
-    with conn.cursor(row_factory=dict_row) as cur:
-        cur.execute("""
-            SELECT selected_place, time1, time2, time3, comment
-            FROM matching WHERE id = %s
-        """, (matching_id,))
-        row = cur.fetchone()
-        return row
-
-
 def change_state(current_state,
                  correct_state,
                  new_state,
@@ -93,6 +82,23 @@ def store_confirm_data(confirm_data, matching_id, conn=None, commit=True):
         time1 = %(time1)s,
         time2 = %(time2)s,
         time3 = %(time3)s,
+        comment = %(comment)s
+        where id = %(matching_id)s
+        """
+    with conn.cursor() as curr:
+        curr.execute(update_stmt, params)
+
+    if commit:
+        conn.commit()
+
+
+def store_booking_data(booking_data, matching_id, conn=None, commit=True):
+    params = booking_data.copy()
+    params['matching_id'] = matching_id
+    update_stmt = """
+        update matching set
+        book_phone = %(book_phone)s,
+        book_name = %(book_name)s,
         comment = %(comment)s
         where id = %(matching_id)s
         """
@@ -224,10 +230,55 @@ def confirm_rest(rest_round):
                            message='已傳送餐廳時間選項給對方')
 
 
+@app.route('/confirm_booking/<int:rest_round>', methods=['POST'])
+def confirm_booking(rest_round):
+    data = session.get('confirm_data')
+    matching_info = session.get('matching_info')
+
+    data['book_name'] = request.form['book_name']
+    data['book_phone'] = request.form['book_phone']
+    data['comment'] = request.form['comment']
+    try:
+        conn = get_db()
+        change_state(matching_info['current_state'],
+                     f'rest_r{rest_round}_waiting',
+                     'mission_sending',
+                     matching_info['id'],
+                     conn=conn, commit=False)
+        store_booking_data(data, matching_info['id'],
+                           conn=conn, commit=False)
+        conn.commit()
+    except ValueError as e:
+        conn.rollback()
+        return render_template('error.html', message=str(e))
+
+    return render_template('thank_you.html',
+                           message='已傳送餐廳時間選項給對方')
+
+
 @app.route('/rest_r1', methods=['GET'])
 def rest_r1():
 
     return render_template('submit_places.html', post_to=url_for('choose_rest', rest_round=1))
+
+
+@app.route('/booking/<int:rest_round>', methods=['POST'])
+def booking(rest_round):
+    # Get form data
+    selected_place = request.form['selected_place']
+    selected_time = request.form['selected_time']
+
+    # Store for confirmation step
+    session['confirm_data'] = {
+        'selected_place': selected_place,
+        'selected_time': selected_time,
+    }
+
+    return render_template('booking_info.html',
+                           place=selected_place,
+                           time=selected_time,
+                           go_back_url=url_for(f'rest_r{rest_round}'),
+                           confirm_url=url_for('confirm_booking', rest_round=rest_round))
 
 
 @app.route('/rest_r2', methods=['GET', 'POST'])
@@ -237,28 +288,14 @@ def rest_r2():
     '''
     matching_info = session.get('matching_info')
     r1_info = get_r1_info(matching_info['id'])
-    if request.method == 'POST':
-        # Get form data
-        selected_place = request.form['selected_place']
-        selected_time = request.form['selected_time']
 
-        # Store for confirmation step
-        session['confirm_data'] = {
-            'selected_place': selected_place,
-            'selected_time': selected_time,
-        }
-
-        return render_template('booking_info.html',
-                               place=selected_place,
-                               time=selected_time,
-                               go_back_url=url_for('rest_r2'),
-                               confirm_url=url_for('rest_r2_confirm'))
     return render_template('show_places.html',
                            place1_url=r1_info['place1_url'],
                            place2_url=r1_info['place2_url'],
                            time1=r1_info['time1'],
                            time2=r1_info['time2'],
                            time3=r1_info['time3'],
+                           booking_url=url_for('booking', rest_round=2),
                            cannot_url=url_for('rest_r2_reject'),
                            comment=r1_info['comment']
                            )
@@ -303,9 +340,6 @@ def rest_r4():
     r1_info = get_r1_info(matching_info['id'])
     session['confirm_data'] = r1_info
 
-    places = [r1_info['place1_url'], r1_info['place2_url']]
-    times = [r1_info['time1'], r1_info['time2'], r1_info['time3']]
-
     return render_template('show_places.html',
                            place1_url=r1_info['place1_url'],
                            place2_url=r1_info['place2_url'],
@@ -313,6 +347,7 @@ def rest_r4():
                            time2=r1_info['time2'],
                            time3=r1_info['time3'],
                            comment=r1_info['comment'],
+                           booking_url=url_for('booking', rest_round=4),
                            bye_bye_url=url_for('bye_bye', rest_round=4)
                            )
 
