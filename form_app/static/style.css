@@ -4,15 +4,14 @@ body {
     background-repeat: no-repeat;
     background-position: center center;
     min-height: 100vh;
-
-    /* Center content without stretching it */
     display: flex;
     align-items: center;
     justify-content: center;
-
     font-family: "Helvetica Neue", sans-serif;
-    font-size: 1.2rem;
-    /* base size */
+    font-size: 1.4rem;
+    /* bigger base font */
+    line-height: 1.8;
+    /* generous line spacing */
     margin: 0;
     position: relative;
 }
@@ -33,7 +32,6 @@ body {
     z-index: 1;
     width: 100%;
     max-width: 1000px;
-    /* Make container wider */
     padding: 2rem;
 }
 
@@ -45,7 +43,7 @@ body {
 }
 
 .card-body {
-    padding: 2rem;
+    padding: 2.5rem;
     text-align: center;
 }
 
@@ -54,19 +52,32 @@ h1,
 h2,
 h3 {
     font-weight: 600;
+    line-height: 1.4;
+    margin-bottom: 1.8rem;
+    /* more space after headings */
+    margin-top: 1.2rem;
+}
+
+
+p {
+    margin-bottom: 1.6rem;
+    /* more space after paragraphs */
+    margin-top: 0.5rem;
+    line-height: 1.8;
 }
 
 .card-title {
-    font-size: 2rem;
+    font-size: 2.5rem;
+    margin-bottom: 2rem;
 }
 
 .card-text,
-p,
 label,
 input,
 textarea,
 button {
-    font-size: 1.25rem;
+    font-size: 1.5rem;
+    line-height: 1.8;
 }
 
 /* Lock section */
@@ -80,14 +91,14 @@ button {
     width: 3rem;
 }
 
-/* Responsive text scaling */
+/* Responsive scaling */
 @media (min-width: 768px) {
     body {
-        font-size: 1.3rem;
+        font-size: 1.5rem;
     }
 
     .card-title {
-        font-size: 2.3rem;
+        font-size: 2.8rem;
     }
 
     .card-text,
@@ -96,6 +107,6 @@ button {
     input,
     textarea,
     button {
-        font-size: 1.35rem;
+        font-size: 1.6rem;
     }
 }
