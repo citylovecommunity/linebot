@@ -5,58 +5,48 @@
 
 {% block content %}
 
-<body class="bg-light">
-    <div class="container py-5">
-        <div class="card shadow-sm mx-auto" style="max-width: 600px;">
-            <div class="card-body text-center">
-                <h4 class="card-title mb-4">請確認以下資訊</h4>
-                <p>
-                    {{first_word}}
-                </p>
+<h4 class="card-title mb-4">請確認以下資訊</h4>
+<p>
+    {{first_word}}
+</p>
 
-                <p>
-                    {% for place in places %}
-                    📍 <a href="{{ place }}" target="_blank">{{ place }}</a><br>
-                    {% endfor %}
-                </p>
+<p>
+    {% for place in places %}
+    📍 <a href="{{ place }}" target="_blank">{{ place }}</a><br>
+    {% endfor %}
+</p>
 
-                <p class="mt-4">
-                    🕒 這些時間，是你為故事預留的心動瞬間：<br>
-                    {% for time in times%}
-                    {{ time }}<br>
-                    {% endfor %}
-                </p>
-                <p>
-                    願這一刻，成為未來回憶裡最溫柔的開場白。
-                </p>
-                {% if comment %}
-                <p class="mt-4">
-                    💬 留言內容：<br>
-                    <em>{{ comment }}</em>
-                </p>
-                {% endif %}
+<p class="mt-4">
+    🕒 這些時間，是你為故事預留的心動瞬間：<br>
+    {% for time in times%}
+    {{ time }}<br>
+    {% endfor %}
+</p>
+<p>
+    願這一刻，成為未來回憶裡最溫柔的開場白。
+</p>
+{% if comment %}
+<p class="mt-4">
+    💬 留言內容：<br>
+    <em>{{ comment }}</em>
+</p>
+{% endif %}
 
 
-                <form method="post" action="{{ confirm_url }}">
-                    {% if new_message %}
-                    <div class="mb-3">
-                        <label for="comment" class="form-label">留言給對方（選填）</label>
-                        <textarea class="form-control" id="comment" name="comment" rows="3"
-                            placeholder="輸入您想對對方說的話..."></textarea>
-                    </div>
-                    {% endif %}
-                    <button type="submit" class="btn btn-success me-2">確認送出</button>
-                    {% if go_back_url %}
-                    <a href="{{ go_back_url }}" class="btn btn-outline-secondary">返回修改</a>
-                    {% endif %}
-                    {% if cannot_url %}
-                    <a href="{{ cannot_url }}" class="btn btn-outline-danger"
-                        onclick="return confirm('確定要拒絕嗎？這將結束此次配對流程。');">仍舊不行</a>
-                    {% endif %}
-                </form>
-            </div>
-        </div>
+<form method="post" action="{{ confirm_url }}">
+    {% if new_message %}
+    <div class="mb-3">
+        <label for="comment" class="form-label">留言給對方（選填）</label>
+        <textarea class="form-control" id="comment" name="comment" rows="3" placeholder="輸入您想對對方說的話..."></textarea>
     </div>
-</body>
+    {% endif %}
+    <button type="submit" class="btn btn-success me-2">確認送出</button>
+    {% if go_back_url %}
+    <a href="{{ go_back_url }}" class="btn btn-outline-secondary">返回修改</a>
+    {% endif %}
+    {% if cannot_url %}
+    <a href="{{ cannot_url }}" class="btn btn-outline-danger" onclick="return confirm('確定要拒絕嗎？這將結束此次配對流程。');">仍舊不行</a>
+    {% endif %}
+</form>
 
 {% endblock %}

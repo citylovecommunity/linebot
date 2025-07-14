@@ -5,44 +5,35 @@
 {% endblock %}
 
 {% block content %}
+<h4 class="card-title mb-4">請協助餐廳訂位🫵</h4>
 
-<body class="bg-light">
-    <div class="container py-5">
-        <div class="card shadow-sm mx-auto" style="max-width: 600px;">
-            <div class="card-body text-center">
-                <h4 class="card-title mb-4">請協助餐廳訂位🫵</h4>
+<p>
+    📍 <a href="{{ place }}" target="_blank">{{ place }}</a><br>
+</p>
 
-                <p>
-                    📍 <a href="{{ place }}" target="_blank">{{ place }}</a><br>
-                </p>
-
-                <p class="mt-4">
-                    🕒 選擇的時間：<br>
-                    {{ time }}<br>
-                </p>
+<p class="mt-4">
+    🕒 選擇的時間：<br>
+    {{ time }}<br>
+</p>
 
 
-                <form method="post" action="{{ confirm_url }}">
-                    <div class="mb-3">
-                        <label for="book_name" class="form-label">訂餐廳的稱呼</label>
-                        <input type="text" class="form-control" id="book_name" name="book_name" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="book_phone" class="form-label">訂餐廳的電話</label>
-                        <input type="text" class="form-control" id="book_phone" name="book_phone" required>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="comment" class="form-label">約會前的留言</label>
-                        <input type="text" class="form-control" id="comment" name="comment" required>
-                    </div>
-
-                    <button type="submit" class="btn btn-success me-2">我訂好了！</button>
-                    <a href="{{ go_back_url }}" class="btn btn-outline-secondary">返回修改</a>
-                </form>
-            </div>
-        </div>
+<form method="post" action="{{ confirm_url }}">
+    <div class="mb-3">
+        <label for="book_name" class="form-label">訂餐廳的稱呼</label>
+        <input type="text" class="form-control" id="book_name" name="book_name" required>
     </div>
-</body>
+    <div class="mb-3">
+        <label for="book_phone" class="form-label">訂餐廳的電話</label>
+        <input type="text" class="form-control" id="book_phone" name="book_phone" required>
+    </div>
+
+    <div class="mb-3">
+        <label for="comment" class="form-label">約會前的留言</label>
+        <input type="text" class="form-control" id="comment" name="comment" required>
+    </div>
+
+    <button type="submit" class="btn btn-success me-2">我訂好了！</button>
+    <a href="{{ go_back_url }}" class="btn btn-outline-secondary">返回修改</a>
+</form>
 
 {% endblock %}
