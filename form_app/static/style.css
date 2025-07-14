@@ -39,3 +39,47 @@
      position: relative;
      z-index: 1;
  }
+
+ body {
+     font-size: 1rem;
+     /* base size */
+ }
+
+ h1,
+ h2,
+ h3 {
+     font-weight: 600;
+ }
+
+ .card-title {
+     font-size: 1.8rem;
+ }
+
+ .card-text,
+ p,
+ label,
+ input,
+ textarea,
+ button {
+     font-size: 1.15rem;
+ }
+
+ @media (min-width: 768px) {
+     body {
+         font-size: 1.125rem;
+         /* larger on tablets and up */
+     }
+
+     .card-title {
+         font-size: 2rem;
+     }
+
+     .card-text,
+     p,
+     label,
+     input,
+     textarea,
+     button {
+         font-size: 1.25rem;
+     }
+ }
