@@ -110,3 +110,14 @@ button {
         font-size: 1.6rem;
     }
 }
+
+
+.btn {
+    font-size: 1.5rem;
+    padding: 0.75rem 2rem;
+    border-radius: 0.6rem;
+}
+
+.btn+.btn {
+    margin-left: 1rem;
+}
