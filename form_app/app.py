@@ -9,6 +9,7 @@ from psycopg.rows import dict_row
 app = Flask(__name__)
 app.secret_key = os.getenv('secret_key')
 DB = os.getenv('DB')
+DEPLOYMENT = os.getenv('FLASK_DEP')
 
 
 def get_db():
@@ -70,20 +71,20 @@ def change_state(current_state,
                  new_state,
                  matching_id,
                  conn=None,
-                 commit=True,
-                 production=True):
-    if not conn:
-        conn = get_db()
-    # check state，如果有人不在正確的state，本次操作取消
-    if (current_state != correct_state) and (production):
-        raise ValueError('狀態錯誤❌')
+                 commit=True):
+    if DEPLOYMENT:
+        if not conn:
+            conn = get_db()
+        # check state，如果有人不在正確的state，本次操作取消
+        if current_state != correct_state:
+            raise ValueError('狀態錯誤❌')
 
-    with conn.cursor() as curr:
-        stmt = "update matching set current_state = %s where id=%s;"
-        curr.execute(
-            stmt, (new_state, matching_id))
-    if commit:
-        conn.commit()
+        with conn.cursor() as curr:
+            stmt = "update matching set current_state = %s where id=%s;"
+            curr.execute(
+                stmt, (new_state, matching_id))
+        if commit:
+            conn.commit()
 
 
 def store_confirm_data(confirm_data, matching_id, conn=None, commit=True):

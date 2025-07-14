@@ -5,15 +5,9 @@ Confirm
 {% endblock %}
 
 {% block content %}
-<div class="container py-5">
-    <div class="card shadow-sm mx-auto" style="max-width: 500px;">
-        <div class="card-body text-center">
-            <h2 class="card-title mb-4">{{ header }}</h2>
-            <p class="card-text">{{ message|safe }}</p>
-            <form method="post" action="{{ url_for(session['action']) }}">
-                <button type="submit" class="btn btn-primary">{{ btn_name }}</button>
-            </form>
-        </div>
-    </div>
-</div>
+<h2 class="card-title mb-4">{{ header }}</h2>
+<p class="card-text">{{ message|safe }}</p>
+<form method="post" action="{{ url_for(session['action']) }}">
+    <button type="submit" class="btn btn-primary">{{ btn_name }}</button>
+</form>
 {% endblock %}
