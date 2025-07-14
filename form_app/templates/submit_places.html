@@ -5,78 +5,80 @@
 提交地點
 {% endblock %}
 
-<head>
-    <style>
-        .section-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
 
-        .lock-btn {
-            width: 3rem;
-        }
-    </style>
-</head>
+
 
 {% block content %}
 
 <body class="bg-light">
     <div class="container py-5">
-        <h2 class="text-center mb-4">約會的餐廳和時間</h2>
-        <p>
-            每一段值得期待的邀約，從你的選擇開始。
-            請填寫兩間你心儀的餐廳、三個適合相遇的時段，讓我們為你妥帖遞出這份溫柔邀請。
-        </p>
-        <form method="post" action="{{ post_to }}">
+        <div class="card shadow-sm mx-auto" style="max-width: 600px;">
+            <div class="card-body text-center">
+                <h2 class="text-center mb-4">{{dating_title}}</h2>
 
-            <!-- 地點 Section -->
-            <div class="mb-3" id="place-section">
-                <div class="section-header">
-                    <label class="form-label">地點 Google Maps 連結</label>
-                    <button type="button" class="btn btn-outline-secondary lock-btn"
-                        onclick="toggleSectionLock('place-section', this)">🔒</button>
-                </div>
-                <input type="url" class="form-control mb-2" id="place1" name="place1" required readonly
-                    value="{{ session['confirm_data']['place1_url'] if session.get('confirm_data') else '' }}">
-                <input type="url" class="form-control" id="place2" name="place2" required readonly
-                    value="{{ session['confirm_data']['place2_url'] if session.get('confirm_data') else '' }}">
+                <p>
+                    {{first_word | safe}}
+                </p>
+                <form method="post" action="{{ post_to }}">
+
+                    <!-- 地點 Section -->
+                    <div class="mb-3" id="place-section">
+                        <div class="section-header">
+                            <label class="form-label">地點 Google Maps 連結</label>
+                            {% if lock %}
+                            <button type="button" class="btn btn-outline-secondary lock-btn"
+                                onclick="toggleSectionLock('place-section', this)">🔒</button>
+                            {% endif %}
+                        </div>
+
+                        {% for i in range(1, 3) %}
+                        <input type="url" class="form-control {% if i == 1 %}mb-2{% endif %}" id="place{{ i }}"
+                            name="place{{ i }}" required {% if lock %} readonly {% endif %}
+                            value="{{ session['confirm_data']['place' ~ i ~ '_url'] if session.get('confirm_data') else '' }}">
+                        {% endfor %}
+
+
+                    </div>
+
+                    <!-- 時間 Section -->
+                    <div class="mb-3" id="time-section">
+                        <div class="section-header">
+                            <label class="form-label">選擇三個時間</label>
+                            {% if lock %}
+                            <button type="button" class="btn btn-outline-secondary lock-btn"
+                                onclick="toggleSectionLock('time-section', this)">🔒</button>
+                            {% endif %}
+                        </div>
+                        {% for i in range(1, 4) %}
+                        <input type="datetime-local" class="form-control mb-2" id="time{{ i }}" name="time{{ i }}"
+                            required {% if lock %} readonly {% endif %}
+                            value="{{ session['confirm_data']['time' ~ i] if session.get('confirm_data') else '' }}">
+                        {% endfor %}
+                    </div>
+                    <p>
+                        {{second_word | safe}}
+                    </p>
+                    <!-- 留言 Section (no lock) -->
+                    <div class="mb-3">
+                        <label for="comment" class="form-label">留言給對方（選填）</label>
+                        <textarea class="form-control" id="comment" name="comment" rows="3"
+                            placeholder="輸入您想對對方說的話...">{{ session['confirm_data']['comment'] if session.get('confirm_data') else '' }}</textarea>
+                    </div>
+
+                    <!-- 提交按鈕 -->
+                    <div class="text-center">
+                        <button type="submit" class="btn btn-success me-2">確認送出</button>
+                        {% if go_back_url %}
+                        <a href="{{ go_back_url }}" class="btn btn-outline-secondary">返回上頁</a>
+                        {% endif %}
+                    </div>
+                </form>
             </div>
 
-            <!-- 時間 Section -->
-            <div class="mb-3" id="time-section">
-                <div class="section-header">
-                    <label class="form-label">選擇三個時間</label>
-                    <button type="button" class="btn btn-outline-secondary lock-btn"
-                        onclick="toggleSectionLock('time-section', this)">🔒</button>
-                </div>
-                <input type="datetime-local" class="form-control mb-2" id="time1" name="time1" required readonly
-                    value="{{ session['confirm_data']['time1'] if session.get('confirm_data') else '' }}">
-                <input type="datetime-local" class="form-control mb-2" id="time2" name="time2" required readonly
-                    value="{{ session['confirm_data']['time2'] if session.get('confirm_data') else '' }}">
-                <input type="datetime-local" class="form-control mb-2" id="time3" name="time3" required readonly
-                    value="{{ session['confirm_data']['time3'] if session.get('confirm_data') else '' }}">
-            </div>
-            <p>
-                關於餐桌上的對話與眼神，交給時間和緣分安排。
-            </p>
-            <!-- 留言 Section (no lock) -->
-            <div class="mb-3">
-                <label for="comment" class="form-label">留言給對方（選填）</label>
-                <textarea class="form-control" id="comment" name="comment" rows="3"
-                    placeholder="輸入您想對對方說的話...">{{ session['confirm_data']['comment'] if session.get('confirm_data') else '' }}</textarea>
-            </div>
-
-            <!-- 提交按鈕 -->
-            <div class="text-center">
-                <button type="submit" class="btn btn-success me-2">確認送出</button>
-                {% if go_back_url %}
-                <a href="{{ go_back_url }}" class="btn btn-outline-secondary">返回上頁</a>
-                {% endif %}
-            </div>
-        </form>
+        </div>
     </div>
 
+    {% if lock %}
     <script>
         function toggleSectionLock(sectionId, btn) {
             const section = document.getElementById(sectionId);
@@ -94,6 +96,7 @@
             btn.textContent = isLocked ? '🔓' : '🔒';
         }
     </script>
+    {% endif %}
 </body>
 
 {% endblock %}

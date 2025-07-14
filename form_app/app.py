@@ -70,11 +70,12 @@ def change_state(current_state,
                  new_state,
                  matching_id,
                  conn=None,
-                 commit=True):
+                 commit=True,
+                 production=True):
     if not conn:
         conn = get_db()
     # check state，如果有人不在正確的state，本次操作取消
-    if current_state != correct_state:
+    if (current_state != correct_state) and (production):
         raise ValueError('狀態錯誤❌')
 
     with conn.cursor() as curr:
@@ -233,13 +234,21 @@ def choose_rest(rest_round):
         places = [url1, url2]
         times = [time1, time2, time3]
 
+        if rest_round == 1:
+            first_word = """
+            💫 浪漫從來不是鋪張，而是剛剛好的用心。<br>
+            你所挑選的餐廳選項，已悄悄飛往對方心裡的信箱。
+            """
+        else:
+            first_word = ''
         return render_template('confirm_places.html',
                                places=places,
                                times=times,
                                comment=comment,
                                go_back_url=url_for(f'rest_r{rest_round}'),
                                confirm_url=url_for(
-                                   'confirm_rest', rest_round=rest_round))
+                                   'confirm_rest', rest_round=rest_round),
+                               first_word=first_word)
 
 
 @app.route('/confirm_rest/<int:rest_round>', methods=['POST'])
@@ -261,7 +270,11 @@ def confirm_rest(rest_round):
         return render_template('error.html', message=str(e))
 
     return render_template('thank_you.html',
-                           message='已傳送餐廳時間選項給對方')
+                           message="""
+                            優雅的餐桌時光，將由你們共同選定，<br>
+                            每個選項，都是為浪漫鋪路的起點。<br>
+                           """,
+                           header="💫 成功遞出相遇的邀請。")
 
 
 @app.route('/confirm_booking/<int:rest_round>', methods=['POST'])
@@ -296,8 +309,16 @@ def confirm_booking(rest_round):
 
 @app.route('/rest_r1', methods=['GET'])
 def rest_r1():
-
-    return render_template('submit_places.html', post_to=url_for('choose_rest', rest_round=1))
+    return render_template('submit_places.html',
+                           post_to=url_for('choose_rest', rest_round=1),
+                           dating_title='約會的餐廳和時間',
+                           first_word="""
+                           每一段值得期待的邀約，從你的選擇開始。<br>
+                            請填寫兩間你心儀的餐廳、三個適合相遇的時段，讓我們為你妥帖遞出這份溫柔邀請。
+                           """,
+                           second_word="""
+                           關於餐桌上的對話與眼神，交給時間和緣分安排。
+                           """)
 
 
 @app.route('/booking/<int:rest_round>', methods=['POST'])
@@ -347,7 +368,11 @@ def rest_r2_reject():
 
     return render_template('submit_places.html',
                            go_back_url=url_for('rest_r2'),
-                           post_to=url_for('choose_rest', rest_round=2))
+                           post_to=url_for('choose_rest', rest_round=2),
+                           lock=True,
+                           dating_title='重新選地方',
+                           first_word='點按🔒來重新選擇'
+                           )
 
 
 @app.route('/rest_r3', methods=['GET', 'POST'])
