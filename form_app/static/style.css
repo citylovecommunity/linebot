@@ -87,6 +87,20 @@ button {
 
 .lock-btn {
     width: 3rem;
+    height: 3rem;
+    /* make button square */
+    display: flex;
+    /* use flexbox */
+    align-items: center;
+    /* vertical center */
+    justify-content: center;
+    /* horizontal center */
+    font-size: 1.5rem;
+    /* size of emoji */
+    padding: 0;
+    /* remove extra padding */
+    line-height: 1;
+    /* tighten line height */
 }
 
 /* Responsive scaling - smaller fonts on tablets/desktops */
