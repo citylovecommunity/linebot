@@ -55,7 +55,7 @@ h3 {
     line-height: 1.4;
     margin-bottom: 1.8rem;
     /* more space after headings */
-    margin-top: 1.2rem;
+    margin-top: 2rem;
 }
 
 
@@ -94,11 +94,9 @@ button {
 /* Responsive scaling */
 @media (min-width: 768px) {
     body {
-        font-size: 3rem;
+        font-size: 2.3rem;
         line-height: 2rem;
     }
-
-
 
     .card-title {
         font-size: 4rem;
@@ -116,9 +114,9 @@ button {
 
 
 .btn {
-    font-size: 2rem;
+    font-size: 3rem;
     padding: 0.75rem 2rem;
-    border-radius: 0.6rem;
+    border-radius: 1rem;
 }
 
 .btn+.btn {
