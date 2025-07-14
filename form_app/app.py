@@ -1,9 +1,9 @@
 
 import os
 
-
 import psycopg
-from flask import Flask, redirect, render_template, request, session, url_for, g
+from flask import (Flask, g, redirect, render_template, request, session,
+                   url_for)
 from psycopg.rows import dict_row
 
 app = Flask(__name__)
@@ -31,6 +31,19 @@ def get_token_matching(token):
         stmt = "select id, subject_id, object_id, current_state from matching where access_token = %s;"
         result = curr.execute(stmt, (token,)).fetchone()
         return result
+
+
+def get_proper_name(matching_info):
+    conn = get_db()
+    with conn.cursor() as curr:
+        stmt = "select name, gender from member where id = %s"
+        result = curr.execute(stmt, (matching_info['object_id'],)).fetchone()
+
+    if result[1] == 'F':
+        surname = '先生'
+    else:
+        surname = '小姐'
+    return result[0][0] + surname
 
 
 def get_name(member_id):
@@ -141,10 +154,20 @@ def invitation():
         except ValueError as e:
             return render_template('error.html', message=str(e))
         return render_template('thank_you.html',
-                               message="您的like已經傳送給對方👍")
+                               message="""
+                               也許此刻，對方正閱讀你的一點喜歡，一份靠近的心意。<br>
+                                真正的連結，從這個「我願意靠近你」的訊號開始。<br>
+                                緣分已被悄悄放進宇宙，我們一起靜待回音📲
+                               """,
+                               header='你的 Like，已溫柔地傳遞給對方。')
     return render_template('confirm.html',
-                           message=f'您是否同意傳送like給{session['obj_name']}',
-                           header='邀請確認')
+                           message="""
+                        有些靠近，不需太多言語，只需把握住當下的機會。<br>
+                        這是你釋出欣賞、種下故事可能性的瞬間。<br>
+                        如果你準備好了，就讓這份感覺往對方的方向流動吧!♾️
+                           """,
+                           header=f'將 Like 傳給{get_proper_name(matching_info)}嗎？',
+                           btn_name='我想傳送 Like')
 
 
 @app.route('/liked', methods=['GET', 'POST'])
@@ -158,10 +181,21 @@ def liked():
         except ValueError as e:
             return render_template('error.html', message=str(e))
         return render_template('thank_you.html',
-                               message="已成功配對💓")
+                               header="屬於你們的連結，已悄然展開",
+                               message="""
+                               一段新的故事正在悄悄展開，恭喜你們順利牽上了線。<br>
+                                這不只是一次系統的成功，更是一場由緣分與真誠共同成就的靠近。<br>
+                                請靜待我們為你們安排後續的認識步驟。<br>
+                                城遇始終相信，剛剛好的兩人，會在剛剛好的時刻相遇💞
+                               """)
     return render_template('confirm.html',
-                           message=f'您是否想認識{session['sub_name']}',
-                           header='被like確認')
+                           message="""
+                           在茫茫人海中，有雙眼睛正溫柔停留在你身上。<br>
+                        來自未見過本人的Like，藏著對方想靠近你的心意。<br>
+                        你願意輕輕回應，讓這段可能的故事有機會展開嗎？<br>
+                           """,
+                           header='你悄悄地被喜歡了',
+                           btn_name='確認相遇')
 
 
 @app.route('/choose_rest/<int:rest_round>', methods=['POST'])
@@ -253,7 +287,11 @@ def confirm_booking(rest_round):
         return render_template('error.html', message=str(e))
 
     return render_template('thank_you.html',
-                           message='已傳送餐廳時間選項給對方')
+                           message="""
+                           💫 成功遞出相遇的邀請。
+                            優雅的餐桌時光，將由你們共同選定，
+                            每個選項，都是為浪漫鋪路的起點。
+                           """)
 
 
 @app.route('/rest_r1', methods=['GET'])

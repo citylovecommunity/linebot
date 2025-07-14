@@ -12,7 +12,11 @@
         <div class="card shadow-sm mx-auto" style="max-width: 600px;">
             <div class="card-body text-center">
                 <h4 class="card-title mb-4">請確認以下資訊</h4>
+                <p>
+                    💫 浪漫從來不是鋪張，而是剛剛好的用心。
 
+                    你所挑選的餐廳選項，已悄悄飛往對方心裡的信箱。
+                </p>
                 <p>
                     {% for place in places %}
                     📍 <a href="{{ place }}" target="_blank">{{ place }}</a><br>
@@ -20,12 +24,14 @@
                 </p>
 
                 <p class="mt-4">
-                    🕒 選擇的時間：<br>
+                    🕒 這些時間，是你為故事預留的心動瞬間：<br>
                     {% for time in times%}
                     {{ time }}<br>
                     {% endfor %}
                 </p>
-
+                <p>
+                    願這一刻，成為未來回憶裡最溫柔的開場白。
+                </p>
                 {% if comment %}
                 <p class="mt-4">
                     💬 留言內容：<br>
