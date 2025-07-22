@@ -6,68 +6,65 @@
 {% endblock %}
 
 
-
-
 {% block content %}
-<h2 class="card-title mb-4">{{dating_title}}</h2>
 
-<p>
-    {{first_word | safe}}
-</p>
-<form method="post" action="{{ post_to }}">
 
-    <!-- 地點 Section -->
-    <div class="mb-3" id="place-section">
-        <div class="section-header">
-            <label class="form-label">地點 Google Maps 連結</label>
-            {% if lock %}
-            <button type="button" class="btn btn-outline-secondary lock-btn"
-                onclick="toggleSectionLock('place-section', this)">🔒</button>
-            {% endif %}
+<div class="px-4 py-5 my-5 text-center"> <img class="d-block mx-auto mb-4"
+        src="{{ url_for('static', filename='images/crocodile-svgrepo-com.svg') }}" alt="" width="144" height="114">
+    <h1 class="display-5 fw-bold text-body-emphasis">{{ dating_title }}</h1>
+    <div class="col-lg-6 mx-auto">
+        <p class="lead mb-4">{{ first_word|safe }}</p>
+    </div>
+
+    <form class="needs-validation" method="post" action="{{ post_to }}">
+        <div class="row g-3">
+            <div class="col-12"> <label for="address" class="form-label">第一間餐廳</label> <input type="url"
+                    class="form-control" id="place1" name="place1" required {% if lock %} disabled {% endif %}
+                    value="{{ session['confirm_data']['place1_url'] if session.get('confirm_data') else '' }}"
+                    placeholder="請貼上Google Map網址">
+                <div class="invalid-feedback">
+                    請輸入有效的 Google Map 網址。
+                </div>
+            </div>
+
+            <div class="col-12"> <label for="address" class="form-label">第二間餐廳</label> <input type="url"
+                    class="form-control" id="place2" name="place2" {% if lock %} disabled {% endif %}
+                    value="{{ session['confirm_data']['place2_url'] if session.get('confirm_data') else '' }}">
+                <div class="invalid-feedback">
+                    Please enter your shipping address.
+                </div>
+            </div>
+
+            <div class="col-md-4"> <label for="time1" class="form-label">time1</label> <input type="datetime-local"
+                    class="form-control mb-2" id="time1" name="time1" required {% if lock %} disabled {% endif %}
+                    value="{{ session['confirm_data']['time1'] if session.get('confirm_data') else '' }}">
+            </div>
+            <div class="col-md-4"> <label for="time2" class="form-label">time2 <span
+                        class="text-body-secondary">(選填)</span></label> <input type="datetime-local"
+                    class="form-control mb-2" id="time2" name="time2" {% if lock %} disabled {% endif %}
+                    value="{{ session['confirm_data']['time2'] if session.get('confirm_data') else '' }}">
+            </div>
+            <div class="col-md-4"> <label for="time3" class="form-label">time3 <span
+                        class="text-body-secondary">(選填)</span></label> <input type="datetime-local"
+                    class="form-control mb-2" id="time3" name="time3" {% if lock %} disabled {% endif %}
+                    value="{{ session['confirm_data']['time3'] if session.get('confirm_data') else '' }}">
+            </div>
+
+            <div class="col-md-12">
+                <label for="comment" class="form-label">留言給對方 <span class="text-body-secondary">(選填)</span></label>
+                <textarea class="form-control" id="comment" name="comment" rows="3"
+                    placeholder="輸入您想對對方說的話...">{{ session['confirm_data']['comment'] if session.get('confirm_data') else '' }}</textarea>
+            </div>
         </div>
 
-        {% for i in range(1, 3) %}
-        <input type="url" class="form-control {% if i == 1 %}mb-2{% endif %}" id="place{{ i }}" name="place{{ i }}"
-            required {% if lock %} disabled {% endif %}
-            value="{{ session['confirm_data']['place' ~ i ~ '_url'] if session.get('confirm_data') else '' }}">
-        {% endfor %}
-
-
-    </div>
-
-    <!-- 時間 Section -->
-    <div class="mb-3" id="time-section">
-        <div class="section-header">
-            <label class="form-label">選擇三個時間</label>
-            {% if lock %}
-            <button type="button" class="btn btn-outline-secondary lock-btn"
-                onclick="toggleSectionLock('time-section', this)">🔒</button>
-            {% endif %}
-        </div>
-        {% for i in range(1, 4) %}
-        <input type="datetime-local" class="form-control mb-2" id="time{{ i }}" name="time{{ i }}" required {% if lock
-            %} disabled {% endif %}
-            value="{{ session['confirm_data']['time' ~ i] if session.get('confirm_data') else '' }}">
-        {% endfor %}
-    </div>
-    <p>
-        {{second_word | safe}}
-    </p>
-    <!-- 留言 Section (no lock) -->
-    <div class="mb-3">
-        <label for="comment" class="form-label">留言給對方（選填）</label>
-        <textarea class="form-control" id="comment" name="comment" rows="3"
-            placeholder="輸入您想對對方說的話...">{{ session['confirm_data']['comment'] if session.get('confirm_data') else '' }}</textarea>
-    </div>
-
-    <!-- 提交按鈕 -->
-    <div class="text-center">
-        <button type="submit" class="btn btn-success me-2">確認送出</button>
+        <button class="w-50 btn btn-primary btn-lg mt-4" type="submit">確認送出</button>
         {% if go_back_url %}
         <a href="{{ go_back_url }}" class="btn btn-outline-secondary">返回上頁</a>
         {% endif %}
-    </div>
-</form>
+    </form>
+
+
+</div>
 
 {% if lock %}
 <script>
