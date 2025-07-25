@@ -90,6 +90,11 @@ def change_state(current_state,
 def store_confirm_data(confirm_data, matching_id, conn=None, commit=True):
     params = confirm_data.copy()
     params['matching_id'] = matching_id
+
+    for key in ['time1', 'time2', 'time3']:
+        if params.get(key) == '':
+            params[key] = None
+
     update_stmt = """
         update matching set
         place1_url = %(place1_url)s,
@@ -169,7 +174,8 @@ def invitation():
                         如果你準備好了，就讓這份感覺往對方的方向流動吧!♾️
                            """,
                            header=f'將 Like 傳給{get_proper_name(matching_info)}嗎？',
-                           btn_name='我想傳送 Like')
+                           btn_name='我想傳送 Like',
+                           action_url=url_for('invitation'))
 
 
 @app.route('/liked', methods=['GET', 'POST'])
@@ -197,7 +203,8 @@ def liked():
                         你願意輕輕回應，讓這段可能的故事有機會展開嗎？<br>
                            """,
                            header='你悄悄地被喜歡了',
-                           btn_name='確認相遇')
+                           btn_name='確認相遇',
+                           action_url=url_for('liked'))
 
 
 @app.route('/choose_rest/<int:rest_round>', methods=['POST'])

@@ -7,50 +7,41 @@
 {% block content %}
 <h2 class="card-title mb-4 text-center">請選擇對方挑的地點與時間</h2>
 
-<form method="post" action="{{ booking_url }}">
+<form method="post" action="{{ booking_url }}" class="mb-5">
     <div class="mb-4">
         <h5>地點：</h5>
-        <div class="form-check">
-            <input class="form-check-input" type="radio" name="selected_place" id="place1" value="{{ place1_url }}"
-                required>
-            <label class="form-check-label" for="place2s">
-                <a href="{{ place1_url }}" target="_blank">{{ place1_url }}</a>
+        <div class="list-group">
+            <label class="list-group-item d-flex align-items-center">
+                <input class="form-check-input me-2" type="radio" name="selected_place" value="{{ place1_url }}"
+                    required>
+                <a href="{{ place1_url }}" target="_blank" class="text-decoration-none flex-grow-1">{{ place1_url }}</a>
             </label>
-
-        </div>
-        <div class="form-check">
-            <input class="form-check-input" type="radio" name="selected_place" id="place1" value="{{ place2_url }}"
-                required>
-            <label class="form-check-label" for="place2">
-                <a href="{{ place2_url }}" target="_blank">{{ place2_url }}</a>
+            <label class="list-group-item d-flex align-items-center">
+                <input class="form-check-input me-2" type="radio" name="selected_place" value="{{ place2_url }}"
+                    required>
+                <a href="{{ place2_url }}" target="_blank" class="text-decoration-none flex-grow-1">{{ place2_url }}</a>
             </label>
-
         </div>
     </div>
 
     <div class="mb-4">
         <h5>時間：</h5>
-        <div class="form-check">
-            <input class="form-check-input" type="radio" name="selected_time" id="time1" value="{{ time1 }}" required>
-            <label class="form-check-label" for="time1">
-                {{ time1 }}
+        <div class="list-group">
+            <label class="list-group-item d-flex align-items-center">
+                <input class="form-check-input me-2" type="radio" name="selected_time" value="{{ time1 }}" required>
+                <span class="flex-grow-1">{{ time1 }}</span>
             </label>
-        </div>
-        <div class="form-check">
-            <input class="form-check-input" type="radio" name="selected_time" id="time2" value="{{ time2 }}">
-            <label class="form-check-label" for="time2">
-                {{ time2 }}
+            <label class="list-group-item d-flex align-items-center">
+                <input class="form-check-input me-2" type="radio" name="selected_time" value="{{ time2 }}">
+                <span class="flex-grow-1">{{ time2 }}</span>
             </label>
-        </div>
-        <div class="form-check">
-            <input class="form-check-input" type="radio" name="selected_time" id="time3" value="{{ time3 }}">
-            <label class="form-check-label" for="time3">
-                {{ time3 }}
+            <label class="list-group-item d-flex align-items-center">
+                <input class="form-check-input me-2" type="radio" name="selected_time" value="{{ time3 }}">
+                <span class="flex-grow-1">{{ time3 }}</span>
             </label>
         </div>
     </div>
 
-    <!-- 🔽 Comment Section -->
     {% if comment %}
     <div class="mb-4">
         <h5>對方的留言：</h5>
@@ -59,17 +50,16 @@
         </div>
     </div>
     {% endif %}
-    <div class="text-center">
-        <button type="submit" class="btn btn-primary me-2">確認選擇</button>
-        {% if cannot_url %}
-        <a href="{{ cannot_url }}" class="btn btn-outline-danger">時間或地點不行</a>
-        {% endif %}
 
+    <div class="text-center">
+        <button type="submit" class="btn btn-primary btn-lg px-4 me-2">確認選擇</button>
+        {% if cannot_url %}
+        <a href="{{ cannot_url }}" class="btn btn-outline-danger btn-lg px-4">時間或地點不行</a>
+        {% endif %}
         {% if bye_bye_url %}
-        <a href="{{ bye_bye_url }}" class="btn btn-outline-danger"
+        <a href="{{ bye_bye_url }}" class="btn btn-outline-danger btn-lg px-4"
             onclick="return confirm('確定要拒絕嗎？這將結束此次配對流程。');">仍然不行</a>
         {% endif %}
     </div>
 </form>
-
 {% endblock %}
