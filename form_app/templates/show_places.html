@@ -14,13 +14,15 @@
             <label class="list-group-item d-flex align-items-center">
                 <input class="form-check-input me-2" type="radio" name="selected_place" value="{{ place1_url }}"
                     required>
-                <a href="{{ place1_url }}" target="_blank" class="text-decoration-none flex-grow-1">{{ place1_url }}</a>
+                <a href="{{ place1_url }}" target="_blank" class="text-decoration-none flex-grow-1">第一家餐廳</a>
             </label>
+            {% if place2_url %}
             <label class="list-group-item d-flex align-items-center">
                 <input class="form-check-input me-2" type="radio" name="selected_place" value="{{ place2_url }}"
                     required>
-                <a href="{{ place2_url }}" target="_blank" class="text-decoration-none flex-grow-1">{{ place2_url }}</a>
+                <a href="{{ place2_url }}" target="_blank" class="text-decoration-none flex-grow-1">第二家餐廳</a>
             </label>
+            {% endif %}
         </div>
     </div>
 

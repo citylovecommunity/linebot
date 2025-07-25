@@ -378,8 +378,7 @@ def rest_r2_reject():
                            go_back_url=url_for('rest_r2'),
                            post_to=url_for('choose_rest', rest_round=2),
                            lock=True,
-                           dating_title='重新選地方',
-                           first_word='點按🔒來重新選擇'
+                           dating_title='重新選地方'
                            )
 
 
