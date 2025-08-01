@@ -1,60 +1,114 @@
 {
     "type": "bubble",
-    "spacing": "md",
+    "hero": {
+        "type": "image",
+        "url": "",
+        "size": "full",
+        "aspectRatio": "20:13",
+        "aspectMode": "cover"
+    },
     "body": {
         "type": "box",
         "layout": "vertical",
         "contents": [
             {
                 "type": "text",
-                "text": "配對推薦通知",
+                "text": "約會邀請卡",
                 "weight": "bold",
-                "size": "xl"
+                "size": "xl",
+                "align": "start",
+                "margin": "none"
             },
             {
-                "type": "text",
-                "text": "您好，本週為您推薦認識一位會員"
+                "type": "box",
+                "layout": "vertical",
+                "contents": [],
+                "margin": "lg"
             },
             {
-                "type": "button",
-                "action": {
-                    "type": "uri",
-                    "label": "介紹頁連結❤️",
-                    "uri": "https://example.com"
-                },
-                "style": "link",
-                "color": "#dd0d3e"
+                "type": "box",
+                "layout": "baseline",
+                "contents": [
+                    {
+                        "type": "icon",
+                        "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png",
+                        "size": "xl",
+                        "margin": "none"
+                    }
+                ]
             },
             {
-                "type": "separator",
-                "color": "#000000"
+                "type": "box",
+                "layout": "vertical",
+                "margin": "lg",
+                "spacing": "sm",
+                "contents": [
+                    {
+                        "type": "box",
+                        "layout": "baseline",
+                        "spacing": "sm",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "對象",
+                                "color": "#aaaaaa",
+                                "size": "sm",
+                                "flex": 2
+                            },
+                            {
+                                "type": "text",
+                                "text": "王先生",
+                                "wrap": true,
+                                "color": "#666666",
+                                "size": "sm",
+                                "flex": 5
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [],
+                "margin": "lg"
+            },
+            {
+                "type": "separator"
             }
         ]
     },
     "footer": {
         "type": "box",
-        "spacing": "md",
         "layout": "vertical",
+        "spacing": "sm",
         "contents": [
             {
                 "type": "button",
                 "action": {
-                    "type": "message",
-                    "label": "有興趣🫵🫵🫵🫵",
-                    "text": "好ㄛ"
-                },
-                "style": "primary",
-                "color": "#da8d5d"
+                    "type": "uri",
+                    "label": "介紹卡連結",
+                    "uri": "http://linecorp.com/"
+                }
             },
             {
                 "type": "button",
+                "style": "primary",
+                "height": "sm",
                 "action": {
-                    "type": "message",
-                    "label": "醜死了沒興趣🗿🗿🗿🗿",
-                    "text": "好ㄛ"
+                    "type": "uri",
+                    "label": "開啟邀請卡",
+                    "uri": "https://line.me/"
                 },
-                "style": "secondary"
+                "color": "#f05c08"
+            },
+            {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [],
+                "margin": "sm"
             }
-        ]
+        ],
+        "flex": 0
     }
 }
