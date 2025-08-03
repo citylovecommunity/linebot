@@ -40,7 +40,7 @@ def get_proper_name(matching_info):
         stmt = "select name, gender from member where id = %s"
         result = curr.execute(stmt, (matching_info['object_id'],)).fetchone()
 
-    if result[1] == 'F':
+    if result[1][0] == 'F':
         surname = '先生'
     else:
         surname = '小姐'

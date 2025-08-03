@@ -32,7 +32,7 @@ def main():
         # 取得符合資格的傳送名單
         list_of_users = get_list(conn, state)
         for row in list_of_users:
-            bubble = BUBBLE_MODIFIER[state](row, base_bubble)
+            bubble = BUBBLE_MODIFIER[state](conn, row, base_bubble)
             send_bubble_to_sub(row.subject_id, bubble, '本週會員推薦🥰')
             write_sent_to_db(conn, row.id, state)
 
