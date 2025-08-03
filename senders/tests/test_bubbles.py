@@ -6,6 +6,7 @@ from config import DB
 import os
 import json
 import psycopg
+import random
 
 load_dotenv()
 
@@ -16,7 +17,8 @@ def test_invitation_bubble():
     bubble = load_bubble('invitation.json')
     with psycopg.connect(DB) as conn:
         list_of_users = get_list(conn, 'invitation')
-        bubble = BUBBLE_MODIFIER['invitation'](conn, bubble, list_of_users[0])
+        bubble = BUBBLE_MODIFIER['invitation'](
+            conn, bubble, random.choice(list_of_users))
         # print(json.dumps(bubble, indent=2, ensure_ascii=False))
         send_bubble(TEST_USER_ID, bubble, 'Test Invitation Bubble')
 

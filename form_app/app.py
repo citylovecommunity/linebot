@@ -1,12 +1,15 @@
 
 import os
 
+from dotenv import load_dotenv
 import psycopg
 from flask import (Flask, g, redirect, render_template, request, session,
                    url_for)
 from psycopg.rows import dict_row
 
 app = Flask(__name__)
+
+load_dotenv()
 app.secret_key = os.getenv('secret_key')
 DB = os.getenv('DB')
 DEPLOYMENT = os.getenv('FLASK_DEP')
@@ -40,7 +43,7 @@ def get_proper_name(matching_info):
         stmt = "select name, gender from member where id = %s"
         result = curr.execute(stmt, (matching_info['object_id'],)).fetchone()
 
-    if result[1][0] == 'F':
+    if result[1][0] == 'M':
         surname = '先生'
     else:
         surname = '小姐'
@@ -162,18 +165,12 @@ def invitation():
             return render_template('error.html', message=str(e))
         return render_template('thank_you.html',
                                message="""
-                               也許此刻，對方正閱讀你的一點喜歡，一份靠近的心意。<br>
-                                真正的連結，從這個「我願意靠近你」的訊號開始。<br>
-                                緣分已被悄悄放進宇宙，我們一起靜待回音📲
                                """,
                                header='你的 Like，已溫柔地傳遞給對方。')
     return render_template('confirm.html',
                            message="""
-                        有些靠近，不需太多言語，只需把握住當下的機會。<br>
-                        這是你釋出欣賞、種下故事可能性的瞬間。<br>
-                        如果你準備好了，就讓這份感覺往對方的方向流動吧!♾️
                            """,
-                           header=f'將 Like 傳給{get_proper_name(matching_info)}嗎？',
+                           header=f'將 Like 傳送給{get_proper_name(matching_info)}嗎？',
                            btn_name='我想傳送 Like',
                            action_url=url_for('invitation'))
 
