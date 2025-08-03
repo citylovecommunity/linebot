@@ -22,5 +22,17 @@ def test_invitation_bubble():
 
 
 def test_send_bubble_to_sub():
-    send_bubble_to_sub(None, 'test_member_id', load_bubble(
-        'invitation.json'), 'Test Bubble to Sub')
+    bubble = load_bubble('invitation.json')
+
+    with psycopg.connect(DB) as conn:
+        stmt = """
+        select id
+        from member
+        where phone_number not in (
+            select phone_number
+            from line_info
+        )
+        """
+        with conn.cursor() as cur:
+            result = cur.execute(stmt).fetchone()
+        send_bubble_to_sub(conn, result[0], bubble, '會員沒有綁定')

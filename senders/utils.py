@@ -1,8 +1,8 @@
 import json
 
-from linebot.models import FlexSendMessage
+from linebot.models import FlexSendMessage, TextMessage
 from psycopg.rows import namedtuple_row
-from config import FORM_WEB_URL, line_bot_api
+from config import FORM_WEB_URL, line_bot_api, ADMIN_LINE_ID
 
 
 def get_invitation_link(row):
@@ -32,13 +32,25 @@ def get_icons():
 def send_bubble_to_sub(conn, member_id, bubble, alt_text):
     user_id = get_user_id(conn, member_id)
     if user_id:
-        send_bubble(user_id, bubble, alt_text)
+        # send_bubble(user_id[0], bubble, alt_text)
+        send_bubble(ADMIN_LINE_ID, bubble, alt_text)
     else:
-        # send to administrator if no user_id found
-        res_id = get_responsible_id(conn, member_id)
-        base_bubble = load_bubble('no_user_id_warning')
-        bubble = no_user_id_warning_modify(base_bubble, member_id)
-        send_bubble(res_id, bubble, alt_text)
+        name = get_user_name(conn, member_id)
+        line_bot_api.push_message(ADMIN_LINE_ID, TextMessage(
+            text=f'會員 {name} 沒有綁定 LINE 帳號⚠️⚠️⚠️',
+            alt_text=alt_text,
+        ))
+
+
+def get_user_name(conn, member_id):
+    stmt = """
+    select name from
+    member
+    where id = %s;
+    """
+    with conn.cursor() as cur:
+        result = cur.execute(stmt, (member_id,)).fetchone()
+        return result[0] if result else '未知會員'
 
 
 def get_user_id(conn, member_id):
