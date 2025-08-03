@@ -245,6 +245,7 @@ dependencies = [
     { name = "flask" },
     { name = "gunicorn" },
     { name = "psycopg", extra = ["binary"] },
+    { name = "python-dotenv" },
 ]
 
 [package.metadata]
@@ -252,6 +253,7 @@ requires-dist = [
     { name = "flask", specifier = ">=3.1.1" },
     { name = "gunicorn", specifier = ">=23.0.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.9" },
+    { name = "python-dotenv", specifier = ">=1.1.0" },
 ]
 
 [[package]]
