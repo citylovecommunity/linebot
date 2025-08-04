@@ -37,11 +37,11 @@ def get_token_matching(token):
         return result
 
 
-def get_proper_name(matching_info):
+def get_proper_name(member_id):
     conn = get_db()
     with conn.cursor() as curr:
         stmt = "select name, gender from member where id = %s"
-        result = curr.execute(stmt, (matching_info['object_id'],)).fetchone()
+        result = curr.execute(stmt, (member_id,)).fetchone()
 
     if result[1][0] == 'M':
         surname = '先生'
@@ -165,12 +165,15 @@ def invitation():
             return render_template('error.html', message=str(e))
         return render_template('thank_you.html',
                                message="""
-                               已傳送邀請給對方
+                               已傳送邀請給對方<br>
+                                請耐心等待對方的回覆<br>
+                                期待你們的美好相遇！
+                               <br>
                                """,
                                header='✅您已傳送邀請')
     return render_template('confirm.html',
                            message=f"""
-                           要傳送邀請給{get_proper_name(matching_info)}嗎？
+                           要傳送邀請給{get_proper_name(matching_info['object_id'])}嗎？
                            """,
                            header=f'傳送邀請',
                            btn_name='確認傳送',
@@ -188,13 +191,19 @@ def liked():
         except ValueError as e:
             return render_template('error.html', message=str(e))
         return render_template('thank_you.html',
-                               header="屬於你們的連結已悄然展開❤️❤️❤️",
+                               header="✅您已確認相遇",
                                message="""
+                               屬於你們的連結已悄然展開<br>
+                               系統將安排接下來的約會流程<br>
+                               讓浪漫的相遇在每個細節中綻放
+                               <br>
                                """)
     return render_template('confirm.html',
-                           message="""
+                           message=f"""
+                           {get_proper_name(matching_info['subject_id'])}對您傳送邀請<br>
+                        是否確認相遇？<br>
                            """,
-                           header='你悄悄地被喜歡了',
+                           header='邀請回覆',
                            btn_name='確認相遇',
                            action_url=url_for('liked'))
 

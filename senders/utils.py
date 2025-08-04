@@ -5,24 +5,15 @@ from psycopg.rows import namedtuple_row
 from config import FORM_WEB_URL, line_bot_api, ADMIN_LINE_ID
 
 
-def get_invitation_link(row):
-    token = row.access_token
-    return f'{FORM_WEB_URL}/{token}/invitation'
-
-
-def get_introduction_link(conn, row):
+def get_introduction_link(conn, member_id):
     with conn.cursor() as curr:
         stmt = """
         select user_info ->> '會員介紹頁網址'
         from member
         where id = %s
         """
-        result = curr.execute(stmt, (row.object_id, )).fetchone()
+        result = curr.execute(stmt, (member_id, )).fetchone()
     return result[0] if result else ''
-
-
-def get_obj_proper_name(conn, row):
-    return get_proper_name(conn, row.object_id)
 
 
 def get_icons():

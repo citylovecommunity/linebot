@@ -1,12 +1,12 @@
-from utils import load_bubble, send_bubble, send_bubble_to_sub
-from bubble_modifiers import BUBBLE_MODIFIER
-from dotenv import load_dotenv
-from utils import get_list
-from config import DB
-import os
 import json
-import psycopg
+import os
 import random
+
+import psycopg
+from bubble_modifiers import BUBBLE_MODIFIER
+from config import DB
+from dotenv import load_dotenv
+from utils import get_list, load_bubble, send_bubble, send_bubble_to_sub
 
 load_dotenv()
 
@@ -14,13 +14,23 @@ TEST_USER_ID = os.getenv('TEST_USER_ID')
 
 
 def test_invitation_bubble():
-    bubble = load_bubble('invitation.json')
+    bubble = load_bubble('basic_bubble.json')
     with psycopg.connect(DB) as conn:
         list_of_users = get_list(conn, 'invitation')
         bubble = BUBBLE_MODIFIER['invitation'](
             conn, bubble, random.choice(list_of_users))
         # print(json.dumps(bubble, indent=2, ensure_ascii=False))
         send_bubble(TEST_USER_ID, bubble, 'Test Invitation Bubble')
+
+
+def test_liked_bubble():
+    bubble = load_bubble('basic_bubble.json')
+    with psycopg.connect(DB) as conn:
+        list_of_users = get_list(conn, 'liked')
+        bubble = BUBBLE_MODIFIER['liked'](
+            conn, bubble, random.choice(list_of_users))
+        # print(json.dumps(bubble, indent=2, ensure_ascii=False))
+        send_bubble(TEST_USER_ID, bubble, 'Test Liked Bubble')
 
 
 def test_send_bubble_to_sub():
