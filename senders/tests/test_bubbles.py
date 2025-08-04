@@ -33,8 +33,18 @@ def test_liked_bubble():
         send_bubble(TEST_USER_ID, bubble, 'Test Liked Bubble')
 
 
+def test_rest_r1_bubble():
+    bubble = load_bubble('basic_bubble.json')
+    with psycopg.connect(DB) as conn:
+        list_of_users = get_list(conn, 'rest_r1')
+        bubble = BUBBLE_MODIFIER['rest_r1'](
+            conn, bubble, random.choice(list_of_users))
+        # print(json.dumps(bubble, indent=2, ensure_ascii=False))
+        send_bubble(TEST_USER_ID, bubble, 'Test rest_r1 Bubble')
+
+
 def test_send_bubble_to_sub():
-    bubble = load_bubble('invitation.json')
+    bubble = load_bubble('basic_bubble.json')
 
     with psycopg.connect(DB) as conn:
         stmt = """

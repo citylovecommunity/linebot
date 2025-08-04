@@ -12,26 +12,26 @@
         {{first_word | safe}}
     </p>
 
-    <p>
+
+    <p class="lead mb-4">
+        📍地點<br>
         {% for place in places %}
         {% if place %}
-        📍 <a href="{{ place }}" target="_blank">{{ place }}</a><br>
+        <a href="{{ place }}" target="_blank">{{ place }}</a><br>
         {% endif %}
         {% endfor %}
     </p>
 
     <p class="lead mb-4">
-        🕒 這些時間，是你為故事預留的心動瞬間：<br>
+        🕒時間<br>
         {% for time in times%}
         {{ time }}<br>
         {% endfor %}
     </p>
-    <p class="lead mb-4">
-        願這一刻，成為未來回憶裡最溫柔的開場白。
-    </p>
+
     {% if comment %}
     <p class="lead mb-4">
-        💬 留言內容：<br>
+        💬 留言<br>
         <em>{{ comment }}</em>
     </p>
     {% endif %}

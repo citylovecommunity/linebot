@@ -6,6 +6,7 @@ import psycopg
 from flask import (Flask, g, redirect, render_template, request, session,
                    url_for)
 from psycopg.rows import dict_row
+from requests import head
 
 app = Flask(__name__)
 
@@ -245,8 +246,6 @@ def choose_rest(rest_round):
 
         if rest_round == 1:
             first_word = """
-            💫 浪漫從來不是鋪張，而是剛剛好的用心。<br>
-            你所挑選的餐廳選項，已悄悄飛往對方心裡的信箱。
             """
         else:
             first_word = ''
@@ -279,11 +278,11 @@ def confirm_rest(rest_round):
         return render_template('error.html', message=str(e))
 
     return render_template('thank_you.html',
+                           header="✅成功送出餐廳選項",
                            message="""
-                            優雅的餐桌時光，將由你們共同選定，<br>
-                            每個選項，都是為浪漫鋪路的起點。<br>
-                           """,
-                           header="💫 成功遞出相遇的邀請。")
+                            系統將知會對方協助訂位<br>
+                            請耐心等待系統通知<br>
+                           """)
 
 
 @app.route('/confirm_booking/<int:rest_round>', methods=['POST'])
@@ -309,10 +308,11 @@ def confirm_booking(rest_round):
         return render_template('error.html', message=str(e))
 
     return render_template('thank_you.html',
+                           header="✅成功傳送訂位資訊",
                            message="""
-                           💫 成功遞出相遇的邀請。
-                            優雅的餐桌時光，將由你們共同選定，
-                            每個選項，都是為浪漫鋪路的起點。
+                            感謝您成功訂位<br>
+                            系統將通知雙方約會資訊<br>
+                            祝您約會順利！<br>
                            """)
 
 
@@ -322,11 +322,9 @@ def rest_r1():
                            post_to=url_for('choose_rest', rest_round=1),
                            dating_title='約會的餐廳和時間',
                            first_word="""
-                           每一段值得期待的邀約，從你的選擇開始。<br>
-                            請填寫兩間你心儀的餐廳、三個適合相遇的時段，讓我們為你妥帖遞出這份溫柔邀請。
+                           請提供心儀的餐廳選項和時間<br>
                            """,
                            second_word="""
-                           關於餐桌上的對話與眼神，交給時間和緣分安排。
                            """)
 
 
