@@ -165,13 +165,15 @@ def invitation():
             return render_template('error.html', message=str(e))
         return render_template('thank_you.html',
                                message="""
+                               已傳送邀請給對方
                                """,
-                               header='已傳送Like❤️❤️❤️')
+                               header='✅您已傳送邀請')
     return render_template('confirm.html',
-                           message="""
+                           message=f"""
+                           要傳送邀請給{get_proper_name(matching_info)}嗎？
                            """,
-                           header=f'將 Like 傳送給{get_proper_name(matching_info)}嗎？',
-                           btn_name='我想傳送 Like',
+                           header=f'傳送邀請',
+                           btn_name='確認傳送',
                            action_url=url_for('invitation'))
 
 
