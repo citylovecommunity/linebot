@@ -1,19 +1,19 @@
 
 import os
 
-from dotenv import load_dotenv
 import psycopg
+from dotenv import load_dotenv
 from flask import (Flask, g, redirect, render_template, request, session,
                    url_for)
 from psycopg.rows import dict_row
-from requests import head
 
 app = Flask(__name__)
 
 load_dotenv()
 app.secret_key = os.getenv('secret_key')
 DB = os.getenv('DB')
-DEPLOYMENT = os.getenv('FLASK_DEP')
+ALLOW_CHANGE_STATE = os.getenv('ALLOW_CHANGE_STATE')
+ALLOW_CHANGE_VALUE = os.getenv('ALLOW_CHANGE_VALUE')
 
 
 def get_db():
@@ -76,7 +76,7 @@ def change_state(current_state,
                  matching_id,
                  conn=None,
                  commit=True):
-    if DEPLOYMENT:
+    if ALLOW_CHANGE_STATE:
         if not conn:
             conn = get_db()
         # check state，如果有人不在正確的state，本次操作取消
@@ -92,45 +92,47 @@ def change_state(current_state,
 
 
 def store_confirm_data(confirm_data, matching_id, conn=None, commit=True):
-    params = confirm_data.copy()
-    params['matching_id'] = matching_id
+    if ALLOW_CHANGE_VALUE:
+        params = confirm_data.copy()
+        params['matching_id'] = matching_id
 
-    for key in ['time1', 'time2', 'time3']:
-        if params.get(key) == '':
-            params[key] = None
+        for key in ['time1', 'time2', 'time3']:
+            if params.get(key) == '':
+                params[key] = None
 
-    update_stmt = """
-        update matching set
-        place1_url = %(place1_url)s,
-        place2_url = %(place2_url)s,
-        time1 = %(time1)s,
-        time2 = %(time2)s,
-        time3 = %(time3)s,
-        comment = %(comment)s
-        where id = %(matching_id)s
-        """
-    with conn.cursor() as curr:
-        curr.execute(update_stmt, params)
+        update_stmt = """
+            update matching set
+            place1_url = %(place1_url)s,
+            place2_url = %(place2_url)s,
+            time1 = %(time1)s,
+            time2 = %(time2)s,
+            time3 = %(time3)s,
+            comment = %(comment)s
+            where id = %(matching_id)s
+            """
+        with conn.cursor() as curr:
+            curr.execute(update_stmt, params)
 
-    if commit:
-        conn.commit()
+        if commit:
+            conn.commit()
 
 
 def store_booking_data(booking_data, matching_id, conn=None, commit=True):
-    params = booking_data.copy()
-    params['matching_id'] = matching_id
-    update_stmt = """
-        update matching set
-        book_phone = %(book_phone)s,
-        book_name = %(book_name)s,
-        comment = %(comment)s
-        where id = %(matching_id)s
-        """
-    with conn.cursor() as curr:
-        curr.execute(update_stmt, params)
+    if ALLOW_CHANGE_VALUE:
+        params = booking_data.copy()
+        params['matching_id'] = matching_id
+        update_stmt = """
+            update matching set
+            book_phone = %(book_phone)s,
+            book_name = %(book_name)s,
+            comment = %(comment)s
+            where id = %(matching_id)s
+            """
+        with conn.cursor() as curr:
+            curr.execute(update_stmt, params)
 
-    if commit:
-        conn.commit()
+        if commit:
+            conn.commit()
 
 
 @app.route('/<token>/<action>', methods=['GET'])

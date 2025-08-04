@@ -35,12 +35,43 @@ def test_liked_bubble():
 
 def test_rest_r1_bubble():
     bubble = load_bubble('basic_bubble.json')
+
     with psycopg.connect(DB) as conn:
         list_of_users = get_list(conn, 'rest_r1')
         bubble = BUBBLE_MODIFIER['rest_r1'](
             conn, bubble, random.choice(list_of_users))
         # print(json.dumps(bubble, indent=2, ensure_ascii=False))
         send_bubble(TEST_USER_ID, bubble, 'Test rest_r1 Bubble')
+
+
+def test_rest_r2_bubble():
+    bubble = load_bubble('basic_bubble.json')
+    with psycopg.connect(DB) as conn:
+        list_of_users = get_list(conn, 'rest_r2')
+        bubble = BUBBLE_MODIFIER['rest_r2'](
+            conn, bubble, random.choice(list_of_users))
+        # print(json.dumps(bubble, indent=2, ensure_ascii=False))
+        send_bubble(TEST_USER_ID, bubble, 'Test rest_r2 Bubble')
+
+
+def test_rest_r3_bubble():
+    bubble = load_bubble('basic_bubble.json')
+    with psycopg.connect(DB) as conn:
+        list_of_users = get_list(conn, 'rest_r3')
+        bubble = BUBBLE_MODIFIER['rest_r3'](
+            conn, bubble, random.choice(list_of_users))
+        # print(json.dumps(bubble, indent=2, ensure_ascii=False))
+        send_bubble(TEST_USER_ID, bubble, 'Test rest_r3 Bubble')
+
+
+def test_rest_r4_bubble():
+    bubble = load_bubble('basic_bubble.json')
+    with psycopg.connect(DB) as conn:
+        list_of_users = get_list(conn, 'rest_r4')
+        bubble = BUBBLE_MODIFIER['rest_r4'](
+            conn, bubble, random.choice(list_of_users))
+        # print(json.dumps(bubble, indent=2, ensure_ascii=False))
+        send_bubble(TEST_USER_ID, bubble, 'Test rest_r4 Bubble')
 
 
 def test_send_bubble_to_sub():

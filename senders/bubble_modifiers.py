@@ -68,20 +68,109 @@ def liked_modifier(conn, base_bubble, matching_row):
     return base_bubble
 
 
-def get_man_id(conn, matching_row):
+def get_gender_id(conn, matching_row, gender):
     stmt = '''
     select gender from member
     where id = %s;
     '''
     with conn.cursor() as cur:
         result = cur.execute(stmt, (matching_row.subject_id,)).fetchone()
-        if result and result[0][0] == 'M':
+        if result and result[0][0] == gender:
             return matching_row.subject_id
         else:
             return matching_row.object_id
 
 
 def rest_r1_modifier(conn, base_bubble, matching_row):
+    # 傳給女生
+    base_bubble = base_modifier(base_bubble)
+    form_app_link = f'{FORM_WEB_URL}/{matching_row.access_token}/rest_r1'
+
+    object_id = get_gender_id(conn, matching_row, 'M')
+    intro_link = get_introduction_link(conn, object_id)
+    proper_name = get_proper_name(conn, object_id)
+
+    # get_icons()
+    base_bubble = set_basic_bubble_title(base_bubble, '餐廳選擇卡')
+    base_bubble = set_basic_bubble_name(base_bubble, proper_name)
+    base_bubble = set_basic_bubble_intro_link(base_bubble, intro_link)
+    base_bubble = set_basic_bubble_form_link(
+        base_bubble, form_app_link, '選擇餐廳')
+    return base_bubble
+
+
+def rest_r2_modifier(conn, base_bubble, matching_row):
+    # 傳給男生
+    base_bubble = base_modifier(base_bubble)
+    form_app_link = f'{FORM_WEB_URL}/{matching_row.access_token}/rest_r2'
+
+    object_id = get_gender_id(conn, matching_row, 'F')
+    intro_link = get_introduction_link(conn, object_id)
+    proper_name = get_proper_name(conn, object_id)
+
+    # get_icons()
+    base_bubble = set_basic_bubble_title(base_bubble, '餐廳訂位卡')
+    base_bubble = set_basic_bubble_name(base_bubble, proper_name)
+    base_bubble = set_basic_bubble_intro_link(base_bubble, intro_link)
+    base_bubble = set_basic_bubble_form_link(
+        base_bubble, form_app_link, '餐廳訂位')
+    return base_bubble
+
+
+def rest_r3_modifier(conn, base_bubble, matching_row):
+    # 傳給女生
+    base_bubble = base_modifier(base_bubble)
+    form_app_link = f'{FORM_WEB_URL}/{matching_row.access_token}/rest_r3'
+
+    object_id = get_gender_id(conn, matching_row, 'M')
+    intro_link = get_introduction_link(conn, object_id)
+    proper_name = get_proper_name(conn, object_id)
+
+    # get_icons()
+    base_bubble = set_basic_bubble_title(base_bubble, '餐廳時間重選卡')
+    base_bubble = set_basic_bubble_name(base_bubble, proper_name)
+    base_bubble = set_basic_bubble_intro_link(base_bubble, intro_link)
+    base_bubble = set_basic_bubble_form_link(
+        base_bubble, form_app_link, '重選餐廳時間')
+    return base_bubble
+
+
+def rest_r4_modifier(conn, base_bubble, matching_row):
+    # 傳給男生
+    base_bubble = base_modifier(base_bubble)
+    form_app_link = f'{FORM_WEB_URL}/{matching_row.access_token}/rest_r4'
+
+    object_id = get_gender_id(conn, matching_row, 'F')
+    intro_link = get_introduction_link(conn, object_id)
+    proper_name = get_proper_name(conn, object_id)
+
+    # get_icons()
+    base_bubble = set_basic_bubble_title(base_bubble, '餐廳最終訂位卡')
+    base_bubble = set_basic_bubble_name(base_bubble, proper_name)
+    base_bubble = set_basic_bubble_intro_link(base_bubble, intro_link)
+    base_bubble = set_basic_bubble_form_link(
+        base_bubble, form_app_link, '選擇最終餐廳')
+    return base_bubble
+
+
+def deal_bubble_modifier(conn, base_bubble, matching_row):
+    base_bubble = base_modifier(base_bubble)
+    form_app_link = f'{FORM_WEB_URL}/{matching_row.access_token}/rest_r1'
+
+    man_id = get_man_id(conn, matching_row)
+    intro_link = get_introduction_link(conn, man_id)
+    proper_name = get_proper_name(conn, man_id)
+
+    # get_icons()
+    base_bubble = set_basic_bubble_title(base_bubble, '餐廳選擇卡')
+    base_bubble = set_basic_bubble_name(base_bubble, proper_name)
+    base_bubble = set_basic_bubble_intro_link(base_bubble, intro_link)
+    base_bubble = set_basic_bubble_form_link(
+        base_bubble, form_app_link, '選擇餐廳')
+    return base_bubble
+
+
+def waste_bubble_modifier(conn, base_bubble, matching_row):
     base_bubble = base_modifier(base_bubble)
     form_app_link = f'{FORM_WEB_URL}/{matching_row.access_token}/rest_r1'
 
