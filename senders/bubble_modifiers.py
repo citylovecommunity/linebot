@@ -153,9 +153,25 @@ def rest_r4_modifier(conn, base_bubble, matching_row):
     return base_bubble
 
 
+def cancel_bubble_modifier(conn, base_bubble, matching_row):
+    base_bubble = base_modifier(base_bubble)
+
+    man_id = get_man_id(conn, matching_row)
+    intro_link = get_introduction_link(conn, man_id)
+    proper_name = get_proper_name(conn, man_id)
+
+    # get_icons()
+    base_bubble = set_basic_bubble_title(base_bubble, '餐廳選擇卡')
+    base_bubble = set_basic_bubble_name(base_bubble, proper_name)
+    base_bubble = set_basic_bubble_intro_link(base_bubble, intro_link)
+    base_bubble = set_basic_bubble_form_link(
+        base_bubble, form_app_link, '選擇餐廳')
+    return base_bubble
+
+
 def deal_bubble_modifier(conn, base_bubble, matching_row):
     base_bubble = base_modifier(base_bubble)
-    form_app_link = f'{FORM_WEB_URL}/{matching_row.access_token}/rest_r1'
+    form_app_link = f'{FORM_WEB_URL}/{matching_row.access_token}/cancel'
 
     man_id = get_man_id(conn, matching_row)
     intro_link = get_introduction_link(conn, man_id)
@@ -187,10 +203,14 @@ def waste_bubble_modifier(conn, base_bubble, matching_row):
     return base_bubble
 
 
+# 有的是要傳給雙向
 BUBBLE_MODIFIER = {
     'invitation': invitation_modifier,
     'liked': liked_modifier,
     'rest_r1': rest_r1_modifier,
-
-    # Add other bubble modifiers as needed
+    'rest_r2': rest_r2_modifier,
+    'rest_r3': rest_r3_modifier,
+    'rest_r4': rest_r4_modifier,
+    'deal': deal_bubble_modifier,
+    'waste': waste_bubble_modifier
 }

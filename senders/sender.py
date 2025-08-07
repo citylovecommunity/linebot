@@ -17,10 +17,6 @@ from bubble_modifiers import BUBBLE_MODIFIER
 # 4. 修改db狀態
 
 
-def no_user_id_warning_modify(base_bubble):
-    pass
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('state')

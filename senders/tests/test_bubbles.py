@@ -1,80 +1,63 @@
-import json
-import os
 import random
 
 import psycopg
-from bubble_modifiers import BUBBLE_MODIFIER
+from bubble_senders import (DealSender, InvitationSender, LikedSender,
+                            RestR1Sender, RestR2Sender, RestR3Sender,
+                            RestR4Sender)
 from config import DB
-from dotenv import load_dotenv
-from utils import get_list, load_bubble, send_bubble, send_bubble_to_sub
-
-load_dotenv()
-
-TEST_USER_ID = os.getenv('TEST_USER_ID')
+from senders_utils import get_list, load_bubble, send_bubble_to_member_id
 
 
 def test_invitation_bubble():
-    bubble = load_bubble('basic_bubble.json')
     with psycopg.connect(DB) as conn:
         list_of_users = get_list(conn, 'invitation')
-        bubble = BUBBLE_MODIFIER['invitation'](
-            conn, bubble, random.choice(list_of_users))
-        # print(json.dumps(bubble, indent=2, ensure_ascii=False))
-        send_bubble(TEST_USER_ID, bubble, 'Test Invitation Bubble')
+        sender = InvitationSender(conn, random.choice(list_of_users))
+        sender.send()
 
 
 def test_liked_bubble():
-    bubble = load_bubble('basic_bubble.json')
     with psycopg.connect(DB) as conn:
         list_of_users = get_list(conn, 'liked')
-        bubble = BUBBLE_MODIFIER['liked'](
-            conn, bubble, random.choice(list_of_users))
-        # print(json.dumps(bubble, indent=2, ensure_ascii=False))
-        send_bubble(TEST_USER_ID, bubble, 'Test Liked Bubble')
+        sender = LikedSender(conn, random.choice(list_of_users))
+        sender.send()
 
 
 def test_rest_r1_bubble():
-    bubble = load_bubble('basic_bubble.json')
-
     with psycopg.connect(DB) as conn:
         list_of_users = get_list(conn, 'rest_r1')
-        bubble = BUBBLE_MODIFIER['rest_r1'](
-            conn, bubble, random.choice(list_of_users))
-        # print(json.dumps(bubble, indent=2, ensure_ascii=False))
-        send_bubble(TEST_USER_ID, bubble, 'Test rest_r1 Bubble')
+        sender = RestR1Sender(conn, random.choice(list_of_users))
+        sender.send()
 
 
 def test_rest_r2_bubble():
-    bubble = load_bubble('basic_bubble.json')
     with psycopg.connect(DB) as conn:
         list_of_users = get_list(conn, 'rest_r2')
-        bubble = BUBBLE_MODIFIER['rest_r2'](
-            conn, bubble, random.choice(list_of_users))
-        # print(json.dumps(bubble, indent=2, ensure_ascii=False))
-        send_bubble(TEST_USER_ID, bubble, 'Test rest_r2 Bubble')
+        sender = RestR2Sender(conn, random.choice(list_of_users))
+        sender.send()
 
 
 def test_rest_r3_bubble():
-    bubble = load_bubble('basic_bubble.json')
     with psycopg.connect(DB) as conn:
         list_of_users = get_list(conn, 'rest_r3')
-        bubble = BUBBLE_MODIFIER['rest_r3'](
-            conn, bubble, random.choice(list_of_users))
-        # print(json.dumps(bubble, indent=2, ensure_ascii=False))
-        send_bubble(TEST_USER_ID, bubble, 'Test rest_r3 Bubble')
+        sender = RestR3Sender(conn, random.choice(list_of_users))
+        sender.send()
 
 
 def test_rest_r4_bubble():
-    bubble = load_bubble('basic_bubble.json')
     with psycopg.connect(DB) as conn:
         list_of_users = get_list(conn, 'rest_r4')
-        bubble = BUBBLE_MODIFIER['rest_r4'](
-            conn, bubble, random.choice(list_of_users))
-        # print(json.dumps(bubble, indent=2, ensure_ascii=False))
-        send_bubble(TEST_USER_ID, bubble, 'Test rest_r4 Bubble')
+        sender = RestR4Sender(conn, random.choice(list_of_users))
+        sender.send()
 
 
-def test_send_bubble_to_sub():
+def test_deal_bubble():
+    with psycopg.connect(DB) as conn:
+        list_of_users = get_list(conn, 'deal')
+        sender = DealSender(conn, random.choice(list_of_users))
+        sender.send()
+
+
+def test_send_bubble_to_member_id():
     bubble = load_bubble('basic_bubble.json')
 
     with psycopg.connect(DB) as conn:
@@ -88,4 +71,4 @@ def test_send_bubble_to_sub():
         """
         with conn.cursor() as cur:
             result = cur.execute(stmt).fetchone()
-        send_bubble_to_sub(conn, result[0], bubble, '會員沒有綁定')
+        send_bubble_to_member_id(conn, result[0], bubble, '會員沒有綁定')
