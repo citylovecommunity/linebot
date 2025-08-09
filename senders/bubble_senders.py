@@ -1,10 +1,12 @@
+import copy
 from abc import ABC, abstractmethod
 from collections import namedtuple
 from typing import List
 
 from config import BUBBLE_HERO_IMAGE_URL, FORM_WEB_URL
 from senders_utils import (get_gender_id, get_introduction_link,
-                           get_proper_name, load_bubble, send_bubble_to_member_id)
+                           get_proper_name, load_bubble,
+                           send_bubble_to_member_id)
 
 
 def base_modifier(base_bubble):
@@ -50,7 +52,17 @@ def set_basic_bubble(bubble, title, city, name, intro_link, form_link, form_labe
     return bubble
 
 
-SendingInfo = namedtuple('SendingInfo', ['recipient', 'bubble'])
+def set_info_bubble(bubble, title, city, name, intro_link, message):
+    bubble = set_basic_bubble_title(bubble, title)
+    bubble = set_basic_bubble_city(bubble, city)
+    bubble = set_basic_bubble_name(bubble, name)
+    bubble["footer"]["contents"][1]["action"]["uri"] = intro_link
+    bubble["footer"]["contents"][0]["text"] = message
+
+    return bubble
+
+
+SendingInfo = namedtuple('SendingInfo', ['recipient', 'bubble', 'alt'])
 
 
 class Sender(ABC):
@@ -64,8 +76,9 @@ class Sender(ABC):
 
     def send(self):
         sending_infos = self.modify_bubble()
-        for recipient, bubble in sending_infos:
-            send_bubble_to_member_id(self.conn, recipient, bubble)
+        for recipient, bubble, alt in sending_infos:
+            send_bubble_to_member_id(
+                self.conn, recipient, bubble, alt_text=alt)
 
 
 class InvitationSender(Sender):
@@ -79,7 +92,7 @@ class InvitationSender(Sender):
         bubble = set_basic_bubble(
             bubble, '約會邀請卡', self.matching_row.city, name, intro_link, form_app_link, '開啟邀請卡')
 
-        return [SendingInfo(self.matching_row.subject_id, bubble)]
+        return [SendingInfo(self.matching_row.subject_id, bubble, '🎉接收您的約會邀請卡')]
 
 
 class LikedSender(Sender):
@@ -91,9 +104,47 @@ class LikedSender(Sender):
             self.conn, self.matching_row.subject_id)
         name = get_proper_name(self.conn, self.matching_row.subject_id)
         bubble = set_basic_bubble(
-            bubble, '約會回覆卡', self.matching_row.city, name, intro_link, form_app_link, '開啟回覆卡')
+            bubble, '約會邀請卡', self.matching_row.city, name, intro_link, form_app_link, '開啟邀請卡')
 
-        return [SendingInfo(self.matching_row.object_id, bubble)]
+        return [SendingInfo(self.matching_row.object_id, bubble, '🎉開啟您的約會邀請卡')]
+
+
+def set_info_two_way_bubble_link_intro(conn, bubble, matching_row, message, info_title):
+    bubble_for_obj = copy.deepcopy(bubble)
+    bubble_for_sub = copy.deepcopy(bubble)
+
+    # For Obj
+    sub_intro_link = get_introduction_link(
+        conn, matching_row.subject_id)
+    sub_name = get_proper_name(conn, matching_row.subject_id)
+    bubble_for_obj = set_info_bubble(
+        bubble_for_obj, info_title, matching_row.city, sub_name, sub_intro_link, message)
+
+    # For Sub
+    obj_intro_link = get_introduction_link(
+        conn, matching_row.object_id)
+    obj_name = get_proper_name(conn, matching_row.object_id)
+    bubble_for_sub = set_info_bubble(
+        bubble_for_sub, info_title, matching_row.city, obj_name, obj_intro_link, message)
+
+    return bubble_for_obj, bubble_for_sub
+
+
+class GoodByeSender(Sender):
+    def modify_bubble(self):
+        base_bubble = load_bubble('info_bubble.json')
+        bubble = base_modifier(base_bubble)
+
+        message = "此約會邀請依雙方意願時間暫不安排\n期待未來比次更多的緣分"
+        alt_message = '後會有期🥲期待新的約會邀請'
+
+        bubble_for_obj, bubble_for_sub = set_info_two_way_bubble_link_intro(
+            self.conn, bubble, self.matching_row, message, '後會有期！')
+
+        return [SendingInfo(
+            self.matching_row.object_id, bubble_for_obj, alt_message),
+            SendingInfo(
+            self.matching_row.subject_id, bubble_for_sub, alt_message)]
 
 
 class RestR1Sender(Sender):

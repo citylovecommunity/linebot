@@ -2,12 +2,7 @@ import json
 
 from config import ADMIN_LINE_ID, SENDER_PRODUCTION, TEST_USER_ID, line_bot_api
 from linebot.models import FlexSendMessage, TextMessage
-from linebot.v3.messaging import TextMessage
 from psycopg.rows import namedtuple_row
-
-
-def get_icons():
-    pass
 
 
 def write_sent_to_db(conn, matching_id, state):
@@ -107,17 +102,18 @@ def get_list(conn, state):
         return cur.execute(stmt, (state+'_sending',)).fetchall()
 
 
-def send_bubble_to_member_id(conn, member_id, bubble, alt_text='嘻嘻'):
+def send_bubble_to_member_id(conn, member_id, bubble, alt_text='嘻嘻', production=SENDER_PRODUCTION):
     user_id = get_user_id(conn, member_id)
-    if user_id:
-        if SENDER_PRODUCTION:
-            return
-            send_bubble(user_id[0], bubble, alt_text)
+    if production:
+        if user_id:
+            #
+            # send_bubble(user_id[0], bubble, alt_text)
+            pass
         else:
-            send_bubble(TEST_USER_ID, bubble, alt_text)
+            name = get_user_name(conn, member_id)
+            line_bot_api.push_message(ADMIN_LINE_ID, TextMessage(
+                text=f'會員 {name} 沒有綁定 LINE 帳號⚠️⚠️⚠️',
+                alt_text=alt_text,
+            ))
     else:
-        name = get_user_name(conn, member_id)
-        line_bot_api.push_message(ADMIN_LINE_ID, TextMessage(
-            text=f'會員 {name} 沒有綁定 LINE 帳號⚠️⚠️⚠️',
-            alt_text=alt_text,
-        ))
+        send_bubble(TEST_USER_ID, bubble, alt_text)

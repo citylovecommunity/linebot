@@ -1,0 +1,122 @@
+{
+    "type": "bubble",
+    "hero": {
+        "type": "image",
+        "url": "",
+        "size": "full",
+        "aspectRatio": "20:13",
+        "aspectMode": "cover"
+    },
+    "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+            {
+                "type": "text",
+                "text": "約會邀請卡",
+                "weight": "bold",
+                "size": "xl",
+                "align": "start",
+                "margin": "none"
+            },
+            {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [],
+                "margin": "lg"
+            },
+            {
+                "type": "box",
+                "layout": "vertical",
+                "margin": "lg",
+                "spacing": "sm",
+                "contents": [
+                    {
+                        "type": "box",
+                        "layout": "baseline",
+                        "spacing": "sm",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "代表城市",
+                                "color": "#aaaaaa",
+                                "size": "sm",
+                                "flex": 2
+                            },
+                            {
+                                "type": "text",
+                                "text": "紐約",
+                                "wrap": true,
+                                "color": "#666666",
+                                "size": "sm",
+                                "flex": 5
+                            }
+                        ]
+                    },
+                    {
+                        "type": "box",
+                        "layout": "baseline",
+                        "spacing": "sm",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "對象",
+                                "color": "#aaaaaa",
+                                "size": "sm",
+                                "flex": 2
+                            },
+                            {
+                                "type": "text",
+                                "text": "王先生",
+                                "wrap": true,
+                                "color": "#666666",
+                                "size": "sm",
+                                "flex": 5
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [],
+                "margin": "lg"
+            },
+            {
+                "type": "separator"
+            }
+        ]
+    },
+    "footer": {
+        "type": "box",
+        "layout": "vertical",
+        "spacing": "sm",
+        "contents": [
+            {
+                "type": "text",
+                "text": "此約會邀請依雙方意願時間暫不安排\n期待未來比次更多的緣分",
+                "margin": "none",
+                "wrap": true,
+                "size": "sm",
+                "decoration": "none",
+                "align": "start"
+            },
+            {
+                "type": "button",
+                "action": {
+                    "type": "uri",
+                    "label": "介紹卡連結",
+                    "uri": "http://linecorp.com/"
+                }
+            },
+            {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [],
+                "margin": "sm"
+            }
+        ],
+        "flex": 0
+    }
+}

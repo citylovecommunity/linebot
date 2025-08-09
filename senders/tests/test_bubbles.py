@@ -1,7 +1,7 @@
 import random
 
 import psycopg
-from bubble_senders import (DealSender, InvitationSender, LikedSender,
+from bubble_senders import (DealSender, GoodByeSender, InvitationSender, LikedSender,
                             RestR1Sender, RestR2Sender, RestR3Sender,
                             RestR4Sender)
 from config import DB
@@ -19,6 +19,13 @@ def test_liked_bubble():
     with psycopg.connect(DB) as conn:
         list_of_users = get_list(conn, 'liked')
         sender = LikedSender(conn, random.choice(list_of_users))
+        sender.send()
+
+
+def test_goodbye_bubble():
+    with psycopg.connect(DB) as conn:
+        list_of_users = get_list(conn, 'goodbye')
+        sender = GoodByeSender(conn, random.choice(list_of_users))
         sender.send()
 
 
