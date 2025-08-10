@@ -1,4 +1,4 @@
-from app import get_proper_name, app
+from app import app, get_proper_name
 
 
 def test_get_proper_name():

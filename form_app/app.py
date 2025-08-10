@@ -84,9 +84,18 @@ def change_state(current_state,
             raise ValueError('狀態錯誤❌')
 
         with conn.cursor() as curr:
-            stmt = "update matching set current_state = %s where id=%s;"
+            stmt = """
+            update matching set current_state = %s, updated_at = now() where id=%s;
+            """
             curr.execute(
-                stmt, (new_state, matching_id))
+                stmt, (new_state, matching_id,))
+
+            stmt = """
+            insert into matching_state_history (matching_id, old_state, new_state, created_at)
+            values (%s, %s, %s, now());
+            """
+            curr.execute(
+                stmt, (matching_id, current_state, new_state))
         if commit:
             conn.commit()
 
