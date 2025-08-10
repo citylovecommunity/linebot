@@ -2,7 +2,7 @@
     "type": "bubble",
     "hero": {
         "type": "image",
-        "url": "",
+        "url": "https://storage.googleapis.com/citylove_images/Bubble/hero/envelope-min.png",
         "size": "full",
         "aspectRatio": "20:13",
         "aspectMode": "cover"
@@ -78,13 +78,15 @@
                 ]
             },
             {
-                "type": "box",
-                "layout": "vertical",
-                "contents": [],
-                "margin": "lg"
+                "type": "text",
+                "text": " ",
+                "margin": "lg",
+                "size": "md",
+                "wrap": true
             },
             {
-                "type": "separator"
+                "type": "separator",
+                "margin": "lg"
             }
         ]
     },
