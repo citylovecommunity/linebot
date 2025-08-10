@@ -2,7 +2,6 @@ import json
 
 from config import ADMIN_LINE_ID, SENDER_PRODUCTION, TEST_USER_ID, line_bot_api
 from linebot.models import FlexSendMessage, TextMessage
-from psycopg.rows import namedtuple_row
 
 
 def write_sent_to_db(conn, matching_id, state):
@@ -90,16 +89,6 @@ def get_proper_name(conn, member_id):
             return f'{result[0][0]}小姐'
         else:
             return ''
-
-
-def get_list(conn, state):
-    stmt = """
-    select * from
-    matching where
-    current_state = %s;
-    """
-    with conn.cursor(row_factory=namedtuple_row) as cur:
-        return cur.execute(stmt, (state+'_sending',)).fetchall()
 
 
 def send_bubble_to_member_id(conn, member_id, bubble, alt_text='嘻嘻', production=SENDER_PRODUCTION):

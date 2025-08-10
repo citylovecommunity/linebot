@@ -1,9 +1,9 @@
 import random
 
 import psycopg
-from bubble_senders import (DealSender, GoodByeSender, InvitationSender,
-                            LikedSender, RestR1Sender, RestR2Sender,
-                            RestR3Sender, RestR4Sender)
+from senders.senders import (DealSender, GoodByeSender, InvitationSender,
+                             LikedSender, RestR1Sender, RestR2Sender,
+                             RestR3Sender, RestR4Sender)
 from config import DB
 from senders_utils import get_list, load_bubble, send_bubble_to_member_id
 
