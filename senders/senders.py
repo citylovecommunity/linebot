@@ -103,6 +103,8 @@ class Sender(ABC):
             send_bubble_to_member_id(
                 self.conn, recipient, bubble, alt_text=alt)
 
+    # TODO: send完每個Sender要負責commit成不同state，並將轉換的紀錄記下來
+
 
 class InvitationSender(Sender):
     def modify_bubble(self):
@@ -153,7 +155,7 @@ def set_two_way_bubble_link_intro(conn, bubble, matching_row, message, info_titl
     return bubble_for_obj, bubble_for_sub
 
 
-class GoodByeSender(Sender):
+class GoodbyeSender(Sender):
     def modify_bubble(self):
         base_bubble = load_bubble('basic_bubble.json')
         bubble = base_modifier(base_bubble)
