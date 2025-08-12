@@ -14,13 +14,18 @@
             <label class="list-group-item d-flex align-items-center">
                 <input class="form-check-input me-2" type="radio" name="selected_place" value="{{ place1_url }}"
                     required>
-                <a href="{{ place1_url }}" target="_blank" class="text-decoration-none flex-grow-1">第一家餐廳</a>
+                <div class="flex flex-grow-1 justify-center">
+                    <a href="{{ place1_url }}" target="_blank" class="text-decoration-none ">第一家餐廳</a>
+                </div>
             </label>
             {% if place2_url %}
             <label class="list-group-item d-flex align-items-center">
                 <input class="form-check-input me-2" type="radio" name="selected_place" value="{{ place2_url }}"
                     required>
-                <a href="{{ place2_url }}" target="_blank" class="text-decoration-none flex-grow-1">第二家餐廳</a>
+
+                <div class="flex flex-grow-1 justify-center">
+                    <a href="{{ place2_url }}" target="_blank" class="text-decoration-none">第二家餐廳</a>
+                </div>
             </label>
             {% endif %}
         </div>
@@ -53,8 +58,8 @@
     </div>
     {% endif %}
 
-    <div class="text-center">
-        <button type="submit" class="btn btn-primary btn-lg px-4 me-2">確認選擇</button>
+    <div class="flex flex-col gap-2 items-stretch">
+        <button type="submit" class="btn btn-primary btn-lg px-4">確認選擇</button>
         {% if cannot_url %}
         <a href="{{ cannot_url }}" class="btn btn-outline-danger btn-lg px-4">時間或地點不行</a>
         {% endif %}
