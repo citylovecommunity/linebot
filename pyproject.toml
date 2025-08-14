@@ -16,4 +16,5 @@ dependencies = [
 [tool.uv.workspace]
 members = [
     "form_app",
+    "flow_charts",
 ]

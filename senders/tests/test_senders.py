@@ -1,5 +1,5 @@
-from dispatcher import (GoodbyeDispatcher, InvitationDispatcher,
-                        LikedDispatcher, RestR1Dispatcher)
+from dispatchers import (GoodbyeDispatcher, InvitationDispatcher,
+                         LikedDispatcher, RestR1Dispatcher)
 from senders_utils import load_bubble, send_bubble_to_member_id
 
 

@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 
+import psycopg
 from psycopg.rows import namedtuple_row
+from typing import NamedTuple
 
 
 def get_list(conn, state):
@@ -18,11 +20,11 @@ class Collector(ABC):
     負責決定哪些配對是本次傳送的對象
     """
 
-    def __init__(self, conn):
+    def __init__(self, conn: psycopg.Connection):
         self.conn = conn
 
     @abstractmethod
-    def collect(self):
+    def collect(self) -> list[NamedTuple]:
         pass
 
 
