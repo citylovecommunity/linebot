@@ -21,7 +21,6 @@ states = [
     'deal_sending',
     'deal_1d_notification_sending',
     'deal_3hr_notification_sending',
-    'wait_for_dating_finish',
     'sudden_change_time_notification_sending',
     'next_month_sending',
     'next_month_waiting'
@@ -37,17 +36,17 @@ for s in wait_for_response_states:
     dot.node(s+'_waiting', shape='ellipse')
     dot.node(s+'_response', shape='diamond')
 
+    dot.edge(s+'_response', s+'_response',
+             label=f'Cron triggers 24/48 {s} notification dispatcher',
+             color='blue')
+
     dot.edge(s+'_sending', s+'_waiting',
              label=f'Cron triggers {s} dispatcher',
              color='blue')
     dot.edge(s+'_waiting', s+'_response')
 
-    if s not in ('invitation', 'liked'):
-        dot.edge(s+'_response', 'no_action_goodbye_sending',
-                 label='No action ≥48h', style='dashed', color='red')
-    else:
-        dot.edge(s+'_response', 'goodbye',
-                 label='No action ≥48h', style='dashed', color='red')
+    dot.edge(s+'_response', 'no_action_goodbye_sending',
+             label='No action ≥72h', style='dashed', color='red')
 
 
 # Main flow
@@ -79,7 +78,7 @@ dot.edge('rest_r1_next_month_sending', 'rest_r1_waiting',
          color='blue')
 
 
-dot.edge('rest_r4_response', 'goodbye_sending', label='reject')
+dot.edge('rest_r4_response', 'next_month_sending', label='reject')
 dot.edge('rest_r4_response', 'deal_sending', label='accept')
 dot.edge('no_action_goodbye_sending', 'goodbye',
          label=f'Cron triggers no_action_goodbye_sending dispatcher',
@@ -88,18 +87,18 @@ dot.edge('no_action_goodbye_sending', 'goodbye',
 
 sending_edges = [('deal_sending', 'deal_1d_notification_sending'),
                  ('deal_1d_notification_sending', 'deal_3hr_notification_sending'),
-                 ('deal_3hr_notification_sending', 'wait_for_dating_finish'),
+                 ('deal_3hr_notification_sending', 'dating_notification_sending'),
+                 ('dating_notification_sending', 'dating_feedback_sending'),
+                 ('dating_feedback_sending', 'dating_done'),
                  ('sudden_change_time_notification_sending', 'change_time_sending')
                  ]
 for from_node, to_node in sending_edges:
-    dot.edge(from_node, to_node, label=f'Cron trigger {from_node} dispatcher',
+    dot.edge(from_node, to_node, label=f'Cron triggers {from_node} dispatcher',
              color='blue')
 
 
 dot.edge('deal_1d_notification_sending', 'sudden_change_time_notification_sending',
-         label='Some one triggers change time', color='red')
-dot.edge('deal_3hr_notification_sending',
-         'sudden_change_time_notification_sending', label='Some one triggers change time', color='red')
+         label='Someone triggers change time', color='red')
 
 
 dot.edge('change_time_sending', 'rest_r1_waiting',
@@ -107,12 +106,14 @@ dot.edge('change_time_sending', 'rest_r1_waiting',
          color='blue')
 
 
-dot.edge('wait_for_dating_finish', 'dating_feedback_sending',
-         label='Cron trigger wait_for_dating_finish transformer')
-dot.edge('dating_feedback_sending', 'dating_done',
-         label='Cron triggers dating_feedback_sending dispatcher',
+dot.edge('deal_3hr_notification_sending', 'next_month_sending',
+         label='Someone triggers change time.',
          color='blue')
 
-# dot.attr(ranksep='1.5', nodesep='1.0')
+dot.edge('dating_notification_sending', 'next_month_sending',
+         label='Someone triggers change time.',
+         color='blue')
+
+dot.attr(ranksep='1.5', nodesep='1.0')
 dot.attr('edge', arrowsize='3', penwidth='3')
 dot.render('flowchart', format='png', cleanup=True)
