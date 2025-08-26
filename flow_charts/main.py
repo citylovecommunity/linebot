@@ -107,12 +107,12 @@ dot.edge('change_time_sending', 'rest_r1_waiting',
 
 
 dot.edge('deal_3hr_notification_sending', 'next_month_sending',
-         label='Someone triggers change time.',
-         color='blue')
+         label='Someone triggers change time next month.',
+         color='red')
 
 dot.edge('dating_notification_sending', 'next_month_sending',
-         label='Someone triggers change time.',
-         color='blue')
+         label='Someone triggers change time next month.',
+         color='red')
 
 dot.attr(ranksep='1.5', nodesep='1.0')
 dot.attr('edge', arrowsize='3', penwidth='3')

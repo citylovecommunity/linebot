@@ -106,3 +106,17 @@ def send_bubble_to_member_id(conn, member_id, bubble, alt_text='嘻嘻', product
             ))
     else:
         send_bubble(TEST_USER_ID, bubble, alt_text)
+
+
+def send_normal_text(conn, member_id, message, production=SENDER_PRODUCTION):
+    user_id = get_user_id(conn, member_id)
+    if production:
+        if user_id:
+            line_bot_api.push_message(user_id[0], TextMessage(text=message))
+        else:
+            name = get_user_name(conn, member_id)
+            line_bot_api.push_message(ADMIN_LINE_ID, TextMessage(
+                text=f'會員 {name} 沒有綁定 LINE 帳號⚠️⚠️⚠️',
+            ))
+    else:
+        line_bot_api.push_message(TEST_USER_ID, TextMessage(text=message))

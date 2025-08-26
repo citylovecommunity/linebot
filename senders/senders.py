@@ -14,6 +14,7 @@ SendingInfo = namedtuple('SendingInfo', ['recipient', 'bubble', 'alt'])
 class Sender(ABC):
     OLD_STATE = None
     NEW_STATE = None
+    NOTIFICATION = None
 
     def __init__(self, conn, matching_row):
         self.matching_row = matching_row
@@ -34,7 +35,10 @@ class Sender(ABC):
                 self.conn, recipient, bubble, alt_text=alt)
 
         if change_state:
-            self._change_state()
+            if self.NOTIFICATION:
+                raise ValueError("A Notification can not change state.")
+            else:
+                self._change_state()
 
 
 class InvitationSender(Sender):
@@ -208,6 +212,194 @@ class CancelNotifySender(Sender):
 
         return [SendingInfo(self.matching_row.object_id, bubble_for_obj),
                 SendingInfo(self.matching_row.subject_id, bubble_for_sub)]
+
+
+class Invitation24Sender(Sender):
+    OLD_STATE = 'invitation24_sending'
+    NEW_STATE = 'invitation24_waiting'
+
+    def modify_bubble(self):
+        # TODO: Implement actual bubble logic
+        return []
+
+
+class Invitation48Sender(Sender):
+    OLD_STATE = 'invitation48_sending'
+    NEW_STATE = 'invitation48_waiting'
+
+    def modify_bubble(self):
+        # TODO: Implement actual bubble logic
+        return []
+
+
+class Liked24Sender(Sender):
+    OLD_STATE = 'liked24_sending'
+    NEW_STATE = 'liked24_waiting'
+
+    def modify_bubble(self):
+        # TODO: Implement actual bubble logic
+        return []
+
+
+class Liked48Sender(Sender):
+    OLD_STATE = 'liked48_sending'
+    NEW_STATE = 'liked48_waiting'
+
+    def modify_bubble(self):
+        # TODO: Implement actual bubble logic
+        return []
+
+
+class RestR124Sender(Sender):
+    NOTIFICATION = True
+
+    def modify_bubble(self):
+        # TODO: Implement actual bubble logic
+        return []
+
+
+class RestR148Sender(Sender):
+    OLD_STATE = 'rest_r148_sending'
+    NEW_STATE = 'rest_r148_waiting'
+
+    def modify_bubble(self):
+        # TODO: Implement actual bubble logic
+        return []
+
+
+class RestR224Sender(Sender):
+    OLD_STATE = 'rest_r224_sending'
+    NEW_STATE = 'rest_r224_waiting'
+
+    def modify_bubble(self):
+        # TODO: Implement actual bubble logic
+        return []
+
+
+class RestR248Sender(Sender):
+    OLD_STATE = 'rest_r248_sending'
+    NEW_STATE = 'rest_r248_waiting'
+
+    def modify_bubble(self):
+        # TODO: Implement actual bubble logic
+        return []
+
+
+class RestR324Sender(Sender):
+    OLD_STATE = 'rest_r324_sending'
+    NEW_STATE = 'rest_r324_waiting'
+
+    def modify_bubble(self):
+        # TODO: Implement actual bubble logic
+        return []
+
+
+class RestR348Sender(Sender):
+    OLD_STATE = 'rest_r348_sending'
+    NEW_STATE = 'rest_r348_waiting'
+
+    def modify_bubble(self):
+        # TODO: Implement actual bubble logic
+        return []
+
+
+class RestR424Sender(Sender):
+    OLD_STATE = 'rest_r424_sending'
+    NEW_STATE = 'rest_r424_waiting'
+
+    def modify_bubble(self):
+        # TODO: Implement actual bubble logic
+        return []
+
+
+class RestR448Sender(Sender):
+    OLD_STATE = 'rest_r448_sending'
+    NEW_STATE = 'rest_r448_waiting'
+
+    def modify_bubble(self):
+        # TODO: Implement actual bubble logic
+        return []
+
+
+class NoActionGoodbyeSender(Sender):
+    OLD_STATE = 'no_action_goodbye_sending'
+    NEW_STATE = 'goodbye'
+
+    def modify_bubble(self):
+        # TODO: Implement actual bubble logic
+        return []
+
+
+class Deal1DDealSender(Sender):
+    OLD_STATE = 'deal_1d_notification_sending'
+    NEW_STATE = 'deal_1d_notification_waiting'
+
+    def modify_bubble(self):
+        # TODO: Implement actual bubble logic
+        return []
+
+
+class Deal3HRSender(Sender):
+    OLD_STATE = 'deal_3hr_notification_sending'
+    NEW_STATE = 'deal_3hr_notification_waiting'
+
+    def modify_bubble(self):
+        # TODO: Implement actual bubble logic
+        return []
+
+
+class SuddenChangeTimeSender(Sender):
+    OLD_STATE = 'sudden_change_time_notification_sending'
+    NEW_STATE = 'sudden_change_time_notification_waiting'
+
+    def modify_bubble(self):
+        # TODO: Implement actual bubble logic
+        return []
+
+
+class NextMonthSender(Sender):
+    OLD_STATE = 'next_month_sending'
+    NEW_STATE = 'next_month_waiting'
+
+    def modify_bubble(self):
+        # TODO: Implement actual bubble logic
+        return []
+
+
+class ChangeTimeSender(Sender):
+    OLD_STATE = 'change_time_sending'
+    NEW_STATE = 'change_time_waiting'
+
+    def modify_bubble(self):
+        # TODO: Implement actual bubble logic
+        return []
+
+
+class RestR1NextMonthSender(Sender):
+    OLD_STATE = 'rest_r1_next_month_sending'
+    NEW_STATE = 'rest_r1_next_month_waiting'
+
+    def modify_bubble(self):
+        # TODO: Implement actual bubble logic
+        return []
+
+
+class DatingNotificationSender(Sender):
+    OLD_STATE = 'dating_notification_sending'
+    NEW_STATE = 'dating_notification_waiting'
+
+    def modify_bubble(self):
+        # TODO: Implement actual bubble logic
+        return []
+
+
+class DatingFeedbackSender(Sender):
+    OLD_STATE = 'dating_feedback_sending'
+    NEW_STATE = 'dating_feedback_waiting'
+
+    def modify_bubble(self):
+        # TODO: Implement actual bubble logic
+        return []
 
 
 def set_two_way_bubble_link_intro(conn, bubble, matching_row, message, info_title):
