@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from tkinter import E
 from typing import NamedTuple
 
 import psycopg
@@ -115,26 +114,22 @@ class ChangeTimeCollector(Collector):
 
 class Invitation24Collector(Collector):
     def collect(self):
-        # TODO: Implement actual logic
-        return []
+        return get_notification_list(self.conn, 'invitation', '24')
 
 
 class Invitation48Collector(Collector):
     def collect(self):
-        # TODO: Implement actual logic
-        return []
+        return get_notification_list(self.conn, 'invitation', '48')
 
 
 class Liked24Collector(Collector):
     def collect(self):
-        # TODO: Implement actual logic
-        return []
+        return get_notification_list(self.conn, 'liked', '24')
 
 
 class Liked48Collector(Collector):
     def collect(self):
-        # TODO: Implement actual logic
-        return []
+        return get_notification_list(self.conn, 'liked', '48')
 
 
 class RestR124Collector(Collector):
@@ -179,53 +174,44 @@ class RestR448Collector(Collector):
 
 class NoActionGoodbyeCollector(Collector):
     def collect(self):
-        # TODO: Implement actual logic
-        return []
+        return get_list(self.conn, 'no_action_goodbye_sending')
 
 
 class Deal1DCollector(Collector):
     def collect(self):
-        # TODO: Implement actual logic
-        return []
+        return get_list(self.conn, 'deal_1d_notification_sending')
 
 
 class Deal3HRCollector(Collector):
     def collect(self):
-        # TODO: Implement actual logic
-        return []
+        return get_list(self.conn, 'deal_3hr_notification_sending')
 
 
 class SuddenChangeTimeCollector(Collector):
     def collect(self):
-        # TODO: Implement actual logic
-        return []
+        return get_list(self.conn, 'sudden_change_time_notification_sending')
 
 
 class NextMonthCollector(Collector):
     def collect(self):
-        # TODO: Implement actual logic
-        return []
+        return get_list(self.conn, 'next_month_waiting')
 
 
 class ChangeTimeCollector(Collector):
     def collect(self):
-        # TODO: Implement actual logic
-        return []
+        return get_list(self.conn, 'change_time_sending')
 
 
 class RestR1NextMonthCollector(Collector):
     def collect(self):
-        # TODO: Implement actual logic
-        return []
+        return get_list(self.conn, 'rest_r1_next_month_sending')
 
 
 class DatingNotificationCollector(Collector):
     def collect(self):
-        # TODO: Implement actual logic
-        return []
+        return get_list(self.conn, 'dating_notification_sending')
 
 
 class DatingFeedbackCollector(Collector):
     def collect(self):
-        # TODO: Implement actual logic
-        return []
+        return get_list(self.conn, 'dating_feedback_sending')
