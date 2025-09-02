@@ -1,11 +1,12 @@
 
 from abc import ABC, abstractmethod
 from collections import namedtuple
+import copy
 from typing import List
 
 from config import FORM_WEB_URL
 from senders_utils import (base_modifier, change_state, get_gender_id,
-                           get_introduction_link, get_proper_name, load_bubble,
+                           get_introduction_link, get_proper_name, load_bubble, load_bubble_raw,
                            send_bubble_to_member_id, send_normal_text,
                            set_basic_bubble, set_two_way_bubble_link_intro)
 
@@ -266,15 +267,41 @@ class RestR4Sender(Sender):
 
 
 class DealSender(Sender):
-    def modify_bubble(self):
-        base_bubble = load_bubble('basic_bubble.json')
-        bubble = base_modifier(base_bubble)
+    OLD_STATE = 'deal_sending'
+    NEW_STATE = 'deal_1d_notification_sending'
 
-        message = "牽線成功\n收到此出擊提醒請務必點擊下方確認扭\n讓我們知道你已收到這個好消息！"
+    def modify_bubble(self):
+        bubble = load_bubble_raw('deal_bubble.json')
+
         alt_message = '開啟您的約會出席提醒'
 
-        bubble_for_obj, bubble_for_sub = set_two_way_bubble_link_intro(
-            self.conn, bubble, self.matching_row, message, '約會出席提醒')
+        # 先把一些共同有的置換上去
+
+        bubble = bubble.replace("###城市###", self.matching_row.city)
+        bubble = bubble.replace("##時間##", self.matching_row.selected_time)
+        bubble = bubble.replace(
+            "###訂位名字###", self.matching_row.book_name)
+        bubble = bubble.replace(
+            "###訂位電話###", self.matching_row.book_phone)
+        bubble = bubble.replace(
+            "###約會留言###", self.matching_row.comment)
+
+        bubble = bubble.replace(
+            "http://rest_url", self.matching_row.selected_place)
+        bubble_template = copy.deepcopy(bubble)
+        # 不同的
+
+        bubble_for_sub = bubble_template.replace(
+            "##對象##", get_proper_name(self.matching_row.object_id))
+        bubble_for_obj = bubble_template.replace(
+            "##對象##", get_proper_name(self.matching_row.subject_id))
+
+        bubble_for_sub.replace(
+            "http://intro_url", get_introduction_link(self.conn, self.matching_row.object_id))
+        bubble_for_obj.replace(
+            "http://intro_url", get_introduction_link(self.conn, self.matching_row.subject_id))
+
+        # TODO: 還有我要改期沒有做
 
         return [SendingInfo(
             self.matching_row.object_id, bubble_for_obj, alt_message),

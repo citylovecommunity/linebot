@@ -136,7 +136,9 @@ def store_booking_data(booking_data, matching_id, conn=None, commit=True):
             update matching set
             book_phone = %(book_phone)s,
             book_name = %(book_name)s,
-            comment = %(comment)s
+            comment = %(comment)s,
+            selected_place = %(selected_place)s,
+            selected_time = %(selected_time)s
             where id = %(matching_id)s
             """
         with conn.cursor() as curr:

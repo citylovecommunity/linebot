@@ -1,11 +1,13 @@
 {
     "type": "bubble",
     "hero": {
-        "type": "image",
-        "url": "",
-        "size": "full",
-        "aspectRatio": "20:13",
-        "aspectMode": "cover"
+        "type": "box",
+        "layout": "vertical",
+        "contents": [],
+        "backgroundColor": "#fe5c0a",
+        "margin": "sm",
+        "cornerRadius": "sm",
+        "height": "10px"
     },
     "body": {
         "type": "box",
@@ -13,7 +15,7 @@
         "contents": [
             {
                 "type": "text",
-                "text": "快樂約會囉",
+                "text": "約會出席提醒",
                 "weight": "bold",
                 "size": "xl",
                 "align": "start",
@@ -22,15 +24,15 @@
             {
                 "type": "box",
                 "layout": "vertical",
-                "contents": [],
-                "margin": "lg"
-            },
-            {
-                "type": "box",
-                "layout": "vertical",
                 "margin": "lg",
                 "spacing": "sm",
                 "contents": [
+                    {
+                        "type": "text",
+                        "text": "提醒您即將到來的約會\n請確認以下資訊",
+                        "wrap": true,
+                        "margin": "xs"
+                    },
                     {
                         "type": "box",
                         "layout": "baseline",
@@ -45,7 +47,7 @@
                             },
                             {
                                 "type": "text",
-                                "text": "紐約",
+                                "text": "###城市###",
                                 "wrap": true,
                                 "color": "#666666",
                                 "size": "sm",
@@ -67,7 +69,7 @@
                             },
                             {
                                 "type": "text",
-                                "text": "訂位時間",
+                                "text": "##時間##",
                                 "wrap": true,
                                 "color": "#666666",
                                 "size": "sm",
@@ -89,7 +91,7 @@
                             },
                             {
                                 "type": "text",
-                                "text": "王先生",
+                                "text": "##對象##",
                                 "wrap": true,
                                 "color": "#666666",
                                 "size": "sm",
@@ -111,7 +113,7 @@
                             },
                             {
                                 "type": "text",
-                                "text": "訂位名字",
+                                "text": "##訂位名字##",
                                 "wrap": true,
                                 "color": "#666666",
                                 "size": "sm",
@@ -133,7 +135,7 @@
                             },
                             {
                                 "type": "text",
-                                "text": "訂位電話",
+                                "text": "##訂位電話##",
                                 "wrap": true,
                                 "color": "#666666",
                                 "size": "sm",
@@ -151,11 +153,12 @@
                                 "text": "約會留言",
                                 "color": "#aaaaaa",
                                 "size": "sm",
-                                "flex": 2
+                                "flex": 2,
+                                "wrap": true
                             },
                             {
                                 "type": "text",
-                                "text": "訂位電話",
+                                "text": "##約會留言##",
                                 "wrap": true,
                                 "color": "#666666",
                                 "size": "sm",
@@ -166,36 +169,33 @@
                 ]
             },
             {
-                "type": "box",
-                "layout": "vertical",
-                "contents": [],
-                "margin": "lg"
-            },
-            {
-                "type": "separator"
+                "type": "separator",
+                "margin": "md"
             }
         ]
     },
     "footer": {
         "type": "box",
         "layout": "vertical",
-        "spacing": "sm",
+        "spacing": "none",
         "contents": [
             {
                 "type": "button",
                 "action": {
                     "type": "uri",
                     "label": "約會餐廳",
-                    "uri": "http://linecorp.com/"
-                }
+                    "uri": "http://rest_url"
+                },
+                "style": "link"
             },
             {
                 "type": "button",
                 "action": {
                     "type": "uri",
                     "label": "介紹卡連結",
-                    "uri": "http://linecorp.com/"
-                }
+                    "uri": "http://intro_url"
+                },
+                "height": "md"
             },
             {
                 "type": "button",
@@ -204,9 +204,8 @@
                 "action": {
                     "type": "uri",
                     "label": "我要改期",
-                    "uri": "https://line.me/"
-                },
-                "color": "#f05c08"
+                    "uri": "http://rest_url"
+                }
             },
             {
                 "type": "box",
@@ -215,6 +214,7 @@
                 "margin": "sm"
             }
         ],
-        "flex": 0
+        "flex": 0,
+        "margin": "none"
     }
 }

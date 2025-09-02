@@ -29,6 +29,12 @@ def load_bubble(name):
     return bubble
 
 
+def load_bubble_raw(name):
+    with open('bubbles/'+name) as file:
+        bubble = file.read()
+    return bubble
+
+
 def get_gender_id(conn, matching_row, gender):
     stmt = '''
     select gender from member
