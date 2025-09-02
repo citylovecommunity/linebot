@@ -4,7 +4,7 @@ import psycopg
 from config import DB
 from dispatchers import DISPATCHER_MAP, get_dispatcher
 
-
+# 只要測試每一個發送出去的內容是否正確
 # dispatcher_types = [
 #     "invitation",✅
 #     "invitation_24",
@@ -16,7 +16,7 @@ from dispatchers import DISPATCHER_MAP, get_dispatcher
 #     "rest_r1",✅
 #     "rest_r1_24",
 #     "rest_r1_48",
-#     "rest_r2",
+#     "rest_r2",✅
 #     "rest_r2_24",
 #     "rest_r2_48",
 #     "rest_r3",

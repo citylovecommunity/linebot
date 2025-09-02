@@ -310,7 +310,7 @@ def confirm_booking(rest_round):
         conn = get_db()
         change_state(matching_info['current_state'],
                      f'rest_r{rest_round}_waiting',
-                     'mission_sending',
+                     'deal_sending',
                      matching_info['id'],
                      conn=conn, commit=False)
         store_booking_data(data, matching_info['id'],
@@ -660,7 +660,6 @@ def mock_process_confirmation():
     Mock endpoint for processing confirmation
     """
     return redirect(url_for("mock_thank_you"))
-
 
 
 if __name__ == '__main__':

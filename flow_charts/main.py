@@ -114,6 +114,6 @@ dot.edge('dating_notification_sending', 'next_month_sending',
          label='Someone triggers change time next month.',
          color='red')
 
-dot.attr(ranksep='1.5', nodesep='1.0')
+# dot.attr(ranksep='1.5', nodesep='1.0')
 dot.attr('edge', arrowsize='3', penwidth='3')
 dot.render('flowchart', format='png', cleanup=True)
