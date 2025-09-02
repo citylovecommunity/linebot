@@ -26,8 +26,8 @@ class Sender(ABC):
         pass
 
     def _change_state(self):
-        change_state(self.conn, self.old_state,
-                     self.new_state, self.matching_row.id)
+        change_state(self.conn, self.OLD_STATE,
+                     self.NEW_STATE, self.matching_row.id)
 
     def send(self, change_state):
         sending_infos = self.modify_bubble()
@@ -184,6 +184,9 @@ class GoodbyeSender(Sender):
 
 
 class RestR1Sender(Sender):
+    OLD_STATE = 'rest_r1_sending'
+    NEW_STATE = 'rest_r1_waiting'
+
     def modify_bubble(self):
         base_bubble = load_bubble('basic_bubble.json')
         bubble = base_modifier(base_bubble)
@@ -199,10 +202,13 @@ class RestR1Sender(Sender):
             bubble, '此約會邀請成功', self.matching_row.city, name,
             intro_link, form_app_link, '開啟約會資訊卡', message)
 
-        return [SendingInfo(send_to_id, bubble, alt='選餐廳囉～')]
+        return [SendingInfo(send_to_id, bubble, alt='來囉！開啟此趟約會行程確認')]
 
 
 class RestR2Sender(Sender):
+    OLD_STATE = 'rest_r2_sending'
+    NEW_STATE = 'rest_r2_waiting'
+
     def modify_bubble(self):
         base_bubble = load_bubble('basic_bubble.json')
         bubble = base_modifier(base_bubble)

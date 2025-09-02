@@ -38,14 +38,18 @@
                 <input class="form-check-input me-2" type="radio" name="selected_time" value="{{ time1 }}" required>
                 <span class="flex-grow-1">{{ time1 }}</span>
             </label>
+            {% if time2 %}
             <label class="list-group-item d-flex align-items-center">
                 <input class="form-check-input me-2" type="radio" name="selected_time" value="{{ time2 }}">
                 <span class="flex-grow-1">{{ time2 }}</span>
             </label>
+            {% endif %}
+            {% if time3 %}
             <label class="list-group-item d-flex align-items-center">
                 <input class="form-check-input me-2" type="radio" name="selected_time" value="{{ time3 }}">
                 <span class="flex-grow-1">{{ time3 }}</span>
             </label>
+            {% endif %}
         </div>
     </div>
 

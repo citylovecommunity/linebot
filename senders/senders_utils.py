@@ -1,8 +1,8 @@
-import json
 import copy
+import json
 
-
-from config import ADMIN_LINE_ID, SENDER_PRODUCTION, TEST_USER_ID, line_bot_api, BUBBLE_HERO_IMAGE_URLs
+from config import (ADMIN_LINE_ID, BUBBLE_HERO_IMAGE_URL, SENDER_PRODUCTION,
+                    TEST_USER_ID, line_bot_api)
 from linebot.models import FlexSendMessage, TextMessage
 
 
@@ -240,7 +240,7 @@ def change_state(conn, old_state, new_state, matching_id):
         select current_state from matching where id=%s;
         """
         current_state = curr.execute(
-            stmt, (matching_id,)).fetchone()
+            stmt, (matching_id,)).fetchone()[0]
         if current_state != old_state:
             raise ValueError(
                 f"{matching_id}狀態錯誤，預期{old_state}，但上面是{current_state}")

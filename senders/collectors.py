@@ -65,11 +65,11 @@ class LikedCollector(Collector):
         select * from
         matching where
         current_state = %s
-        and obj_id not in (
-            select obj_id
+        and object_id not in (
+            select object_id
             from matching
-            where current_state not in ('invitation', 'goodbye')
-            group by obj_id
+            where current_state not in ('invitation_sending', 'goodbye')
+            group by object_id
             having count(*) >= 3
             );
         """

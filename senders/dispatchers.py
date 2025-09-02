@@ -1,5 +1,3 @@
-import random
-
 import psycopg
 from collectors import (ChangeTimeCollector, Collector,
                         DatingFeedbackCollector, DatingNotificationCollector,
@@ -45,7 +43,7 @@ class Dispatcher:
             self.sender(self.conn, matching_row).send(change_state)
 
     def send_one(self, change_state=None):
-        self.sender(self.conn, random.choice(self._users)).send(change_state)
+        self.sender(self.conn, self._users[0]).send(change_state)
 
 
 # Mapping of dispatcher types to their collector and sender classes
