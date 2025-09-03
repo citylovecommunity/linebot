@@ -32,7 +32,7 @@ def load_bubble(name):
 def load_bubble_raw(name):
     with open('bubbles/'+name) as file:
         bubble = file.read()
-    return bubble
+    return BUBBLE(bubble)
 
 
 def get_gender_id(conn, matching_row, gender):
@@ -128,6 +128,62 @@ def send_normal_text(conn, member_id, message, production=SENDER_PRODUCTION):
             ))
     else:
         line_bot_api.push_message(TEST_USER_ID, TextMessage(text=message))
+
+
+class BUBBLE:
+    def __init__(self, bubble):
+        self.bubble = bubble
+
+    def copy(self):
+        return BUBBLE(copy.deepcopy(self.bubble))
+
+    def set_title(self, title):
+        self.bubble = self.bubble.replace('##標題##', title)
+        return self
+
+    def set_city(self, city):
+        self.bubble = self.bubble.replace('##城市##', city)
+        return self
+
+    def set_time(self, time):
+        self.bubble = self.bubble.replace('##時間##', time)
+        return self
+
+    def set_book_name(self, book_name):
+        self.bubble = self.bubble.replace('##訂位名字##', book_name)
+        return self
+
+    def set_book_phone(self, book_phone):
+        self.bubble = self.bubble.replace('##訂位電話##', book_phone)
+        return self
+
+    def set_message(self, message):
+        self.bubble = self.bubble.replace('##約會留言##', message)
+        return self
+
+    def set_intro_link(self, intro_link):
+        self.bubble = self.bubble.replace('http://intro_url', intro_link)
+        return self
+
+    def set_sent_to_proper_name(self, name):
+        self.bubble = self.bubble.replace('##對象##', name)
+        return self
+
+    def set_rest_url(self, rest_url):
+        self.bubble = self.bubble.replace('http://rest_url', rest_url)
+        return self
+
+    def set_title(self, title):
+        self.bubble = self.bubble.replace('##標題##', title)
+        return self
+
+    def set_form_app_link(self, form_app_link):
+        self.bubble = self.bubble.replace(
+            'http://form_app_url', form_app_link)
+        return self
+
+    def as_dict(self):
+        return json.loads(self.bubble)
 
 
 def set_two_way_bubble_link_intro(conn, bubble, matching_row, message, info_title):

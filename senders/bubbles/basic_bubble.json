@@ -13,7 +13,7 @@
         "contents": [
             {
                 "type": "text",
-                "text": "約會邀請卡",
+                "text": "##標題##",
                 "weight": "bold",
                 "size": "xl",
                 "align": "start",
@@ -45,7 +45,7 @@
                             },
                             {
                                 "type": "text",
-                                "text": "紐約",
+                                "text": "##城市##",
                                 "wrap": true,
                                 "color": "#666666",
                                 "size": "sm",
@@ -67,7 +67,7 @@
                             },
                             {
                                 "type": "text",
-                                "text": "王先生",
+                                "text": "##對象##",
                                 "wrap": true,
                                 "color": "#666666",
                                 "size": "sm",
@@ -76,13 +76,6 @@
                         ]
                     }
                 ]
-            },
-            {
-                "type": "text",
-                "text": " ",
-                "margin": "lg",
-                "size": "md",
-                "wrap": true
             },
             {
                 "type": "separator",
@@ -100,7 +93,7 @@
                 "action": {
                     "type": "uri",
                     "label": "介紹卡連結",
-                    "uri": "http://linecorp.com/"
+                    "uri": "http://intro_url"
                 }
             },
             {
@@ -110,7 +103,7 @@
                 "action": {
                     "type": "uri",
                     "label": "開啟邀請卡",
-                    "uri": "https://line.me/"
+                    "uri": "http://form_app_url"
                 },
                 "color": "#f05c08"
             },

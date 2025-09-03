@@ -51,16 +51,20 @@ class InvitationSender(Sender):
     NEW_STATE = 'invitation_waiting'
 
     def modify_bubble(self):
-        base_bubble = load_bubble('basic_bubble.json')
-        bubble = base_modifier(base_bubble)
-        form_app_link = f'{FORM_WEB_URL}/{self.matching_row.access_token}/invitation'
-        intro_link = get_introduction_link(
-            self.conn, self.matching_row.object_id)
-        name = get_proper_name(self.conn, self.matching_row.object_id)
-        bubble = set_basic_bubble(
-            bubble, '約會邀請卡', self.matching_row.city, name, intro_link, form_app_link, '開啟邀請卡')
+        bubble = load_bubble_raw('basic_bubble.json')
 
-        return [SendingInfo(self.matching_row.subject_id, bubble, '🎉接收您的約會邀請卡')]
+        bubble.set_title('約會邀請卡')
+
+        bubble.set_city(self.matching_row.city)
+        bubble.set_form_app_link(
+            f'{FORM_WEB_URL}/{self.matching_row.access_token}/invitation')
+
+        bubble.set_intro_link(get_introduction_link(
+            self.conn, self.matching_row.object_id))
+        bubble.set_sent_to_proper_name(get_proper_name(
+            self.conn, self.matching_row.object_id))
+
+        return [SendingInfo(self.matching_row.subject_id, bubble.as_dict(), '🎉接收您的約會邀請卡')]
 
 
 class Invitation24Sender(Sender):
@@ -268,45 +272,44 @@ class RestR4Sender(Sender):
 
 class DealSender(Sender):
     OLD_STATE = 'deal_sending'
-    NEW_STATE = 'deal_1d_notification_sending'
+    NEW_STATE = 'deal_sending'
+    # NEW_STATE = 'deal_1d_notification_sending'
 
     def modify_bubble(self):
-        bubble = load_bubble_raw('deal_bubble.json')
+        base_bubble = load_bubble_raw('deal_bubble.json')
 
         alt_message = '開啟您的約會出席提醒'
 
         # 先把一些共同有的置換上去
 
-        bubble = bubble.replace("###城市###", self.matching_row.city)
-        bubble = bubble.replace("##時間##", self.matching_row.selected_time)
-        bubble = bubble.replace(
-            "###訂位名字###", self.matching_row.book_name)
-        bubble = bubble.replace(
-            "###訂位電話###", self.matching_row.book_phone)
-        bubble = bubble.replace(
-            "###約會留言###", self.matching_row.comment)
+        base_bubble.set_city(self.matching_row.city)
+        base_bubble.set_time(
+            self.matching_row.selected_time.strftime('%Y-%m-%d %H:%M'))
+        base_bubble.set_book_name(self.matching_row.book_name)
+        base_bubble.set_book_phone(self.matching_row.book_phone)
+        base_bubble.set_message(self.matching_row.comment)
+        base_bubble.set_rest_url(self.matching_row.selected_place)
 
-        bubble = bubble.replace(
-            "http://rest_url", self.matching_row.selected_place)
-        bubble_template = copy.deepcopy(bubble)
         # 不同的
+        bubble_for_sub = base_bubble.copy()
+        bubble_for_obj = base_bubble.copy()
 
-        bubble_for_sub = bubble_template.replace(
-            "##對象##", get_proper_name(self.matching_row.object_id))
-        bubble_for_obj = bubble_template.replace(
-            "##對象##", get_proper_name(self.matching_row.subject_id))
+        bubble_for_sub.set_sent_to_proper_name(
+            get_proper_name(self.conn, self.matching_row.object_id))
+        bubble_for_obj.set_sent_to_proper_name(
+            get_proper_name(self.conn, self.matching_row.subject_id))
 
-        bubble_for_sub.replace(
-            "http://intro_url", get_introduction_link(self.conn, self.matching_row.object_id))
-        bubble_for_obj.replace(
-            "http://intro_url", get_introduction_link(self.conn, self.matching_row.subject_id))
+        bubble_for_sub.set_intro_link(
+            get_introduction_link(self.conn, self.matching_row.object_id))
+        bubble_for_obj.set_intro_link(
+            get_introduction_link(self.conn, self.matching_row.subject_id))
 
-        # TODO: 還有我要改期沒有做
+        # TODO: 還有我要改期連結沒有做
 
         return [SendingInfo(
-            self.matching_row.object_id, bubble_for_obj, alt_message),
+            self.matching_row.object_id, bubble_for_obj.as_dict(), alt_message),
             SendingInfo(
-            self.matching_row.subject_id, bubble_for_sub, alt_message)]
+            self.matching_row.subject_id, bubble_for_sub.as_dict(), alt_message)]
 
 
 class NoActionGoodbyeSender(Sender):
