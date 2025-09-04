@@ -1,5 +1,6 @@
 
 import os
+import re
 
 import psycopg
 from dotenv import load_dotenv
@@ -167,6 +168,42 @@ def router(token, action):
 
     else:
         return render_template('error.html', message='token錯誤❌')
+
+
+@app.route('/<token>/change_time/<int:member_id>', methods=['GET', 'POST'])
+def change_time(token, member_id):
+    if request.method == 'POST':
+        message = request.form['message']
+        matching_info = get_token_matching(token)
+
+        # check member_id in matching
+        if member_id not in (matching_info['subject_id'], matching_info['object_id']):
+            return render_template('error.html', message='無權限操作此配對❌')
+
+        # insert change_time_message
+        change_time_stmt = """
+        insert into change_time_history
+        (member_id, created_at, matching_id, change_time_message)
+        values (%s, now(), %s, %s)
+        """
+        with get_db() as conn:
+            with conn.cursor() as curr:
+                curr.execute(change_time_stmt, (member_id,
+                             matching_info['id'], message))
+            conn.commit()
+
+        return render_template('thank_you.html',
+                               header='您已成功改期',
+                               message="""
+                               本配對已成功改期<br>
+                               系統將重新為您安排配對<br>
+                               請耐心等待後續通知<br>
+                               """)
+    else:
+        # 檢查這一對是否已經有改期過，如果有，顯示提醒訊息
+        # if has_changed_time(matching_info['id']):
+        #     return render_template('change_time.html', token=token, member_id=member_id, message="這一對已經有改期過了")
+        return render_template('change_time.html', token=token, member_id=member_id)
 
 
 @app.route('/invitation', methods=['GET', 'POST'])
