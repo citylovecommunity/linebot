@@ -47,11 +47,54 @@
                             },
                             {
                                 "type": "text",
-                                "text": "###城市###",
+                                "text": "##城市##",
                                 "wrap": true,
                                 "color": "#666666",
                                 "size": "sm",
                                 "flex": 5
+                            }
+                        ]
+                    },
+                    {
+                        "type": "box",
+                        "layout": "baseline",
+                        "spacing": "sm",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "約會對象",
+                                "color": "#aaaaaa",
+                                "size": "sm",
+                                "flex": 2
+                            },
+                            {
+                                "type": "text",
+                                "text": "##對象##",
+                                "wrap": true,
+                                "color": "#666666",
+                                "size": "sm",
+                                "flex": 5
+                            }
+                        ]
+                    },
+                    {
+                        "type": "box",
+                        "layout": "baseline",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "約會餐廳",
+                                "flex": 2,
+                                "size": "sm",
+                                "color": "#aaaaaa"
+                            },
+                            {
+                                "type": "text",
+                                "text": "##約會餐廳##",
+                                "flex": 5,
+                                "size": "sm",
+                                "color": "#666666",
+                                "wrap": true
                             }
                         ]
                     },
@@ -70,28 +113,6 @@
                             {
                                 "type": "text",
                                 "text": "##時間##",
-                                "wrap": true,
-                                "color": "#666666",
-                                "size": "sm",
-                                "flex": 5
-                            }
-                        ]
-                    },
-                    {
-                        "type": "box",
-                        "layout": "baseline",
-                        "spacing": "sm",
-                        "contents": [
-                            {
-                                "type": "text",
-                                "text": "對象",
-                                "color": "#aaaaaa",
-                                "size": "sm",
-                                "flex": 2
-                            },
-                            {
-                                "type": "text",
-                                "text": "##對象##",
                                 "wrap": true,
                                 "color": "#666666",
                                 "size": "sm",
@@ -204,7 +225,7 @@
                 "action": {
                     "type": "uri",
                     "label": "我要改期",
-                    "uri": "http://rest_url"
+                    "uri": "http://form_app_url"
                 }
             },
             {

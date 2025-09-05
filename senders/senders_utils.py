@@ -1,18 +1,19 @@
 import copy
 import json
+from collections import namedtuple
+from datetime import datetime
 
-from config import (ADMIN_LINE_ID, BUBBLE_HERO_IMAGE_URL, SENDER_PRODUCTION,
-                    TEST_USER_ID, line_bot_api)
+from config import ADMIN_LINE_ID, SENDER_PRODUCTION, TEST_USER_ID, line_bot_api
 from linebot.models import FlexSendMessage, TextMessage
 
 
-def write_sent_to_db(conn, matching_id, state):
+def write_sent_to_db(conn, matching_id, body, send_at, send_to):
     stmt = """
-    update set current_state = %s
-    where id = %s;
+    insert into sending_history (matching_id, body, send_at, send_to)
+    values (%s, %s, %s, %s)
     """
     with conn.cursor() as cur:
-        return cur.execute(stmt, (state+'_waiting', matching_id,))
+        return cur.execute(stmt, (matching_id, body, send_at, send_to))
 
 
 def send_bubble(user_id, bubble, alt_text='酷喔'):
@@ -99,8 +100,13 @@ def get_proper_name(conn, member_id):
             return ''
 
 
+real_sending_info = namedtuple(
+    'real_sending_info', ['body', 'send_at', 'send_to'])
+
+
 def send_bubble_to_member_id(conn, member_id, bubble, alt_text='嘻嘻', production=SENDER_PRODUCTION):
     user_id = get_user_id(conn, member_id)
+    body = bubble
     if production:
         if user_id:
             #
@@ -108,12 +114,27 @@ def send_bubble_to_member_id(conn, member_id, bubble, alt_text='嘻嘻', product
             pass
         else:
             name = get_user_name(conn, member_id)
-            line_bot_api.push_message(ADMIN_LINE_ID, TextMessage(
-                text=f'會員 {name} 沒有綁定 LINE 帳號⚠️⚠️⚠️',
-                alt_text=alt_text,
-            ))
+            body = f'會員 {name} 沒有綁定 LINE 帳號⚠️⚠️⚠️'
+            user_id = ADMIN_LINE_ID
+            line_bot_api.push_message(user_id,
+                                      TextMessage(
+                                          text=body,
+                                          alt_text=alt_text,
+                                      ))
     else:
-        send_bubble(TEST_USER_ID, bubble, alt_text)
+        user_id = TEST_USER_ID
+        send_bubble(TEST_USER_ID, body, alt_text)
+
+    return real_sending_info(body_to_str(body), datetime.now(), user_id)
+
+
+def body_to_str(body):
+    if isinstance(body, str):
+        return body
+    elif isinstance(body, dict):
+        return json.dumps(body, ensure_ascii=False)
+    else:
+        return ''
 
 
 def send_normal_text(conn, member_id, message, production=SENDER_PRODUCTION):
@@ -169,6 +190,10 @@ class BUBBLE:
         self.bubble = self.bubble.replace('##對象##', name)
         return self
 
+    def set_rest_name(self, rest_name):
+        self.bubble = self.bubble.replace('##約會餐廳##', rest_name)
+        return self
+
     def set_rest_url(self, rest_url):
         self.bubble = self.bubble.replace('http://rest_url', rest_url)
         return self
@@ -184,116 +209,6 @@ class BUBBLE:
 
     def as_dict(self):
         return json.loads(self.bubble)
-
-
-def set_two_way_bubble_link_intro(conn, bubble, matching_row, message, info_title):
-    bubble_for_obj = copy.deepcopy(bubble)
-    bubble_for_sub = copy.deepcopy(bubble)
-
-    # For Obj
-    sub_intro_link = get_introduction_link(
-        conn, matching_row.subject_id)
-    sub_name = get_proper_name(conn, matching_row.subject_id)
-    bubble_for_obj = set_basic_bubble(
-        bubble_for_obj, info_title, matching_row.city, sub_name, sub_intro_link, message=message)
-
-    # For Sub
-    obj_intro_link = get_introduction_link(
-        conn, matching_row.object_id)
-    obj_name = get_proper_name(conn, matching_row.object_id)
-    bubble_for_sub = set_basic_bubble(
-        bubble_for_sub, info_title, matching_row.city, obj_name, obj_intro_link, message=message)
-
-    return bubble_for_obj, bubble_for_sub
-
-
-def base_modifier(base_bubble):
-    # add universal settings
-    base_bubble['hero']['url'] = BUBBLE_HERO_IMAGE_URL
-    return base_bubble
-
-
-def set_basic_bubble_title(bubble, title):
-    bubble["body"]["contents"][0]['text'] = title
-    return bubble
-
-
-def set_basic_bubble_name(bubble, name):
-    bubble["body"]["contents"][2]["contents"][1]["contents"][1]["text"] = name
-    return bubble
-
-
-def set_basic_bubble_city(bubble, name):
-    bubble["body"]["contents"][2]["contents"][0]["contents"][1]["text"] = name
-    return bubble
-
-
-def set_basic_bubble_intro_link(bubble, link, label='介紹卡連結'):
-    bubble["footer"]["contents"][0]["action"]["uri"] = link
-    bubble["footer"]["contents"][0]["action"]["label"] = label
-    return bubble
-
-
-def set_basic_bubble_form_link(bubble, link, label):
-    bubble["footer"]["contents"][1]["action"]["uri"] = link
-    bubble["footer"]["contents"][1]["action"]["label"] = label
-    return bubble
-
-
-def set_basic_bubble_message(bubble, message):
-    bubble["body"]["contents"][3]['text'] = message
-    return bubble
-
-
-def set_basic_bubble(bubble, title, city, name, intro_link, form_link=None, form_label=None, message=None):
-    bubble = set_basic_bubble_title(bubble, title)
-    bubble = set_basic_bubble_city(bubble, city)
-    bubble = set_basic_bubble_name(bubble, name)
-    bubble = set_basic_bubble_intro_link(bubble, intro_link)
-    if form_link and form_label:
-        bubble = set_basic_bubble_form_link(
-            bubble, form_link, form_label)
-    else:
-        bubble = remove_form_link(bubble)
-    if message:
-        bubble = set_basic_bubble_message(
-            bubble, message)
-    else:
-        bubble = remove_message(bubble)
-    return bubble
-
-
-def remove_message(bubble):
-    bubble['body']['contents'].pop(-2)
-    return bubble
-
-
-def remove_form_link(bubble):
-    bubble['footer']['contents'].pop(1)
-    return bubble
-
-
-def set_info_bubble(bubble, title, city, name, intro_link, message):
-    bubble = set_basic_bubble_title(bubble, title)
-    bubble = set_basic_bubble_city(bubble, city)
-    bubble = set_basic_bubble_name(bubble, name)
-    bubble["footer"]["contents"][1]["action"]["uri"] = intro_link
-    bubble["footer"]["contents"][0]["text"] = message
-
-    return bubble
-
-
-def set_deal_bubble(bubble, city, name, rest_name, phone, message, time, rest_link, intro_link, cancel_link):
-    bubble["body"]["contents"][2]["contents"][0]["contents"][1]["text"] = city
-    bubble["body"]["contents"][2]["contents"][1]["contents"][1]["text"] = time
-    bubble["body"]["contents"][2]["contents"][2]["contents"][1]["text"] = name
-    bubble["body"]["contents"][2]["contents"][3]["contents"][1]["text"] = rest_name
-    bubble["body"]["contents"][2]["contents"][4]["contents"][1]["text"] = phone
-    bubble["body"]["contents"][2]["contents"][5]["contents"][1]["text"] = message
-    bubble["footer"]["contents"][0]["action"]["uri"] = rest_link
-    bubble["footer"]["contents"][1]["action"]["uri"] = intro_link
-    bubble["footer"]["contents"][2]["action"]["uri"] = cancel_link
-    return bubble
 
 
 def change_state(conn, old_state, new_state, matching_id):
@@ -319,3 +234,17 @@ def change_state(conn, old_state, new_state, matching_id):
             """
         curr.execute(
             stmt, (matching_id, old_state, new_state))
+
+
+def show_google_map_name(url):
+    import requests
+    from bs4 import BeautifulSoup
+
+    response = requests.get(url, allow_redirects=True)
+    soup = BeautifulSoup(response.text, 'html.parser')
+    meta_tag = soup.find('meta', property='og:title')
+    if meta_tag and meta_tag.get('content'):
+        shop_name = meta_tag['content']
+        return shop_name
+    else:
+        return None

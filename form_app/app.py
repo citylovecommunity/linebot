@@ -170,15 +170,18 @@ def router(token, action):
         return render_template('error.html', message='token錯誤❌')
 
 
-@app.route('/<token>/change_time/<int:member_id>', methods=['GET', 'POST'])
-def change_time(token, member_id):
+@app.route('/<token>/change_time/<who>', methods=['GET', 'POST'])
+def change_time(token, who):
     if request.method == 'POST':
         message = request.form['message']
         matching_info = get_token_matching(token)
 
-        # check member_id in matching
-        if member_id not in (matching_info['subject_id'], matching_info['object_id']):
-            return render_template('error.html', message='無權限操作此配對❌')
+        if who == 'sub':
+            member_id = matching_info['subject_id']
+        elif who == 'obj':
+            member_id = matching_info['object_id']
+        else:
+            return render_template('error.html', message='錯誤❌')
 
         # insert change_time_message
         change_time_stmt = """

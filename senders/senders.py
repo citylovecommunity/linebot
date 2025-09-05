@@ -1,14 +1,13 @@
 
 from abc import ABC, abstractmethod
 from collections import namedtuple
-import copy
 from typing import List
 
 from config import FORM_WEB_URL
-from senders_utils import (base_modifier, change_state, get_gender_id,
-                           get_introduction_link, get_proper_name, load_bubble, load_bubble_raw,
+from senders_utils import (change_state, get_gender_id, get_introduction_link,
+                           get_proper_name, load_bubble, load_bubble_raw,
                            send_bubble_to_member_id, send_normal_text,
-                           set_basic_bubble, set_two_way_bubble_link_intro)
+                           show_google_map_name, write_sent_to_db)
 
 SendingInfo = namedtuple('SendingInfo', ['recipient', 'bubble', 'alt'])
 
@@ -36,8 +35,12 @@ class Sender(ABC):
             if self.NOTIFICATION:
                 send_normal_text(self.conn, recipient, body)
             else:
-                send_bubble_to_member_id(
+                real_sending_info = send_bubble_to_member_id(
                     self.conn, recipient, body, alt_text=alt)
+            write_sent_to_db(self.conn, self.matching_row.id,
+                             real_sending_info.body,
+                             real_sending_info.send_at,
+                             real_sending_info.send_to)
 
         if change_state:
             if self.NOTIFICATION:
@@ -86,16 +89,18 @@ class LikedSender(Sender):
     NEW_STATE = 'liked_waiting'
 
     def modify_bubble(self):
-        base_bubble = load_bubble('basic_bubble.json')
-        bubble = base_modifier(base_bubble)
-        form_app_link = f'{FORM_WEB_URL}/{self.matching_row.access_token}/liked'
-        intro_link = get_introduction_link(
-            self.conn, self.matching_row.subject_id)
-        name = get_proper_name(self.conn, self.matching_row.subject_id)
-        bubble = set_basic_bubble(
-            bubble, '約會邀請卡', self.matching_row.city, name, intro_link, form_app_link, '開啟邀請卡')
+        bubble = load_bubble_raw('basic_bubble.json')
 
-        return [SendingInfo(self.matching_row.object_id, bubble, '🎉開啟您的約會邀請卡')]
+        bubble.set_title('約會邀請卡')
+        bubble.set_city(self.matching_row.city)
+        bubble.set_form_app_link(
+            f'{FORM_WEB_URL}/{self.matching_row.access_token}/liked')
+
+        bubble.set_intro_link(get_introduction_link(
+            self.conn, self.matching_row.subject_id))
+        bubble.set_sent_to_proper_name(get_proper_name(
+            self.conn, self.matching_row.subject_id))
+        return [SendingInfo(self.matching_row.object_id, bubble.as_dict(), '🎉開啟您的約會邀請卡')]
 
 
 class Liked24Sender(Sender):
@@ -279,7 +284,6 @@ class DealSender(Sender):
         base_bubble = load_bubble_raw('deal_bubble.json')
 
         alt_message = '開啟您的約會出席提醒'
-
         # 先把一些共同有的置換上去
 
         base_bubble.set_city(self.matching_row.city)
@@ -289,22 +293,29 @@ class DealSender(Sender):
         base_bubble.set_book_phone(self.matching_row.book_phone)
         base_bubble.set_message(self.matching_row.comment)
         base_bubble.set_rest_url(self.matching_row.selected_place)
+        base_bubble.set_rest_name(show_google_map_name(
+            self.matching_row.selected_place))
 
         # 不同的
         bubble_for_sub = base_bubble.copy()
         bubble_for_obj = base_bubble.copy()
 
+        # 稱謂
         bubble_for_sub.set_sent_to_proper_name(
             get_proper_name(self.conn, self.matching_row.object_id))
         bubble_for_obj.set_sent_to_proper_name(
             get_proper_name(self.conn, self.matching_row.subject_id))
 
+        # 介紹卡連結
         bubble_for_sub.set_intro_link(
             get_introduction_link(self.conn, self.matching_row.object_id))
         bubble_for_obj.set_intro_link(
             get_introduction_link(self.conn, self.matching_row.subject_id))
 
-        # TODO: 還有我要改期連結沒有做
+        # 改期連結
+        change_time_link = f'{FORM_WEB_URL}/{self.matching_row.access_token}/change_time/'
+        bubble_for_sub.set_form_app_link(change_time_link+'sub')
+        bubble_for_obj.set_form_app_link(change_time_link+'obj')
 
         return [SendingInfo(
             self.matching_row.object_id, bubble_for_obj.as_dict(), alt_message),
