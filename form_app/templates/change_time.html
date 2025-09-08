@@ -2,7 +2,7 @@
 
 {% block content %}
 <h2 class="mb-4">約會臨時改期</h2>
-<form method="POST" action="{{ url_for('change_time', token=token, member_id=member_id) }}">
+<form method="POST" action="{{ url_for('change_time', token=token, who=who) }}">
     <div class="mb-3">
         <div class="form-text text-muted mb-2">請向對方說明您想改期的理由</div>
         <textarea id="message" name="message" class="form-control" rows="4" required></textarea>

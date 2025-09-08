@@ -206,7 +206,7 @@ def change_time(token, who):
         # 檢查這一對是否已經有改期過，如果有，顯示提醒訊息
         # if has_changed_time(matching_info['id']):
         #     return render_template('change_time.html', token=token, member_id=member_id, message="這一對已經有改期過了")
-        return render_template('change_time.html', token=token, member_id=member_id)
+        return render_template('change_time.html', token=token, who=who)
 
 
 @app.route('/invitation', methods=['GET', 'POST'])
