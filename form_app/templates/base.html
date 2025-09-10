@@ -32,7 +32,15 @@
         <!-- Bootstrap Navbar as menu bar -->
         <nav class="navbar navbar-light bg-white border-bottom mb-4">
             <div class="container justify-content-center">
-                <span class="navbar-brand mb-0 h1 fw-bold">City Love | 城遇</span>
+                {% if link_endpoint %}
+                <a href="{{ link_endpoint}}" class="navbar-brand mb-0 h1 fw-bold text-decoration-none">
+                    City Love | 城遇
+                </a>
+                {% else %}
+                <span class="navbar-brand mb-0 h1 fw-bold text-decoration-none">
+                    City Love | 城遇
+                </span>
+                {% endif %}
             </div>
         </nav>
 

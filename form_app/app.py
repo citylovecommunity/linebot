@@ -170,6 +170,42 @@ def router(token, action):
         return render_template('error.html', message='token錯誤❌')
 
 
+@app.route('/<token>/sudden_change_time/<who>', methods=['GET', 'POST'])
+def sudden_change_time(token, who):
+    matching_info = get_token_matching(token)
+    if who == 'sub':
+        member_id = matching_info['subject_id']
+    elif who == 'obj':
+        member_id = matching_info['object_id']
+    else:
+        return render_template('error.html', message='錯誤❌')
+
+    if request.method == 'POST':
+        # insert change_time_message
+        change_time_stmt = """
+        insert into sudden_change_time_history
+        (member_id, created_at, matching_id)
+        values (%s, now(), %s)
+        """
+        with get_db() as conn:
+            with conn.cursor() as curr:
+                curr.execute(change_time_stmt, (member_id,
+                             matching_info['id']))
+            conn.commit()
+
+        return render_template('thank_you.html',
+                               header='已成功改期',
+                               message=f"""
+                               {get_proper_name(member_id)}已新增一筆超臨時改期紀錄<br>
+                               此配對延後至下個月<br>
+                               """)
+    else:
+        return render_template('confirm.html',
+                               message=f"是否對{get_proper_name(member_id)}觸發超臨時改期？",
+                               action_url=url_for(
+                                   'sudden_change_time', token=token, who=who))
+
+
 @app.route('/<token>/change_time/<who>', methods=['GET', 'POST'])
 def change_time(token, who):
     if request.method == 'POST':
@@ -206,7 +242,9 @@ def change_time(token, who):
         # 檢查這一對是否已經有改期過，如果有，顯示提醒訊息
         # if has_changed_time(matching_info['id']):
         #     return render_template('change_time.html', token=token, member_id=member_id, message="這一對已經有改期過了")
-        return render_template('change_time.html', token=token, who=who)
+        return render_template('change_time.html', token=token, who=who,
+                               link_endpoint=url_for(
+                                   'sudden_change_time', token=token, who=who))
 
 
 @app.route('/invitation', methods=['GET', 'POST'])
