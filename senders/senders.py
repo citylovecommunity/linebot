@@ -277,8 +277,7 @@ class RestR4Sender(Sender):
 
 class DealSender(Sender):
     OLD_STATE = 'deal_sending'
-    NEW_STATE = 'deal_sending'
-    # NEW_STATE = 'deal_1d_notification_sending'
+    NEW_STATE = 'deal_1d_notification_sending'
 
     def modify_bubble(self):
         base_bubble = load_bubble_raw('deal_bubble.json')

@@ -11,7 +11,9 @@ Confirm
     <p class="lead mb-4">{{ message|safe }}</p>
     <form method="post" action="{{ action_url }}">
         <div class="d-grid gap-2 d-sm-flex justify-content-sm-center"> <button type="submit"
-                class="btn btn-primary btn-lg px-4 gap-3">{{ btn_name }}</button>
+                class="btn btn-primary btn-lg px-4 gap-3" {% if alert %}onclick="return confirm('{{ alert }}');" {%
+                endif %}>{{ btn_name }}</button>
+
         </div>
     </form>
     {% endblock %}

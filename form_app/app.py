@@ -1,6 +1,5 @@
 
 import os
-import re
 
 import psycopg
 from dotenv import load_dotenv
@@ -181,17 +180,29 @@ def sudden_change_time(token, who):
         return render_template('error.html', message='錯誤❌')
 
     if request.method == 'POST':
+
+        if matching_info['current_state'] not in ('dating_notification_sending'):
+            return render_template('error.html', message='目前狀態無法使用超臨時改期❌，請聯絡客服做處理！')
+
         # insert change_time_message
         change_time_stmt = """
         insert into sudden_change_time_history
         (member_id, created_at, matching_id)
         values (%s, now(), %s)
         """
-        with get_db() as conn:
-            with conn.cursor() as curr:
-                curr.execute(change_time_stmt, (member_id,
-                             matching_info['id']))
-            conn.commit()
+
+        change_state_stmt = """
+        update matching set current_state = 'next_month_sending',
+        updated_at = now() where id = %s;
+        """
+
+        conn = get_db()
+
+        with conn.cursor() as curr:
+            curr.execute(change_time_stmt, (member_id,
+                                            matching_info['id']))
+            curr.execute(change_state_stmt, (matching_info['id'],))
+        conn.commit()
 
         return render_template('thank_you.html',
                                header='已成功改期',
@@ -202,8 +213,10 @@ def sudden_change_time(token, who):
     else:
         return render_template('confirm.html',
                                message=f"是否對{get_proper_name(member_id)}觸發超臨時改期？",
+                               btn_name='確認改期',
                                action_url=url_for(
-                                   'sudden_change_time', token=token, who=who))
+                                   'sudden_change_time', token=token, who=who),
+                               alert='確定要觸發超臨時改期嗎？')
 
 
 @app.route('/<token>/change_time/<who>', methods=['GET', 'POST'])
@@ -219,17 +232,32 @@ def change_time(token, who):
         else:
             return render_template('error.html', message='錯誤❌')
 
+        # first check right state
+        stmt = """
+        select current_state from matching where id = %s;
+        """
+
+        if matching_info['current_state'] not in ('deal_1d_notification_sending', 'deal_3d_notification_sending'):
+            return render_template('error.html', message='目前狀態無法改期❌，請聯絡客服做處理！')
+
         # insert change_time_message
         change_time_stmt = """
         insert into change_time_history
         (member_id, created_at, matching_id, change_time_message)
         values (%s, now(), %s, %s)
         """
-        with get_db() as conn:
-            with conn.cursor() as curr:
-                curr.execute(change_time_stmt, (member_id,
-                             matching_info['id'], message))
-            conn.commit()
+
+        change_state_stmt = """
+        update matching set current_state = 'change_time_notification_sending',
+        updated_at = now() where id = %s;
+        """
+
+        conn = get_db()
+        with conn.cursor() as curr:
+            curr.execute(change_time_stmt, (member_id,
+                                            matching_info['id'], message))
+            curr.execute(change_state_stmt, (matching_info['id'],))
+        conn.commit()
 
         return render_template('thank_you.html',
                                header='您已成功改期',

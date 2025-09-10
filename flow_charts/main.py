@@ -21,7 +21,7 @@ states = [
     'deal_sending',
     'deal_1d_notification_sending',
     'deal_3hr_notification_sending',
-    'sudden_change_time_notification_sending',
+    'change_time_notification_sending',
     'next_month_sending',
     'next_month_waiting'
 ]
@@ -90,14 +90,14 @@ sending_edges = [('deal_sending', 'deal_1d_notification_sending'),
                  ('deal_3hr_notification_sending', 'dating_notification_sending'),
                  ('dating_notification_sending', 'dating_feedback_sending'),
                  ('dating_feedback_sending', 'dating_done'),
-                 ('sudden_change_time_notification_sending', 'change_time_sending')
+                 ('change_time_notification_sending', 'change_time_sending')
                  ]
 for from_node, to_node in sending_edges:
     dot.edge(from_node, to_node, label=f'Cron triggers {from_node} dispatcher',
              color='blue')
 
 
-dot.edge('deal_1d_notification_sending', 'sudden_change_time_notification_sending',
+dot.edge('deal_1d_notification_sending', 'change_time_notification_sending',
          label='Someone triggers change time', color='red')
 
 
@@ -106,8 +106,8 @@ dot.edge('change_time_sending', 'rest_r1_waiting',
          color='blue')
 
 
-dot.edge('deal_3hr_notification_sending', 'next_month_sending',
-         label='Someone triggers change time next month.',
+dot.edge('deal_3hr_notification_sending', 'change_time_notification_sending',
+         label='Someone triggers change time.',
          color='red')
 
 dot.edge('dating_notification_sending', 'next_month_sending',
