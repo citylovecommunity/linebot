@@ -33,20 +33,17 @@ class Sender(ABC):
         sending_infos = self.modify_bubble()
         for recipient, body, alt in sending_infos:
             if self.NOTIFICATION:
-                send_normal_text(self.conn, recipient, body)
+                real_sending_info = send_normal_text(
+                    self.conn, recipient, body)
             else:
                 real_sending_info = send_bubble_to_member_id(
                     self.conn, recipient, body, alt_text=alt)
             write_sent_to_db(self.conn, self.matching_row.id,
                              real_sending_info.body,
-                             real_sending_info.send_at,
                              real_sending_info.send_to)
 
-        if change_state:
-            if self.NOTIFICATION:
-                raise ValueError("A Notification can not change state.")
-            else:
-                self._change_state()
+        if change_state and not self.NOTIFICATION:
+            self._change_state()
 
 
 class InvitationSender(Sender):

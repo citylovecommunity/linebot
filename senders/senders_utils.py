@@ -7,13 +7,18 @@ from config import ADMIN_LINE_ID, SENDER_PRODUCTION, TEST_USER_ID, line_bot_api
 from linebot.models import FlexSendMessage, TextMessage
 
 
-def write_sent_to_db(conn, matching_id, body, send_at, send_to):
-    stmt = """
+def write_sent_to_db(conn, matching_id, body, send_to):
+    history_stmt = """
     insert into sending_history (matching_id, body, send_at, send_to)
-    values (%s, %s, %s, %s)
+    values (%s, %s, now(), %s)
+    """
+    send_at_stmt = """
+    update matching set last_sent_at = now() where id = %s
     """
     with conn.cursor() as cur:
-        return cur.execute(stmt, (matching_id, body, send_at, send_to))
+        cur.execute(history_stmt, (matching_id, body,  send_to))
+        cur.execute(send_at_stmt, (matching_id,))
+    conn.commit()
 
 
 def send_bubble(user_id, bubble, alt_text='酷喔'):
@@ -101,7 +106,7 @@ def get_proper_name(conn, member_id):
 
 
 real_sending_info = namedtuple(
-    'real_sending_info', ['body', 'send_at', 'send_to'])
+    'real_sending_info', ['body', 'send_to'])
 
 
 def send_bubble_to_member_id(conn, member_id, bubble, alt_text='嘻嘻', production=SENDER_PRODUCTION):
@@ -125,7 +130,7 @@ def send_bubble_to_member_id(conn, member_id, bubble, alt_text='嘻嘻', product
         user_id = TEST_USER_ID
         send_bubble(TEST_USER_ID, body, alt_text)
 
-    return real_sending_info(body_to_str(body), datetime.now(), user_id)
+    return real_sending_info(body_to_str(body), user_id)
 
 
 def body_to_str(body):
@@ -144,11 +149,15 @@ def send_normal_text(conn, member_id, message, production=SENDER_PRODUCTION):
             line_bot_api.push_message(user_id[0], TextMessage(text=message))
         else:
             name = get_user_name(conn, member_id)
+            user_id = ADMIN_LINE_ID
             line_bot_api.push_message(ADMIN_LINE_ID, TextMessage(
                 text=f'會員 {name} 沒有綁定 LINE 帳號⚠️⚠️⚠️',
             ))
     else:
+        user_id = TEST_USER_ID
         line_bot_api.push_message(TEST_USER_ID, TextMessage(text=message))
+
+    return real_sending_info(message, user_id)
 
 
 class BUBBLE:
@@ -223,7 +232,10 @@ def change_state(conn, old_state, new_state, matching_id):
                 f"{matching_id}狀態錯誤，預期{old_state}，但上面是{current_state}")
 
         stmt = """
-            update matching set current_state = %s, updated_at = now() where id=%s;
+            update matching set 
+            last_change_state_at=now(), 
+            current_state = %s,
+            updated_at = now() where id=%s;
             """
         curr.execute(
             stmt, (new_state, matching_id,))

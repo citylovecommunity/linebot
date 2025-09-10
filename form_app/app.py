@@ -87,7 +87,9 @@ def change_state(current_state,
 
         with conn.cursor() as curr:
             stmt = """
-            update matching set current_state = %s, updated_at = now() where id=%s;
+            update matching set current_state = %s,
+            last_change_state_at=now(),
+            updated_at = now() where id=%s;
             """
             curr.execute(
                 stmt, (new_state, matching_id,))
@@ -193,6 +195,7 @@ def sudden_change_time(token, who):
 
         change_state_stmt = """
         update matching set current_state = 'next_month_sending',
+        last_change_state_at=now(),
         updated_at = now() where id = %s;
         """
 
@@ -249,6 +252,7 @@ def change_time(token, who):
 
         change_state_stmt = """
         update matching set current_state = 'change_time_notification_sending',
+        last_change_state_at=now(),
         updated_at = now() where id = %s;
         """
 

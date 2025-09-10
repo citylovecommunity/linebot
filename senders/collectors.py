@@ -21,7 +21,7 @@ def get_notification_list(conn, state, time):
         select * from
         matching where
         current_state = %s
-        and current_time - last_sent_at between interval '24 hours' and interval '48 hours'
+        and now() - last_sent_at between interval '24 hours' and interval '48 hours'
         ;
         """
     elif time == '48':
@@ -29,12 +29,12 @@ def get_notification_list(conn, state, time):
         select * from
         matching where
         current_state = %s
-        and current_time - last_sent_at >= interval '48 hours'
+        and now() - last_sent_at >= interval '48 hours'
         """
     else:
         raise ValueError('time must be 24 or 48')
     with conn.cursor(row_factory=namedtuple_row) as cur:
-        return cur.execute(stmt, (state+'_sending',)).fetchall()
+        return cur.execute(stmt, (state+'_waiting',)).fetchall()
 
 
 class Collector(ABC):
