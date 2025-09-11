@@ -5,9 +5,10 @@ from typing import List
 
 from config import FORM_WEB_URL
 from senders_utils import (change_state, get_gender_id, get_introduction_link,
-                           get_proper_name, load_bubble, load_bubble_raw,
-                           send_bubble_to_member_id, send_normal_text,
-                           show_google_map_name, write_sent_to_db)
+                           get_phone_number, get_proper_name, load_bubble,
+                           load_bubble_raw, send_bubble_to_member_id,
+                           send_normal_text, show_google_map_name,
+                           write_sent_to_db)
 
 SendingInfo = namedtuple('SendingInfo', ['recipient', 'bubble', 'alt'])
 
@@ -32,7 +33,8 @@ class Sender(ABC):
     def send(self, change_state):
         sending_infos = self.modify_bubble()
         for recipient, body, alt in sending_infos:
-            if self.NOTIFICATION:
+
+            if isinstance(body, str):
                 real_sending_info = send_normal_text(
                     self.conn, recipient, body)
             else:
@@ -55,6 +57,7 @@ class InvitationSender(Sender):
 
         bubble.set_title('約會邀請卡')
 
+        bubble.set_bubble_message("這是一個約會邀請卡")
         bubble.set_city(self.matching_row.city)
         bubble.set_form_app_link(
             f'{FORM_WEB_URL}/{self.matching_row.access_token}/invitation')
@@ -92,7 +95,7 @@ class LikedSender(Sender):
         bubble.set_city(self.matching_row.city)
         bubble.set_form_app_link(
             f'{FORM_WEB_URL}/{self.matching_row.access_token}/liked')
-
+        bubble.set_bubble_message("這是一個約會邀請卡")
         bubble.set_intro_link(get_introduction_link(
             self.conn, self.matching_row.subject_id))
         bubble.set_sent_to_proper_name(get_proper_name(
@@ -171,23 +174,31 @@ class RestR448Sender(Sender):
 
 
 class GoodbyeSender(Sender):
-    OLD_STATE = 'goodbye_sending'
+    OLD_STATE = ('goodbye_sending', 'no_action_goodbye_sending')
     NEW_STATE = 'goodbye'
 
     def modify_bubble(self):
-        base_bubble = load_bubble('basic_bubble.json')
-        bubble = base_modifier(base_bubble)
-
+        bubble = load_bubble_raw('simple_message_bubble.json')
         message = "此約會邀請依雙方意願時間暫不安排\n期待未來比次更多的緣分"
+
+        bubble.set_title('後會有期！')
+        bubble.set_city(self.matching_row.city)
+        bubble.set_bubble_message(message)
+
+        bubble_for_obj = bubble.copy()
+        bubble_for_sub = bubble.copy()
+
+        bubble_for_obj.set_sent_to_proper_name(get_proper_name(
+            self.conn, self.matching_row.subject_id))
+        bubble_for_sub.set_sent_to_proper_name(get_proper_name(
+            self.conn, self.matching_row.object_id))
+
         alt_message = '後會有期🥲期待新的約會邀請'
 
-        bubble_for_obj, bubble_for_sub = set_two_way_bubble_link_intro(
-            self.conn, bubble, self.matching_row, message, '後會有期！')
-
         return [SendingInfo(
-            self.matching_row.object_id, bubble_for_obj, alt_message),
+            self.matching_row.object_id, bubble_for_obj.as_dict(), alt_message),
             SendingInfo(
-            self.matching_row.subject_id, bubble_for_sub, alt_message)]
+            self.matching_row.subject_id, bubble_for_sub.as_dict(), alt_message)]
 
 
 class RestR1Sender(Sender):
@@ -195,21 +206,26 @@ class RestR1Sender(Sender):
     NEW_STATE = 'rest_r1_waiting'
 
     def modify_bubble(self):
-        base_bubble = load_bubble('basic_bubble.json')
-        bubble = base_modifier(base_bubble)
-        form_app_link = f'{FORM_WEB_URL}/{self.matching_row.access_token}/rest_r1'
+        bubble = load_bubble_raw('basic_bubble.json')
 
+        bubble.set_title('約會邀請卡')
+        bubble.set_city(self.matching_row.city)
+        form_app_link = f'{FORM_WEB_URL}/{self.matching_row.access_token}/rest_r1'
+        bubble.set_form_app_link(form_app_link)
         send_to_id = get_gender_id(self.conn, self.matching_row, 'F')
         rendered_id = get_gender_id(self.conn, self.matching_row, 'M')
 
         intro_link = get_introduction_link(self.conn, rendered_id)
         name = get_proper_name(self.conn, rendered_id)
-        message = '請提供心儀之約會餐廳與時間'
-        bubble = set_basic_bubble(
-            bubble, '此約會邀請成功', self.matching_row.city, name,
-            intro_link, form_app_link, '開啟約會資訊卡', message)
 
-        return [SendingInfo(send_to_id, bubble, alt='來囉！開啟此趟約會行程確認')]
+        bubble.set_intro_link(intro_link)
+        bubble.set_sent_to_proper_name(name)
+
+        message = '請提供心儀之約會餐廳與時間'
+
+        bubble.set_bubble_message(message)
+
+        return [SendingInfo(send_to_id, bubble.as_dict(), alt='來囉！開啟此趟約會行程確認')]
 
 
 class RestR2Sender(Sender):
@@ -217,59 +233,75 @@ class RestR2Sender(Sender):
     NEW_STATE = 'rest_r2_waiting'
 
     def modify_bubble(self):
-        base_bubble = load_bubble('basic_bubble.json')
-        bubble = base_modifier(base_bubble)
-        form_app_link = f'{FORM_WEB_URL}/{self.matching_row.access_token}/rest_r2'
 
+        bubble = load_bubble_raw('basic_bubble.json')
+
+        bubble.set_title('約會邀請卡')
+        bubble.set_city(self.matching_row.city)
+        form_app_link = f'{FORM_WEB_URL}/{self.matching_row.access_token}/rest_r2'
+        bubble.set_form_app_link(form_app_link)
         send_to_id = get_gender_id(self.conn, self.matching_row, 'M')
         rendered_id = get_gender_id(self.conn, self.matching_row, 'F')
 
         intro_link = get_introduction_link(self.conn, rendered_id)
         name = get_proper_name(self.conn, rendered_id)
-        message = '請您提供可配合時間與餐廳訂位\n若需進一步溝通請於資訊卡留言'
-        bubble = set_basic_bubble(
-            bubble, '此約會邀請成功', self.matching_row.city,
-            name, intro_link, form_app_link, '開啟資訊卡', message)
 
-        return [SendingInfo(send_to_id, bubble, alt='來囉！開啟此趟約會行程確認')]
+        bubble.set_intro_link(intro_link)
+        bubble.set_sent_to_proper_name(name)
+
+        message = '請您提供可配合時間與餐廳訂位\n若需進一步溝通請於資訊卡留言'
+
+        bubble.set_bubble_message(message)
+
+        return [SendingInfo(send_to_id, bubble.as_dict(), alt='來囉！開啟此趟約會行程確認')]
 
 
 class RestR3Sender(Sender):
     def modify_bubble(self):
-        base_bubble = load_bubble('basic_bubble.json')
-        bubble = base_modifier(base_bubble)
-        form_app_link = f'{FORM_WEB_URL}/{self.matching_row.access_token}/rest_r3'
 
+        bubble = load_bubble_raw('basic_bubble.json')
+
+        bubble.set_title('約會邀請卡')
+        bubble.set_city(self.matching_row.city)
+        form_app_link = f'{FORM_WEB_URL}/{self.matching_row.access_token}/rest_r3'
+        bubble.set_form_app_link(form_app_link)
         send_to_id = get_gender_id(self.conn, self.matching_row, 'F')
         rendered_id = get_gender_id(self.conn, self.matching_row, 'M')
 
         intro_link = get_introduction_link(self.conn, rendered_id)
         name = get_proper_name(self.conn, rendered_id)
-        message = '男生已確認要約並想與妳開啟約會內容溝通\n請您進一步開啟溝通卡內容'
-        bubble = set_basic_bubble(
-            bubble, '約會資訊溝通卡', self.matching_row.city, name,
-            intro_link, form_app_link, '開啟溝通卡', message)
 
-        return [SendingInfo(send_to_id, bubble, alt='開啟您的約會資訊溝通卡')]
+        bubble.set_intro_link(intro_link)
+        bubble.set_sent_to_proper_name(name)
+
+        message = '男生已確認要約並想與妳開啟約會內容溝通\n請您進一步開啟溝通卡內容'
+
+        bubble.set_bubble_message(message)
+
+        return [SendingInfo(send_to_id, bubble.as_dict(), alt='開啟您的約會資訊溝通卡')]
 
 
 class RestR4Sender(Sender):
     def modify_bubble(self):
-        base_bubble = load_bubble('basic_bubble.json')
-        bubble = base_modifier(base_bubble)
+        bubble = load_bubble_raw('basic_bubble.json')
+        bubble.set_title('約會邀請卡')
+        bubble.set_city(self.matching_row.city)
         form_app_link = f'{FORM_WEB_URL}/{self.matching_row.access_token}/rest_r4'
-
+        bubble.set_form_app_link(form_app_link)
         send_to_id = get_gender_id(self.conn, self.matching_row, 'M')
         rendered_id = get_gender_id(self.conn, self.matching_row, 'F')
 
         intro_link = get_introduction_link(self.conn, rendered_id)
         name = get_proper_name(self.conn, rendered_id)
-        message = '請您提供可配合時間與餐廳訂位\n若需進一步溝通請於資訊卡留言'
-        bubble = set_basic_bubble(
-            bubble, '此約會溝通成功', self.matching_row.city, name, intro_link,
-            form_app_link, '開啟溝通卡', message)
 
-        return [SendingInfo(send_to_id, bubble, alt='恭喜溝通成功')]
+        bubble.set_intro_link(intro_link)
+        bubble.set_sent_to_proper_name(name)
+
+        message = '請您提供可配合時間與餐廳訂位\n若需進一步溝通請於資訊卡留言'
+
+        bubble.set_bubble_message(message)
+
+        return [SendingInfo(send_to_id, bubble.as_dict(), alt='恭喜溝通成功')]
 
 
 class DealSender(Sender):
@@ -281,7 +313,7 @@ class DealSender(Sender):
 
         alt_message = '開啟您的約會出席提醒'
         # 先把一些共同有的置換上去
-
+        base_bubble.set_title('約會出席提醒')
         base_bubble.set_city(self.matching_row.city)
         base_bubble.set_time(
             self.matching_row.selected_time.strftime('%Y-%m-%d %H:%M'))
@@ -319,38 +351,51 @@ class DealSender(Sender):
             self.matching_row.subject_id, bubble_for_sub.as_dict(), alt_message)]
 
 
-class NoActionGoodbyeSender(Sender):
-    OLD_STATE = 'no_action_goodbye_sending'
-    NEW_STATE = 'goodbye'
-
-    def modify_bubble(self):
-        base_bubble = load_bubble('basic_bubble.json')
-        bubble = base_modifier(base_bubble)
-        form_app_link = f'{FORM_WEB_URL}/{self.matching_row.access_token}/invitation'
-        intro_link = get_introduction_link(
-            self.conn, self.matching_row.object_id)
-        name = get_proper_name(self.conn, self.matching_row.object_id)
-        bubble = set_basic_bubble(
-            bubble, '約會邀請卡', self.matching_row.city, name, intro_link, form_app_link, '開啟邀請卡')
-
-        return [SendingInfo(self.matching_row.subject_id, bubble, '🎉接收您的約會邀請卡')]
-
-
 class Deal1DDealSender(Sender):
     OLD_STATE = 'deal_1d_notification_sending'
     NEW_STATE = 'deal_3hr_notification_sending'
 
     def modify_bubble(self):
-        base_bubble = load_bubble('basic_bubble.json')
-        bubble = base_modifier(base_bubble)
-        form_app_link = f'{FORM_WEB_URL}/{self.matching_row.access_token}/invitation'
-        intro_link = get_introduction_link(
-            self.conn, self.matching_row.object_id)
-        name = get_proper_name(self.conn, self.matching_row.object_id)
-        bubble = set_basic_bubble(
-            bubble, '約會邀請卡', self.matching_row.city, name, intro_link, form_app_link, '開啟邀請卡')
+        base_bubble = load_bubble_raw('deal_bubble.json')
 
-        return [SendingInfo(self.matching_row.subject_id, bubble, '🎉接收您的約會邀請卡')]
+        alt_message = '開啟您的約會出席提醒'
+        # 先把一些共同有的置換上去
+        base_bubble.set_title('一天前約會出席提醒')
+        base_bubble.set_city(self.matching_row.city)
+        base_bubble.set_time(
+            self.matching_row.selected_time.strftime('%Y-%m-%d %H:%M'))
+        base_bubble.set_book_name(self.matching_row.book_name)
+        base_bubble.set_book_phone(self.matching_row.book_phone)
+        base_bubble.set_message(self.matching_row.comment)
+        base_bubble.set_rest_url(self.matching_row.selected_place)
+        base_bubble.set_rest_name(show_google_map_name(
+            self.matching_row.selected_place))
+
+        # 不同的
+        bubble_for_sub = base_bubble.copy()
+        bubble_for_obj = base_bubble.copy()
+
+        # 稱謂
+        bubble_for_sub.set_sent_to_proper_name(
+            get_proper_name(self.conn, self.matching_row.object_id))
+        bubble_for_obj.set_sent_to_proper_name(
+            get_proper_name(self.conn, self.matching_row.subject_id))
+
+        # 介紹卡連結
+        bubble_for_sub.set_intro_link(
+            get_introduction_link(self.conn, self.matching_row.object_id))
+        bubble_for_obj.set_intro_link(
+            get_introduction_link(self.conn, self.matching_row.subject_id))
+
+        # 改期連結
+        change_time_link = f'{FORM_WEB_URL}/{self.matching_row.access_token}/change_time/'
+        bubble_for_sub.set_form_app_link(change_time_link+'sub')
+        bubble_for_obj.set_form_app_link(change_time_link+'obj')
+
+        return [SendingInfo(
+            self.matching_row.object_id, bubble_for_obj.as_dict(), alt_message),
+            SendingInfo(
+            self.matching_row.subject_id, bubble_for_sub.as_dict(), alt_message)]
 
 
 class Deal3HRSender(Sender):
@@ -358,16 +403,45 @@ class Deal3HRSender(Sender):
     NEW_STATE = 'dating_notification_sending'
 
     def modify_bubble(self):
-        base_bubble = load_bubble('basic_bubble.json')
-        bubble = base_modifier(base_bubble)
-        form_app_link = f'{FORM_WEB_URL}/{self.matching_row.access_token}/invitation'
-        intro_link = get_introduction_link(
-            self.conn, self.matching_row.object_id)
-        name = get_proper_name(self.conn, self.matching_row.object_id)
-        bubble = set_basic_bubble(
-            bubble, '約會邀請卡', self.matching_row.city, name, intro_link, form_app_link, '開啟邀請卡')
 
-        return [SendingInfo(self.matching_row.subject_id, bubble, '🎉接收您的約會邀請卡')]
+        message_for_obj = f"""
+        提醒您再3小時後即將與{get_proper_name(self.conn, self.matching_row.subject_id)}約會\n
+        這是對方的電話號碼：{get_phone_number(self.conn, self.matching_row.subject_id)}\n
+        若有任何問題，請直接與對方聯繫。\n
+        祝您約會愉快！
+        """
+        message_for_sub = f"""
+        提醒您再3小時後即將與{get_proper_name(self.conn, self.matching_row.object_id)}約會\n
+        這是對方的電話號碼：{get_phone_number(self.conn, self.matching_row.object_id)}\n
+        若有任何問題，請直接與對方聯繫。\n
+        祝您約會愉快！
+        """
+
+        return [SendingInfo(
+            self.matching_row.object_id, message_for_obj),
+            SendingInfo(
+            self.matching_row.subject_id, message_for_sub)]
+
+
+class DatingNotificationSender(Sender):
+    OLD_STATE = 'dating_notification_sending'
+    NEW_STATE = 'dating_feedback_sending'
+
+    def modify_bubble(self):
+
+        message_for_obj = f"""
+        提醒您即將與{get_proper_name(self.conn, self.matching_row.subject_id)}約會\n
+        祝您約會愉快！
+        """
+        message_for_sub = f"""
+        提醒您與{get_proper_name(self.conn, self.matching_row.object_id)}約會\n
+        祝您約會愉快！
+        """
+
+        return [SendingInfo(
+            self.matching_row.object_id, message_for_obj),
+            SendingInfo(
+            self.matching_row.subject_id, message_for_sub)]
 
 
 class SuddenChangeTimeSender(Sender):
@@ -423,36 +497,31 @@ class ChangeTimeSender(Sender):
 
 class RestR1NextMonthSender(Sender):
     OLD_STATE = 'rest_r1_next_month_sending'
-    NEW_STATE = 'rest_r1_next_month_waiting'
+    NEW_STATE = 'rest_r1_waiting'
 
     def modify_bubble(self):
-        base_bubble = load_bubble('basic_bubble.json')
-        bubble = base_modifier(base_bubble)
-        form_app_link = f'{FORM_WEB_URL}/{self.matching_row.access_token}/invitation'
-        intro_link = get_introduction_link(
-            self.conn, self.matching_row.object_id)
-        name = get_proper_name(self.conn, self.matching_row.object_id)
-        bubble = set_basic_bubble(
-            bubble, '約會邀請卡', self.matching_row.city, name, intro_link, form_app_link, '開啟邀請卡')
+        bubble = load_bubble_raw('basic_bubble.json')
 
-        return [SendingInfo(self.matching_row.subject_id, bubble, '🎉接收您的約會邀請卡')]
+        bubble.set_title('約會邀請卡')
+        bubble.set_city(self.matching_row.city)
+        form_app_link = f'{FORM_WEB_URL}/{self.matching_row.access_token}/rest_r1'
+        bubble.set_form_app_link(form_app_link)
+        send_to_id = get_gender_id(self.conn, self.matching_row, 'F')
+        rendered_id = get_gender_id(self.conn, self.matching_row, 'M')
 
+        intro_link = get_introduction_link(self.conn, rendered_id)
+        name = get_proper_name(self.conn, rendered_id)
 
-class DatingNotificationSender(Sender):
-    OLD_STATE = 'dating_notification_sending'
-    NEW_STATE = 'dating_notification_waiting'
+        bubble.set_intro_link(intro_link)
+        bubble.set_sent_to_proper_name(name)
 
-    def modify_bubble(self):
-        base_bubble = load_bubble('basic_bubble.json')
-        bubble = base_modifier(base_bubble)
-        form_app_link = f'{FORM_WEB_URL}/{self.matching_row.access_token}/invitation'
-        intro_link = get_introduction_link(
-            self.conn, self.matching_row.object_id)
-        name = get_proper_name(self.conn, self.matching_row.object_id)
-        bubble = set_basic_bubble(
-            bubble, '約會邀請卡', self.matching_row.city, name, intro_link, form_app_link, '開啟邀請卡')
+        message = f"""經過一個月的等待\n
+        您和{name}再次配對成功了！\n
+        請提供心儀之約會餐廳與時間"""
 
-        return [SendingInfo(self.matching_row.subject_id, bubble, '🎉接收您的約會邀請卡')]
+        bubble.set_bubble_message(message)
+
+        return [SendingInfo(send_to_id, bubble, '🎉接收您的約會邀請卡')]
 
 
 class DatingFeedbackSender(Sender):
@@ -460,13 +529,18 @@ class DatingFeedbackSender(Sender):
     NEW_STATE = 'dating_done'
 
     def modify_bubble(self):
-        base_bubble = load_bubble('basic_bubble.json')
-        bubble = base_modifier(base_bubble)
-        form_app_link = f'{FORM_WEB_URL}/{self.matching_row.access_token}/invitation'
-        intro_link = get_introduction_link(
-            self.conn, self.matching_row.object_id)
-        name = get_proper_name(self.conn, self.matching_row.object_id)
-        bubble = set_basic_bubble(
-            bubble, '約會邀請卡', self.matching_row.city, name, intro_link, form_app_link, '開啟邀請卡')
+        def message_generator(name):
+            return f"""
+        和{name}約會還順利嗎？\n
+        這是回饋表單：##Google 表單連結##\n
+        """
 
-        return [SendingInfo(self.matching_row.subject_id, bubble, '🎉接收您的約會邀請卡')]
+        message_for_obj = message_generator(
+            get_proper_name(self.conn, self.matching_row.subject_id))
+        message_for_sub = message_generator(
+            get_proper_name(self.conn, self.matching_row.object_id))
+
+        return [SendingInfo(
+            self.matching_row.object_id, message_for_obj),
+            SendingInfo(
+            self.matching_row.subject_id, message_for_sub)]

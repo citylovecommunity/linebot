@@ -15,7 +15,7 @@
         "contents": [
             {
                 "type": "text",
-                "text": "約會出席提醒",
+                "text": "##標題##",
                 "weight": "bold",
                 "size": "xl",
                 "align": "start",

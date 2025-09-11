@@ -89,6 +89,17 @@ def get_user_id(conn, member_id):
         return result
 
 
+def get_phone_number(conn, member_id):
+    stmt = """
+    select phone_number from
+    member
+    where id = %s;
+    """
+    with conn.cursor() as cur:
+        result = cur.execute(stmt, (member_id,)).fetchone()
+        return result[0] if result else ''
+
+
 def get_proper_name(conn, member_id):
     stmt = """
     select name, gender from
@@ -191,6 +202,10 @@ class BUBBLE:
         self.bubble = self.bubble.replace('##約會留言##', message)
         return self
 
+    def set_bubble_message(self, message):
+        self.bubble = self.bubble.replace('##message##', message)
+        return self
+
     def set_intro_link(self, intro_link):
         self.bubble = self.bubble.replace('http://intro_url', intro_link)
         return self
@@ -227,7 +242,13 @@ def change_state(conn, old_state, new_state, matching_id):
         """
         current_state = curr.execute(
             stmt, (matching_id,)).fetchone()[0]
-        if current_state != old_state:
+
+        # if old_state is str, compare. If old state is tuple, check if current_state in it.
+        if isinstance(old_state, tuple):
+            if current_state not in old_state:
+                raise ValueError(
+                    f"{matching_id}狀態錯誤，預期{old_state}其中一個，但上面是{current_state}")
+        elif current_state != old_state:
             raise ValueError(
                 f"{matching_id}狀態錯誤，預期{old_state}，但上面是{current_state}")
 
