@@ -10,10 +10,13 @@ Confirm
 <div class="col-lg-6 mx-auto">
     <p class="lead mb-4">{{ message|safe }}</p>
     <form method="post" action="{{ action_url }}">
-        <div class="d-grid gap-2 d-sm-flex justify-content-sm-center"> <button type="submit"
-                class="btn btn-primary btn-lg px-4 gap-3" {% if alert %}onclick="return confirm('{{ alert }}');" {%
-                endif %}>{{ btn_name }}</button>
-
+        <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
+            <button type="submit" name="action" value="accept" class="btn btn-primary btn-lg px-4 gap-3" {% if alert
+                %}onclick="return confirm('{{ alert }}');" {% endif %}>{{ btn_name }}</button>
+            {% if decline %}
+            <button type="submit" name="action" value="decline" class="btn btn-danger btn-lg px-4 gap-3" {% if alert
+                %}onclick="return confirm('{{ alert }}');" {% endif %}>{{ decline }}</button>
+            {% endif %}
         </div>
     </form>
     {% endblock %}

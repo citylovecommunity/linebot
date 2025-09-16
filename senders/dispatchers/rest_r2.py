@@ -1,0 +1,44 @@
+import psycopg
+from config import FORM_WEB_URL, DB
+from senders_utils import load_bubble_raw, get_proper_name, get_introduction_link, get_gender_id
+from collector_utils import get_list
+from base import Collector, Sender, SendingInfo, Dispatcher
+
+
+class MyCollector(Collector):
+    def collect(self):
+        return get_list(self.conn, 'rest_r2')
+
+
+class MySender(Sender):
+    OLD_STATE = 'rest_r2_sending'
+    NEW_STATE = 'rest_r2_waiting'
+
+    def modify_bubble(self):
+
+        bubble = load_bubble_raw('basic_bubble.json')
+
+        bubble.set_title('約會邀請卡')
+        bubble.set_city(self.matching_row.city)
+        form_app_link = f'{FORM_WEB_URL}/{self.matching_row.access_token}/rest_r2'
+        bubble.set_form_app_link(form_app_link)
+        send_to_id = get_gender_id(self.conn, self.matching_row, 'M')
+        rendered_id = get_gender_id(self.conn, self.matching_row, 'F')
+
+        intro_link = get_introduction_link(self.conn, rendered_id)
+        name = get_proper_name(self.conn, rendered_id)
+
+        bubble.set_intro_link(intro_link)
+        bubble.set_sent_to_proper_name(name)
+
+        message = '請您提供可配合時間與餐廳訂位\n若需進一步溝通請於資訊卡留言'
+
+        bubble.set_bubble_message(message)
+
+        return [SendingInfo(send_to_id, bubble.as_dict(), alt='來囉！開啟此趟約會行程確認')]
+
+
+if __name__ == '__main__':
+    with psycopg.connect(DB) as conn:
+        dispatcher = Dispatcher(conn, MyCollector, MySender)
+        dispatcher.send()

@@ -40,6 +40,14 @@ def get_token_matching(token):
         return result
 
 
+def get_current_state(matching_id):
+    conn = get_db()
+    with conn.cursor() as curr:
+        stmt = "select current_state from matching where id = %s;"
+        result = curr.execute(stmt, (matching_id,)).fetchone()
+        return result[0] if result else None
+
+
 def get_proper_name(member_id):
     conn = get_db()
     with conn.cursor() as curr:
@@ -72,82 +80,38 @@ def get_r1_info(matching_id):
         return row
 
 
-def change_state(current_state,
-                 correct_state,
+def change_state(correct_state,
                  new_state,
-                 matching_id,
-                 conn=None,
-                 commit=True):
+                 matching_id):
     if ALLOW_CHANGE_STATE:
-        if not conn:
-            conn = get_db()
+        conn = get_db()
         # check state，如果有人不在正確的state，本次操作取消
-        if current_state != correct_state:
-            raise ValueError('狀態錯誤❌')
 
-        with conn.cursor() as curr:
-            stmt = """
-            update matching set current_state = %s,
-            last_change_state_at=now(),
-            updated_at = now() where id=%s;
-            """
-            curr.execute(
-                stmt, (new_state, matching_id,))
+        try:
+            current_state = get_current_state(matching_id)
 
-            stmt = """
-            insert into matching_state_history (matching_id, old_state, new_state, created_at)
-            values (%s, %s, %s, now());
-            """
-            curr.execute(
-                stmt, (matching_id, current_state, new_state))
-        if commit:
+            if current_state != correct_state:
+                raise ValueError('狀態錯誤❌')
+
+            with conn.cursor() as curr:
+                stmt = """
+                update matching set current_state = %s,
+                last_change_state_at=now(),
+                updated_at = now() where id=%s;
+                """
+                curr.execute(
+                    stmt, (new_state, matching_id,))
+
+                stmt = """
+                insert into matching_state_history (matching_id, old_state, new_state, created_at)
+                values (%s, %s, %s, now());
+                """
+                curr.execute(
+                    stmt, (matching_id, current_state, new_state))
             conn.commit()
-
-
-def store_confirm_data(confirm_data, matching_id, conn=None, commit=True):
-    if ALLOW_CHANGE_VALUE:
-        params = confirm_data.copy()
-        params['matching_id'] = matching_id
-
-        for key in ['time1', 'time2', 'time3']:
-            if params.get(key) == '':
-                params[key] = None
-
-        update_stmt = """
-            update matching set
-            place1_url = %(place1_url)s,
-            place2_url = %(place2_url)s,
-            time1 = %(time1)s,
-            time2 = %(time2)s,
-            time3 = %(time3)s,
-            comment = %(comment)s
-            where id = %(matching_id)s
-            """
-        with conn.cursor() as curr:
-            curr.execute(update_stmt, params)
-
-        if commit:
-            conn.commit()
-
-
-def store_booking_data(booking_data, matching_id, conn=None, commit=True):
-    if ALLOW_CHANGE_VALUE:
-        params = booking_data.copy()
-        params['matching_id'] = matching_id
-        update_stmt = """
-            update matching set
-            book_phone = %(book_phone)s,
-            book_name = %(book_name)s,
-            comment = %(comment)s,
-            selected_place = %(selected_place)s,
-            selected_time = %(selected_time)s
-            where id = %(matching_id)s
-            """
-        with conn.cursor() as curr:
-            curr.execute(update_stmt, params)
-
-        if commit:
-            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            raise e
 
 
 @app.route('/<token>/<action>', methods=['GET'])
@@ -160,13 +124,7 @@ def router(token, action):
         session['matching_info'] = matching_info
         session['obj_name'] = get_name(matching_info['object_id'])
         session['sub_name'] = get_name(matching_info['subject_id'])
-
-        # 一些特別需要存的在這邊if就好
-
-        # 直接在這邊放連結失效的error
-
         return redirect(url_for(action))
-
     else:
         return render_template('error.html', message='token錯誤❌')
 
@@ -284,8 +242,7 @@ def invitation():
     matching_info = session.get('matching_info')
     if request.method == 'POST':
         try:
-            change_state(matching_info['current_state'],
-                         'invitation_waiting', 'liked_sending',
+            change_state('invitation_waiting', 'liked_sending',
                          matching_info['id'])
         except ValueError as e:
             return render_template('error.html', message=str(e))
@@ -310,20 +267,33 @@ def invitation():
 def liked():
     matching_info = session.get('matching_info')
     if request.method == 'POST':
-        try:
-            change_state(matching_info['current_state'],
-                         'liked_waiting', 'rest_r1_sending',
-                         matching_info['id'])
-        except ValueError as e:
-            return render_template('error.html', message=str(e))
-        return render_template('thank_you.html',
-                               header="✅您已確認相遇",
-                               message="""
-                               屬於你們的連結已悄然展開<br>
-                               系統將安排接下來的約會流程<br>
-                               讓浪漫的相遇在每個細節中綻放
-                               <br>
-                               """)
+        action = request.form['action']
+        if action == 'decline':
+            try:
+                change_state('liked_waiting', 'goodbye_sending',
+                             matching_info['id'])
+            except ValueError as e:
+                return render_template('error.html', message=str(e))
+            return render_template('thank_you.html',
+                                   header="🥲您已婉拒邀請",
+                                   message="""
+                                   很遺憾您拒絕邀請<br>
+                                系統將會為您安排更合適的對象<br>
+                                """)
+        elif action == 'accept':
+            try:
+                change_state('liked_waiting', 'rest_r1_sending',
+                             matching_info['id'])
+            except ValueError as e:
+                return render_template('error.html', message=str(e))
+            return render_template('thank_you.html',
+                                   header="✅您已確認相遇",
+                                   message="""
+                                屬於你們的連結已悄然展開<br>
+                                系統將安排接下來的約會流程<br>
+                                讓浪漫的相遇在每個細節中綻放
+                                <br>
+                                """)
     return render_template('confirm.html',
                            message=f"""
                            {get_proper_name(matching_info['subject_id'])}對您傳送邀請<br>
@@ -331,6 +301,7 @@ def liked():
                            """,
                            header='邀請回覆',
                            btn_name='確認相遇',
+                           decline='拒絕邀請',
                            action_url=url_for('liked'))
 
 
@@ -386,20 +357,43 @@ def choose_rest(rest_round):
 
 @app.route('/confirm_rest/<int:rest_round>', methods=['POST'])
 def confirm_rest(rest_round):
+
+    def store_confirm_data(confirm_data, matching_id):
+        if ALLOW_CHANGE_VALUE:
+            conn = get_db()
+            try:
+                params = confirm_data.copy()
+                params['matching_id'] = matching_id
+
+                for key in ['time1', 'time2', 'time3']:
+                    if params.get(key) == '':
+                        params[key] = None
+
+                update_stmt = """
+                    update matching set
+                    place1_url = %(place1_url)s,
+                    place2_url = %(place2_url)s,
+                    time1 = %(time1)s,
+                    time2 = %(time2)s,
+                    time3 = %(time3)s,
+                    comment = %(comment)s
+                    where id = %(matching_id)s
+                    """
+                with conn.cursor() as curr:
+                    curr.execute(update_stmt, params)
+
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                raise e
     data = session.get('confirm_data')
     matching_info = session.get('matching_info')
     try:
-        conn = get_db()
-        change_state(matching_info['current_state'],
-                     f'rest_r{rest_round}_waiting',
+        change_state(f'rest_r{rest_round}_waiting',
                      f'rest_r{rest_round+1}_sending',
-                     matching_info['id'],
-                     conn=conn, commit=False)
-        store_confirm_data(data, matching_info['id'],
-                           conn=conn, commit=False)
-        conn.commit()
+                     matching_info['id'])
+        store_confirm_data(data, matching_info['id'])
     except ValueError as e:
-        conn.rollback()
         return render_template('error.html', message=str(e))
 
     return render_template('thank_you.html',
@@ -412,6 +406,27 @@ def confirm_rest(rest_round):
 
 @app.route('/confirm_booking/<int:rest_round>', methods=['POST'])
 def confirm_booking(rest_round):
+    def store_booking_data(booking_data, matching_id):
+        if ALLOW_CHANGE_VALUE:
+            conn = get_db()
+            try:
+                params = booking_data.copy()
+                params['matching_id'] = matching_id
+                update_stmt = """
+                    update matching set
+                    book_phone = %(book_phone)s,
+                    book_name = %(book_name)s,
+                    comment = %(comment)s,
+                    selected_place = %(selected_place)s,
+                    selected_time = %(selected_time)s
+                    where id = %(matching_id)s
+                    """
+                with conn.cursor() as curr:
+                    curr.execute(update_stmt, params)
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                raise e
     data = session.get('confirm_data')
     matching_info = session.get('matching_info')
 
@@ -419,17 +434,11 @@ def confirm_booking(rest_round):
     data['book_phone'] = request.form['book_phone']
     data['comment'] = request.form['comment']
     try:
-        conn = get_db()
-        change_state(matching_info['current_state'],
-                     f'rest_r{rest_round}_waiting',
+        change_state(f'rest_r{rest_round}_waiting',
                      'deal_sending',
-                     matching_info['id'],
-                     conn=conn, commit=False)
-        store_booking_data(data, matching_info['id'],
-                           conn=conn, commit=False)
-        conn.commit()
+                     matching_info['id'])
+        store_booking_data(data, matching_info['id'])
     except ValueError as e:
-        conn.rollback()
         return render_template('error.html', message=str(e))
 
     return render_template('thank_you.html',
@@ -552,8 +561,7 @@ def bye_bye(rest_round):
     matching_info = session.get('matching_info')
     try:
         conn = get_db()
-        change_state(matching_info['current_state'],
-                     f'rest_r{rest_round}_waiting',
+        change_state(f'rest_r{rest_round}_waiting',
                      'abort_sending',
                      matching_info['id'],
                      conn=conn)

@@ -2,7 +2,7 @@ import sys
 
 import psycopg
 from config import DB
-from dispatchers import DISPATCHER_MAP, get_dispatcher
+from senders.dispatcher import DISPATCHER_MAP, get_dispatcher
 
 # 只要測試每一個發送出去的內容是否正確
 # dispatcher_types = [
