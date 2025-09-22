@@ -22,15 +22,14 @@ class MySender(Sender):
     NEW_STATE = 'deal_3hr_notification_sending'
 
     def modify_bubble(self):
-        message = """
-        📅 溫馨提醒：明天您有一場約會 😊
+        message = """📅 溫馨提醒：明天您有一場約會 😊
         📌 請務必準時抵達，建議您提早 5～10 分鐘到場，避免讓對方久等唷 🙇
         """
 
         return [SendingInfo(
-            self.matching_row.object_id, message),
+            self.matching_row.object_id, message, alt=""),
             SendingInfo(
-            self.matching_row.subject_id, message)]
+            self.matching_row.subject_id, message, alt="")]
 
 
 if __name__ == '__main__':

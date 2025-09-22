@@ -1,6 +1,7 @@
 name: dispatcher_runner
 
 on:
+  # Scheduled workflows will only run on the default branch.:)
   schedule:
     - cron: '* * * * *'  
   workflow_dispatch:
