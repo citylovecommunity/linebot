@@ -1,8 +1,9 @@
 import psycopg
-from config import FORM_WEB_URL, DB
-from senders_utils import load_bubble_raw, get_proper_name, get_introduction_link, get_gender_id
+from base import Collector, Dispatcher, Sender, SendingInfo
 from collector_utils import get_list
-from base import Collector, Sender, SendingInfo, Dispatcher
+from config import DB, FORM_WEB_URL
+from senders_utils import (get_gender_id, get_introduction_link,
+                           get_proper_name, load_bubble_raw)
 
 
 class MyCollector(Collector):

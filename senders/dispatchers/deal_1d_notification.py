@@ -28,9 +28,9 @@ class MySender(Sender):
         """
 
         return [SendingInfo(
-            self.matching_row.object_id, message),
+            self.matching_row.object_id, message, alt=""),
             SendingInfo(
-            self.matching_row.subject_id, message)]
+            self.matching_row.subject_id, message, alt="")]
 
 
 if __name__ == '__main__':
