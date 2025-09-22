@@ -1,10 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import NamedTuple, List
-import psycopg
-from senders_utils import (send_bubble_to_member_id,
-                           send_normal_text, write_sent_to_db, change_state)
 from collections import namedtuple
+from typing import List, NamedTuple
+
+import psycopg
 from config import SENDER_PRODUCTION
+from senders_utils import (change_state, send_bubble_to_member_id,
+                           send_normal_text, write_sent_to_db)
 
 
 class Collector(ABC):
@@ -40,7 +41,7 @@ class Sender(ABC):
         change_state(self.conn, self.OLD_STATE,
                      self.NEW_STATE, self.matching_row.id)
 
-    def send(self, change_state):
+    def send(self):
         sending_infos = self.modify_bubble()
         for recipient, body, alt in sending_infos:
 
@@ -54,7 +55,7 @@ class Sender(ABC):
                              real_sending_info.body,
                              real_sending_info.send_to)
 
-        if change_state and not self.NOTIFICATION:
+        if not self.NOTIFICATION:
             self._change_state()
 
 
@@ -69,7 +70,7 @@ class Dispatcher:
     def show_collection(self):
         return self._users
 
-    def send(self, change_state=None):
+    def send(self):
         if len(self._users) > 0:
             if SENDER_PRODUCTION:
                 for matching_row in self._users:
