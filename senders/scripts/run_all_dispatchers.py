@@ -5,13 +5,15 @@ dispatcher_dir = pathlib.Path(__file__).parent.parent / "dispatchers"
 failures = []
 
 for pyfile in dispatcher_dir.glob("*.py"):
-    print(f"Running {pyfile} ...")
+    module_name = f"dispatchers.{pyfile.stem}"
+    print(f"Running {module_name} ...")
     try:
         result = subprocess.run(
-            [f"cd  /home/runner/work/linebot/linebot/senders && uv run python -m dispatchers.{str(pyfile.name).replace(".py", "")}"],
+            ["uv", "run", "python", "-m", module_name],
             capture_output=True,
             text=True,
-            check=True
+            check=True,
+            cwd=dispatcher_dir.parent  # This sets working dir to 'senders'
         )
         print(f"{pyfile.name} succeeded.")
     except subprocess.CalledProcessError as e:
@@ -22,7 +24,6 @@ for pyfile in dispatcher_dir.glob("*.py"):
             "stdout": e.stdout,
             "stderr": e.stderr
         })
-
 print("\nSummary:")
 if failures:
     for fail in failures:
