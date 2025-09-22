@@ -7,7 +7,7 @@ on:
   push:  
 
 jobs:
-  matching:
+  dispatcher_runner:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -19,9 +19,12 @@ jobs:
 
       - name: Install Dependencies
         run: cd senders && uv sync
+        
+      - name: Make Sure Where I am 
+        run: ls 
 
       - name: Run Script
-        run: uv run python -m scripts.run_all_dispatchers
+        run: pwd && uv run python -m scripts.run_all_dispatchers
         env: 
             DB: ${{ secrets.TEST_DB }}
             LINE_CHANNEL_SECRET: ${{ secrets.TEST_DB }}
