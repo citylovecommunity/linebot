@@ -23,16 +23,14 @@ class MySender(Sender):
     NEW_STATE = 'dating_notification_sending'
 
     def modify_bubble(self):
-        message_for_obj = f"""
-        提醒您再3小時後即將與{get_proper_name(self.conn, self.matching_row.subject_id)}約會\n
-        這是對方的電話號碼：{get_phone_number(self.conn, self.matching_row.subject_id)}\n
-        若有任何問題，請直接與對方聯繫。\n
+        message_for_obj = f"""提醒您再3小時後即將與{get_proper_name(self.conn, self.matching_row.subject_id)}約會
+        這是對方的電話號碼：{get_phone_number(self.conn, self.matching_row.subject_id)}
+        若有任何問題，請直接與對方聯繫。
         祝您約會愉快！
         """
-        message_for_sub = f"""
-        提醒您再3小時後即將與{get_proper_name(self.conn, self.matching_row.object_id)}約會\n
-        這是對方的電話號碼：{get_phone_number(self.conn, self.matching_row.object_id)}\n
-        若有任何問題，請直接與對方聯繫。\n
+        message_for_sub = f"""提醒您再3小時後即將與{get_proper_name(self.conn, self.matching_row.object_id)}約會
+        這是對方的電話號碼：{get_phone_number(self.conn, self.matching_row.object_id)}
+        若有任何問題，請直接與對方聯繫。
         祝您約會愉快！
         """
 
