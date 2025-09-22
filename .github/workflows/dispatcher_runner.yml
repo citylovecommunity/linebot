@@ -10,6 +10,10 @@ jobs:
   matching:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4.2.2
+
+
       - name: Set up uv
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
 
