@@ -18,13 +18,10 @@ jobs:
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
 
       - name: Install Dependencies
-        run: cd senders && uv sync
-        
-      - name: Make Sure Where I am 
-        run: ls 
+        run: uv sync
 
       - name: Run Script
-        run: pwd && uv run python -m scripts.run_all_dispatchers
+        run: cd senders && uv run python -m scripts.run_all_dispatchers
         env: 
             DB: ${{ secrets.TEST_DB }}
             LINE_CHANNEL_SECRET: ${{ secrets.TEST_DB }}
