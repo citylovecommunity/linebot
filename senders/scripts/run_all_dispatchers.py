@@ -8,7 +8,7 @@ for pyfile in dispatcher_dir.glob("*.py"):
     print(f"Running {pyfile} ...")
     try:
         result = subprocess.run(
-            [f"uv run python -m dispatchers.{pyfile.replace(",py", "")}"],
+            [f"cd  /home/runner/work/linebot/linebot/senders && uv run python -m dispatchers.{str(pyfile).replace(",py", "")}"],
             capture_output=True,
             text=True,
             check=True
