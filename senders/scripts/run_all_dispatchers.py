@@ -32,5 +32,6 @@ if failures:
         print(f"Stdout:\n{fail['stdout']}")
         print(f"Stderr:\n{fail['stderr']}")
         print("-" * 40)
+    raise RuntimeError(f"{len(failures)} dispatcher script(s) failed.")
 else:
     print("All dispatcher scripts ran successfully.")

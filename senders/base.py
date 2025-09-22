@@ -70,8 +70,9 @@ class Dispatcher:
         return self._users
 
     def send(self, change_state=None):
-        if SENDER_PRODUCTION:
-            for matching_row in self._users:
-                self.sender(self.conn, matching_row).send(change_state)
-        else:
-            self.sender(self.conn, self._users[0]).send(change_state)
+        if len(self._users) > 0:
+            if SENDER_PRODUCTION:
+                for matching_row in self._users:
+                    self.sender(self.conn, matching_row).send(change_state)
+            else:
+                self.sender(self.conn, self._users[0]).send(change_state)
