@@ -12,6 +12,16 @@ def get_list(conn, state):
         return cur.execute(stmt, (state+'_sending',)).fetchall()
 
 
+def get_list_within_time(conn, state):
+    stmt = """
+        select * from
+        matching where
+        current_state = %s;
+        """
+    with conn.cursor(row_factory=namedtuple_row) as cur:
+        return cur.execute(stmt, (state+'_sending',)).fetchall()
+
+
 def get_notification_list(conn, state, time):
     if time == '24':
         stmt = """
