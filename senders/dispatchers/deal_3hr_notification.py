@@ -1,4 +1,5 @@
 
+from email import message
 import psycopg
 from base import Collector, Dispatcher, Sender, SendingInfo
 from config import DB
@@ -23,16 +24,15 @@ class MySender(Sender):
     NEW_STATE = 'dating_notification_sending'
 
     def modify_bubble(self):
-        message_for_obj = f"""提醒您再3小時後即將與{get_proper_name(self.conn, self.matching_row.subject_id)}約會
-        這是對方的電話號碼：{get_phone_number(self.conn, self.matching_row.subject_id)}
-        若有任何問題，請直接與對方聯繫。
-        祝您約會愉快！
-        """
-        message_for_sub = f"""提醒您再3小時後即將與{get_proper_name(self.conn, self.matching_row.object_id)}約會
-        這是對方的電話號碼：{get_phone_number(self.conn, self.matching_row.object_id)}
-        若有任何問題，請直接與對方聯繫。
-        祝您約會愉快！
-        """
+        def message_format(name, number):
+            message = f"""提醒您再3小時後即將與{name}約會\n\n這是對方的電話號碼：{number}\n\n若有任何問題，請別害羞直接與對方聯繫。\n\n祝您約會愉快！"""
+            return message
+
+        message_for_obj = message_format(get_proper_name(
+            self.conn, self.matching_row.subject_id), get_phone_number(self.conn, self.matching_row.subject_id))
+
+        message_for_sub = message_format(get_proper_name(
+            self.conn, self.matching_row.object_id), get_phone_number(self.conn, self.matching_row.object_id))
 
         return [SendingInfo(
             self.matching_row.object_id, message_for_obj, alt=""),

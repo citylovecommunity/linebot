@@ -12,6 +12,9 @@ class MyCollector(Collector):
 
 
 class MySender(Sender):
+    OLD_STATE = 'rest_r4_sending'
+    NEW_STATE = 'rest_r4_waiting'
+
     def modify_bubble(self):
         bubble = load_bubble_raw('basic_bubble.json')
         bubble.set_title('約會邀請卡')
@@ -27,7 +30,7 @@ class MySender(Sender):
         bubble.set_intro_link(intro_link)
         bubble.set_sent_to_proper_name(name)
 
-        message = '請您提供可配合時間與餐廳訂位\n若需進一步溝通請於資訊卡留言'
+        message = '請您提供可配合時間與餐廳訂位，若需進一步溝通請於資訊卡留言'
 
         bubble.set_bubble_message(message)
 

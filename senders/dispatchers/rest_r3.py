@@ -12,6 +12,9 @@ class MyCollector(Collector):
 
 
 class MySender(Sender):
+    OLD_STATE = 'rest_r3_sending'
+    NEW_STATE = 'rest_r3_waiting'
+
     def modify_bubble(self):
 
         bubble = load_bubble_raw('basic_bubble.json')
@@ -29,7 +32,7 @@ class MySender(Sender):
         bubble.set_intro_link(intro_link)
         bubble.set_sent_to_proper_name(name)
 
-        message = '男生已確認要約並想與妳開啟約會內容溝通\n請您進一步開啟溝通卡內容'
+        message = """男生已確認要約並想與妳開啟約會內容溝通，請您進一步開啟溝通卡內容"""
 
         bubble.set_bubble_message(message)
 

@@ -1,8 +1,9 @@
 import psycopg
-from config import FORM_WEB_URL, DB
-from senders_utils import load_bubble_raw, get_proper_name, get_introduction_link
-from base import Collector, Sender, SendingInfo, Dispatcher
+from base import Collector, Dispatcher, Sender, SendingInfo
+from config import DB, FORM_WEB_URL
 from psycopg.rows import namedtuple_row
+from senders_utils import (get_introduction_link, get_proper_name,
+                           load_bubble_raw)
 
 
 class MyCollector(Collector):
@@ -14,17 +15,17 @@ class MyCollector(Collector):
         stmt = """
         select * from
         matching where
-        current_state = %s
+        current_state = 'liked_sending'
         and object_id not in (
             select object_id
             from matching
-            where current_state not in ('invitation_sending', 'goodbye')
+            where current_state not in ('invitation_sending', 'goodbye', 'liked_sending')
             group by object_id
             having count(*) >= 3
             );
         """
         with self.conn.cursor(row_factory=namedtuple_row) as cur:
-            return cur.execute(stmt, ('liked_sending',)).fetchall()
+            return cur.execute(stmt).fetchall()
 
 
 class MySender(Sender):

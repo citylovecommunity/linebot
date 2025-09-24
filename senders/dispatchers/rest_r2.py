@@ -31,7 +31,9 @@ class MySender(Sender):
         bubble.set_intro_link(intro_link)
         bubble.set_sent_to_proper_name(name)
 
-        message = '請您提供可配合時間與餐廳訂位\n若需進一步溝通請於資訊卡留言'
+        message = """
+        請您提供可配合時間與餐廳訂位，若需進一步溝通請於資訊卡留言
+        """
 
         bubble.set_bubble_message(message)
 
