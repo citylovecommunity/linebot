@@ -240,6 +240,7 @@ def change_time(token, who):
 @app.route('/invitation', methods=['GET', 'POST'])
 def invitation():
     matching_info = session.get('matching_info')
+    name = get_proper_name(matching_info['object_id'])
     if request.method == 'POST':
         try:
             change_state('invitation_waiting', 'liked_sending',
@@ -255,53 +256,34 @@ def invitation():
                                """,
                                header='✅您已傳送邀請')
     return render_template('confirm.html',
+                           header='赴約意願確認',
                            message=f"""
-                           要傳送邀請給{get_proper_name(matching_info['object_id'])}嗎？
+                           有意願認識{name}這位新朋友嗎？
                            """,
-                           header=f'傳送邀請',
-                           btn_name='確認傳送',
+                           btn_name='願意認識新朋友',
                            action_url=url_for('invitation'))
 
 
 @app.route('/liked', methods=['GET', 'POST'])
 def liked():
     matching_info = session.get('matching_info')
+    name = get_proper_name(matching_info['subject_id'])
     if request.method == 'POST':
-        action = request.form['action']
-        if action == 'decline':
-            try:
-                change_state('liked_waiting', 'goodbye_sending',
-                             matching_info['id'])
-            except ValueError as e:
-                return render_template('error.html', message=str(e))
-            return render_template('thank_you.html',
-                                   header="🥲您已婉拒邀請",
-                                   message="""
-                                   很遺憾您拒絕邀請<br>
-                                系統將會為您安排更合適的對象<br>
-                                """)
-        elif action == 'accept':
-            try:
-                change_state('liked_waiting', 'rest_r1_sending',
-                             matching_info['id'])
-            except ValueError as e:
-                return render_template('error.html', message=str(e))
-            return render_template('thank_you.html',
-                                   header="✅您已確認相遇",
-                                   message="""
-                                屬於你們的連結已悄然展開<br>
-                                系統將安排接下來的約會流程<br>
-                                讓浪漫的相遇在每個細節中綻放
-                                <br>
-                                """)
+        try:
+            change_state('liked_waiting', 'rest_r1_sending',
+                         matching_info['id'])
+        except ValueError as e:
+            return render_template('error.html', message=str(e))
+        return render_template('thank_you.html',
+                               header="✅您已確認相遇",
+                               message="""
+                            屬於你們的連結已悄然展開<br>系統將安排接下來的約會流程<br>讓浪漫的相遇在每個細節中綻放
+                            """)
+
     return render_template('confirm.html',
-                           message=f"""
-                           {get_proper_name(matching_info['subject_id'])}對您傳送邀請<br>
-                        是否確認相遇？<br>
-                           """,
+                           message=f"""{name}有意願認識您<br>是否答應赴約交個新朋友呢？""",
                            header='邀請回覆',
-                           btn_name='確認相遇',
-                           decline='拒絕邀請',
+                           btn_name='可以💓',
                            action_url=url_for('liked'))
 
 

@@ -5,18 +5,14 @@ Confirm
 {% endblock %}
 
 {% block content %}
-
-<h1 class="display-5 fw-bold text-body-emphasis">{{ header }}</h1>
-<div class="col-lg-6 mx-auto">
-    <p class="lead mb-4">{{ message|safe }}</p>
-    <form method="post" action="{{ action_url }}">
-        <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
-            <button type="submit" name="action" value="accept" class="btn btn-primary btn-lg px-4 gap-3" {% if alert
-                %}onclick="return confirm('{{ alert }}');" {% endif %}>{{ btn_name }}</button>
-            {% if decline %}
-            <button type="submit" name="action" value="decline" class="btn btn-danger btn-lg px-4 gap-3" {% if alert
-                %}onclick="return confirm('{{ alert }}');" {% endif %}>{{ decline }}</button>
-            {% endif %}
-        </div>
-    </form>
-    {% endblock %}
+<h1 class="display-5 fw-bold text-body-emphasis mb-4 mt-2">{{ header }}</h1>
+<p class="lead mb-4">{{ message|safe }}</p>
+<form method="post" action="{{ action_url }}">
+    <div class="d-grid gap-3 d-sm-flex justify-content-sm-center mt-4">
+        <button type="submit" name="action" class="btn btn-primary btn-lg px-5 py-2" {% if alert
+            %}onclick="return confirm('{{ alert }}');" {% endif %}>
+            {{ btn_name }}
+        </button>
+    </div>
+</form>
+{% endblock %}
