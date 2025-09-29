@@ -41,31 +41,30 @@
         </div>
 
         <div class="col-12 mb-3">
-            <label for="time1" class="form-label">time1</label>
+            <label for="time1" class="form-label">日期1</label>
             <div class="input-group">
-                <input type="datetime-local" class="form-control mb-2" id="time1" name="time1" required {% if lock %}
-                    disabled {% endif %}
-                    value="{{ session['confirm_data']['time1'] if session.get('confirm_data') else '' }}">
+                <input type="date" class="form-control mb-2" id="time1" name="time1" required {% if lock %} disabled {%
+                    endif %} value="{{ session['confirm_data']['time1'] if session.get('confirm_data') else '' }}">
                 {% if lock %}
                 <button class="btn btn-outline-secondary  ms-2" type="button" onclick="enableInput('time1')">重填</button>
                 {% endif %}
             </div>
         </div>
         <div class="col-12 mb-3">
-            <label for="time2" class="form-label">time2 <span class="text-body-secondary">(選填)</span></label>
+            <label for="time2" class="form-label">日期2 <span class="text-body-secondary">(選填)</span></label>
             <div class="input-group">
-                <input type="datetime-local" class="form-control mb-2" id="time2" name="time2" {% if lock %} disabled {%
-                    endif %} value="{{ session['confirm_data']['time2'] if session.get('confirm_data') else '' }}">
+                <input type="date" class="form-control mb-2" id="time2" name="time2" {% if lock %} disabled {% endif %}
+                    value="{{ session['confirm_data']['time2'] if session.get('confirm_data') else '' }}">
                 {% if lock %}
                 <button class="btn btn-outline-secondary ms-2" type="button" onclick="enableInput('time2')">重填</button>
                 {% endif %}
             </div>
         </div>
         <div class="col-12 mb-3">
-            <label for="time3" class="form-label">time3 <span class="text-body-secondary">(選填)</span></label>
+            <label for="time3" class="form-label">日期3 <span class="text-body-secondary">(選填)</span></label>
             <div class="input-group">
-                <input type="datetime-local" class="form-control mb-2" id="time3" name="time3" {% if lock %} disabled {%
-                    endif %} value="{{ session['confirm_data']['time3'] if session.get('confirm_data') else '' }}">
+                <input type="date" class="form-control mb-2" id="time3" name="time3" {% if lock %} disabled {% endif %}
+                    value="{{ session['confirm_data']['time3'] if session.get('confirm_data') else '' }}">
                 {% if lock %}
                 <button class="btn btn-outline-secondary ms-2" type="button" onclick="enableInput('time3')">重填</button>
                 {% endif %}
@@ -74,8 +73,7 @@
 
         <div class="col-md-12">
             <label for="comment" class="form-label">留言給對方 <span class="text-body-secondary">(選填)</span></label>
-            <textarea class="form-control" id="comment" name="comment" rows="3" placeholder="輸入您想對對方說的話...">
-                </textarea>
+            <textarea class="form-control" id="comment" name="comment" rows="4" placeholder="輸入您想對對方說的話..."></textarea>
         </div>
     </div>
 

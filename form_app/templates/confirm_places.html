@@ -6,29 +6,33 @@
 {% block content %}
 
 <div class="col-lg-6 mx-auto">
-    <p class="lead mb-4">
-        📍地點<br>
+    <h2 class="mb-3">地點</h2>
+    <ul class="list-group mb-4">
         {% for place in places %}
         {% if place %}
-        <a href="{{ place }}" target="_blank">{{ place }}</a><br>
+        <li class="list-group-item">
+            <span>第{{ loop.index }}家餐廳：</span>
+            <a href="{{ place }}" target="_blank" class="text-decoration-none">
+                {{ place }}
+            </a>
+        </li>
         {% endif %}
         {% endfor %}
-    </p>
+    </ul>
 
-    <p class="lead mb-4">
-        🕒時間<br>
-        {% for time in times%}
-        {{ time }}<br>
+    <h2 class="mb-3">日期</h2>
+    <ul class="list-group mb-4">
+        {% for time in times %}
+        <li class="list-group-item">{{ time }}</li>
         {% endfor %}
-    </p>
+    </ul>
 
     {% if comment %}
-    <p class="lead mb-4">
-        💬 留言<br>
+    <h2 class="mb-3">留言</h2>
+    <div class="alert alert-secondary mb-4">
         <em>{{ comment }}</em>
-    </p>
+    </div>
     {% endif %}
-
 
     <form method="post" action="{{ confirm_url }}" class="mb-5">
         {% if new_message %}
@@ -48,6 +52,4 @@
             {% endif %}
         </div>
     </form>
-
-
     {% endblock %}

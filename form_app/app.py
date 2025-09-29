@@ -324,11 +324,6 @@ def choose_rest(rest_round):
         places = [url1, url2]
         times = [time1, time2, time3]
 
-        if rest_round == 1:
-            first_word = """
-            """
-        else:
-            first_word = ''
         return render_template('confirm_places.html',
                                places=places,
                                times=times,
@@ -336,7 +331,11 @@ def choose_rest(rest_round):
                                go_back_url=url_for(f'rest_r{rest_round}'),
                                confirm_url=url_for(
                                    'confirm_rest', rest_round=rest_round),
-                               first_word=first_word)
+                               header="確認地點日期",
+                               message="""
+                               再送出之前<br>
+                               請確認地點和日期是否正確
+                               """)
 
 
 @app.route('/confirm_rest/<int:rest_round>', methods=['POST'])
@@ -440,10 +439,16 @@ def confirm_booking(rest_round):
 def rest_r1():
     return render_template('submit_places.html',
                            post_to=url_for('choose_rest', rest_round=1),
-                           header='約會的餐廳和時間',
+                           header='約會的餐廳和日期',
                            message="""
-                           請提供心儀的餐廳選項和時間<br>
-                           餐廳部分請填入Google Map網址，方便對方查詢～
+                           請提供心儀的餐廳選項和日期<br>
+                           餐廳請複製貼上Google Map網址<br>
+                           <br>
+                           若有額外需求（如幾點後方便）<br>
+                           請在底下留言，
+                           系統將為您轉達給對方
+                           <br>
+                           <br>
                            """,
                            )
 
@@ -464,7 +469,15 @@ def booking(rest_round):
                            place=selected_place,
                            time=selected_time,
                            go_back_url=url_for(f'rest_r{rest_round}'),
-                           confirm_url=url_for('confirm_booking', rest_round=rest_round))
+                           confirm_url=url_for(
+                               'confirm_booking', rest_round=rest_round),
+                           header='請協助餐廳訂位',
+                           message="""
+                           請協助預約所選的約會餐廳<br>
+                           <br>
+                           若日期或時間不符合對方需求<br>
+                           請返回上一頁點選紅色按鈕進行修改
+                           """)
 
 
 @app.route('/rest_r2', methods=['GET', 'POST'])
