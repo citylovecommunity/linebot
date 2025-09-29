@@ -5,14 +5,7 @@
 
 {% block content %}
 
-<h1 class="display-5 fw-bold text-body-emphasis">請確認以下資訊</h1>
 <div class="col-lg-6 mx-auto">
-    <p class="lead mb-4">{{ message|safe }}</p>
-    <p class="lead mb-4">
-        {{first_word | safe}}
-    </p>
-
-
     <p class="lead mb-4">
         📍地點<br>
         {% for place in places %}

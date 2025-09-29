@@ -1,4 +1,5 @@
 
+from email import message
 import os
 
 import psycopg
@@ -177,7 +178,7 @@ def sudden_change_time(token, who):
                                btn_name='確認改期',
                                action_url=url_for(
                                    'sudden_change_time', token=token, who=who),
-                               alert='確定要觸發超臨時改期嗎？')
+                               alert='確定要觸發超臨時改期嗎？', )
 
 
 @app.route('/<token>/change_time/<who>', methods=['GET', 'POST'])
@@ -229,7 +230,13 @@ def change_time(token, who):
         #     return render_template('change_time.html', token=token, member_id=member_id, message="這一對已經有改期過了")
         return render_template('change_time.html', token=token, who=who,
                                link_endpoint=url_for(
-                                   'sudden_change_time', token=token, who=who))
+                                   'sudden_change_time', token=token, who=who),
+                               header="臨時改期",
+                               message="""
+                            若您因臨時有事要取消本次約會<br>
+                            請向對方說明您的理由<br>
+                            系統將為您轉達給對方
+                            """)
 
 
 @app.route('/invitation', methods=['GET', 'POST'])
@@ -278,7 +285,7 @@ def liked():
     return render_template('confirm.html',
                            message=f"""{name}有意願認識您<br>是否答應赴約交個新朋友呢？""",
                            header='邀請回覆',
-                           btn_name='可以💓',
+                           btn_name='可以',
                            action_url=url_for('liked'))
 
 
@@ -393,6 +400,7 @@ def confirm_booking(rest_round):
                     update matching set
                     book_phone = %(book_phone)s,
                     book_name = %(book_name)s,
+                    book_time = %(book_time)s,
                     comment = %(comment)s,
                     selected_place = %(selected_place)s,
                     selected_time = %(selected_time)s
@@ -408,6 +416,7 @@ def confirm_booking(rest_round):
     matching_info = session.get('matching_info')
 
     data['book_name'] = request.form['book_name']
+    data['book_time'] = request.form['book_time']
     data['book_phone'] = request.form['book_phone']
     data['comment'] = request.form['comment']
     try:
@@ -431,12 +440,12 @@ def confirm_booking(rest_round):
 def rest_r1():
     return render_template('submit_places.html',
                            post_to=url_for('choose_rest', rest_round=1),
-                           dating_title='約會的餐廳和時間',
-                           first_word="""
+                           header='約會的餐廳和時間',
+                           message="""
                            請提供心儀的餐廳選項和時間<br>
+                           餐廳部分請填入Google Map網址，方便對方查詢～
                            """,
-                           second_word="""
-                           """)
+                           )
 
 
 @app.route('/booking/<int:rest_round>', methods=['POST'])
@@ -474,7 +483,13 @@ def rest_r2():
                            time3=r1_info['time3'],
                            booking_url=url_for('booking', rest_round=2),
                            cannot_url=url_for('rest_r2_reject'),
-                           comment=r1_info['comment']
+                           comment=r1_info['comment'],
+                           header="餐廳時間勾選",
+                           message="""
+                           以下是女方提供的餐廳以及方便的時段<br>
+                           勾選完成後按下藍色按鈕進入訂位畫面<br>
+                           若時間或地點皆不方便，請點選紅色按鈕
+                           """
                            )
 
 
@@ -488,7 +503,12 @@ def rest_r2_reject():
                            go_back_url=url_for('rest_r2'),
                            post_to=url_for('choose_rest', rest_round=2),
                            lock=True,
-                           dating_title='重新選地方'
+                           header='重新勾選餐廳或時間',
+                           message="""
+                           點按重填按鈕可以重新填入自己方便的時間或地點<br>
+                           並麻煩將重新填寫的原因也寫下<br>
+                           系統將會轉達給女方作確認
+                           """
                            )
 
 
@@ -510,7 +530,16 @@ def rest_r3():
                            comment=r1_info['comment'],
                            new_message=True,
                            cannot_url=url_for("bye_bye", rest_round=3),
-                           confirm_url=url_for('choose_rest', rest_round=3))
+                           confirm_url=url_for('choose_rest', rest_round=3),
+                           header="""
+                           餐廳地點的選擇
+                           """,
+                           message="""
+                           由於上次您提交的地點/時間有部分原因男無法配合<br>
+                           以下是男方所提交的餐廳和時間<br>
+                           再麻煩協助確認<br>
+                           也可以在留言區直接跟男方說比較偏好的地點/時間
+                           """)
 
 
 @app.route('/rest_r4', methods=['GET', 'POST'])
@@ -528,7 +557,14 @@ def rest_r4():
                            time3=r1_info['time3'],
                            comment=r1_info['comment'],
                            booking_url=url_for('booking', rest_round=4),
-                           bye_bye_url=url_for('bye_bye', rest_round=4)
+                           bye_bye_url=url_for('bye_bye', rest_round=4),
+                           header="""
+                           餐廳地點的選擇
+                           """,
+                           message="""
+                           您上次重新選擇的時間地點已被女方所確認<br>
+                            沒問題的話再按下藍色按鈕進入訂餐廳頁面
+                           """
                            )
 
 

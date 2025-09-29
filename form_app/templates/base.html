@@ -16,6 +16,8 @@
         <div class="card shadow-lg rounded-4 border-0 mx-auto w-90"
             style="max-width: 600px; background: #fff; border: 1px solid #dee2e6;">
             <div class="card-body px-3 px-md-5 py-4 text-center">
+                <h1 class="display-5 fw-bold text-body-emphasis mb-4 mt-2">{{ header }}</h1>
+                <p class="lead mb-4">{{ message|safe }}</p>
                 {% block content %}{% endblock %}
             </div>
         </div>
