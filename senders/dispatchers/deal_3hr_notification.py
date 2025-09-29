@@ -1,5 +1,4 @@
 
-from email import message
 import psycopg
 from base import Collector, Dispatcher, Sender, SendingInfo
 from config import DB

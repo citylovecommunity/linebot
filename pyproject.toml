@@ -19,4 +19,5 @@ dependencies = [
 members = [
     "form_app",
     "flow_charts",
+    "database",
 ]

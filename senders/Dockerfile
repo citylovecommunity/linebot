@@ -9,6 +9,3 @@ ADD . /app
 WORKDIR /app
 
 RUN uv sync --locked
-
-# Default run command: enter senders folder and run your dispatcher script
-CMD ["uv", "run", "python", "-m", "scripts.run_all_dispatchers"]
