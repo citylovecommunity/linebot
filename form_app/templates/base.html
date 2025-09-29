@@ -11,19 +11,15 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
 </head>
 
-<body class="flex justify-center min-h-screen">
-    <main class="min-vh-100 d-flex align-items-center justify-content-center"
-        style="background: linear-gradient(135deg, #e3e6f0 0%, #bfc8e6 100%);">
-        <div class="container py-5">
-            <div class="card shadow-lg rounded-4 border-0 mx-auto"
-                style="max-width: 600px; background: #fff; border: 1px solid #dee2e6;">
-                <div class="card-body px-5 py-5 text-center">
-                    {% block content %}{% endblock %}
-                </div>
+<body style="min-height: 100vh; background: linear-gradient(135deg, #e3e6f0 0%, #bfc8e6 100%);">
+    <main class="d-flex align-items-center justify-content-center" style="min-height: 100vh;">
+        <div class="card shadow-lg rounded-4 border-0 mx-auto w-90"
+            style="max-width: 600px; background: #fff; border: 1px solid #dee2e6;">
+            <div class="card-body px-3 px-md-5 py-4 text-center">
+                {% block content %}{% endblock %}
             </div>
         </div>
     </main>
-
 </body>
 
 </html>

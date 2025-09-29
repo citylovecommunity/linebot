@@ -1,10 +1,14 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2 class="mb-4">約會臨時改期</h2>
+<h1 class="mb-4">約會臨時改期</h1>
 <form method="POST" action="{{ url_for('change_time', token=token, who=who) }}">
     <div class="mb-3">
-        <div class="form-text text-muted mb-2">請向對方說明您想改期的理由</div>
+        <div class="form-text text-muted mb-2">
+            若您因臨時有事要取消本次約會<br>
+            請向對方說明您的理由<br>
+            系統將為您轉達給對方
+        </div>
         <textarea id="message" name="message" class="form-control" rows="4" required></textarea>
     </div>
     <button type="submit" class="btn btn-danger" onclick="return confirmCancel()">送出</button>
