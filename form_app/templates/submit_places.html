@@ -23,7 +23,7 @@
                     endif %} value="{{ session['confirm_data']['place1_url'] if session.get('confirm_data') else '' }}"
                     placeholder="請貼上Google Map網址">
                 {% if lock %}
-                <button class="btn btn-outline-secondary ms-2" type="button" onclick="enableInput('place1')">編輯</button>
+                <button class="btn btn-outline-secondary ms-2" type="button" onclick="enableInput('place1')">重填</button>
                 {% endif %}
             </div>
             <div class="invalid-feedback">
@@ -37,7 +37,7 @@
                 <input type="url" class="form-control" id="place2" name="place2" {% if lock %} disabled {% endif %}
                     value="{{ session['confirm_data']['place2_url'] if session.get('confirm_data') else '' }}">
                 {% if lock %}
-                <button class="btn btn-outline-secondary ms-2" type="button" onclick="enableInput('place2')">編輯</button>
+                <button class="btn btn-outline-secondary ms-2" type="button" onclick="enableInput('place2')">重填</button>
                 {% endif %}
             </div>
             <div class="invalid-feedback">
@@ -45,42 +45,42 @@
             </div>
         </div>
 
-        <div class="col-md-4 mb-3">
+        <div class="col-12 mb-3">
             <label for="time1" class="form-label">time1</label>
             <div class="input-group">
                 <input type="datetime-local" class="form-control mb-2" id="time1" name="time1" required {% if lock %}
                     disabled {% endif %}
                     value="{{ session['confirm_data']['time1'] if session.get('confirm_data') else '' }}">
                 {% if lock %}
-                <button class="btn btn-outline-secondary  ms-2" type="button" onclick="enableInput('time1')">編輯</button>
+                <button class="btn btn-outline-secondary  ms-2" type="button" onclick="enableInput('time1')">重填</button>
                 {% endif %}
             </div>
         </div>
-        <div class="col-md-4 mb-3">
+        <div class="col-12 mb-3">
             <label for="time2" class="form-label">time2 <span class="text-body-secondary">(選填)</span></label>
             <div class="input-group">
                 <input type="datetime-local" class="form-control mb-2" id="time2" name="time2" {% if lock %} disabled {%
                     endif %} value="{{ session['confirm_data']['time2'] if session.get('confirm_data') else '' }}">
                 {% if lock %}
-                <button class="btn btn-outline-secondary ms-2" type="button" onclick="enableInput('time2')">編輯</button>
+                <button class="btn btn-outline-secondary ms-2" type="button" onclick="enableInput('time2')">重填</button>
                 {% endif %}
             </div>
         </div>
-        <div class="col-md-4 mb-3">
+        <div class="col-12 mb-3">
             <label for="time3" class="form-label">time3 <span class="text-body-secondary">(選填)</span></label>
             <div class="input-group">
                 <input type="datetime-local" class="form-control mb-2" id="time3" name="time3" {% if lock %} disabled {%
                     endif %} value="{{ session['confirm_data']['time3'] if session.get('confirm_data') else '' }}">
                 {% if lock %}
-                <button class="btn btn-outline-secondary ms-2" type="button" onclick="enableInput('time3')">編輯</button>
+                <button class="btn btn-outline-secondary ms-2" type="button" onclick="enableInput('time3')">重填</button>
                 {% endif %}
             </div>
         </div>
 
         <div class="col-md-12">
             <label for="comment" class="form-label">留言給對方 <span class="text-body-secondary">(選填)</span></label>
-            <textarea class="form-control" id="comment" name="comment" rows="3"
-                placeholder="輸入您想對對方說的話...">{{ session['confirm_data']['comment'] if session.get('confirm_data') else '' }}</textarea>
+            <textarea class="form-control" id="comment" name="comment" rows="3" placeholder="輸入您想對對方說的話...">
+                </textarea>
         </div>
     </div>
 
@@ -95,9 +95,10 @@
 {% if lock %}
 <script>
     function enableInput(inputId) {
-        document.getElementById(inputId).removeAttribute('disabled');
-        // Optionally, focus the input
-        document.getElementById(inputId).focus();
+        var input = document.getElementById(inputId);
+        input.removeAttribute('disabled');
+        input.value = ''; // Clear the value
+        input.focus();
     }
     document.querySelector('form.needs-validation').addEventListener('submit', function (e) {
         // Enable all disabled inputs before submit
