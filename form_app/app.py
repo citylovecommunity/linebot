@@ -193,11 +193,6 @@ def change_time(token, who):
         else:
             return render_template('error.html', message='錯誤❌')
 
-        # first check right state
-        stmt = """
-        select current_state from matching where id = %s;
-        """
-
         if matching_info['current_state'] not in ('deal_1d_notification_sending', 'deal_3d_notification_sending'):
             return render_template('error.html', message='目前狀態無法改期❌，請聯絡客服做處理！')
 
