@@ -23,6 +23,7 @@ def upgrade() -> None:
     op.execute("""
                CREATE TABLE change_time_history (
         id integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+        member_id integer,
         matching_id integer,
         change_time_message text,
         created_at timestamp with time zone
