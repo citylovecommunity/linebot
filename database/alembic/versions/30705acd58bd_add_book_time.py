@@ -22,7 +22,7 @@ def upgrade() -> None:
     """Upgrade schema."""
     op.execute("""
                alter table matching 
-               add column book_time timestamptz;
+               add column book_time time;
                """)
 
 
