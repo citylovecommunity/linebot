@@ -36,27 +36,26 @@ for s in wait_for_response_states:
     dot.node(s+'_waiting', shape='ellipse')
     dot.node(s+'_response', shape='diamond')
 
-    dot.edge(s+'_response', s+'_response',
-             label=f'Cron triggers 24/48 {s} notification dispatcher',
-             color='blue')
-
     dot.edge(s+'_sending', s+'_waiting',
              label=f'Cron triggers {s} dispatcher',
              color='blue')
     dot.edge(s+'_waiting', s+'_response')
 
-    dot.edge(s+'_response', 'no_action_goodbye_sending',
-             label='No action ≥72h', style='dashed', color='red')
+    if s.startswith('rest'):
+
+        dot.edge(s+'_waiting', 'no_action_goodbye_sending',
+                 label='No action ≥72h', style='dashed', color='red')
+
+        dot.edge(s+'_waiting', s+'_waiting',
+                 label='24hr reminder', style='dashed', color='blue')
 
 
 # Main flow
 dot.edge('invitation_response', 'liked_sending')
-dot.edge('liked_response', 'goodbye_sending', label='decline')
-dot.edge('liked_response', 'rest_r1_sending', label='accept')
 
-dot.edge('goodbye_sending', 'goodbye',
-         label='Cron triggers goodbye_sending dispatcher',
-         color='blue')
+dot.edge('liked_response', 'rest_r1_sending')
+
+
 dot.edge('rest_r1_response', 'rest_r2_sending')
 
 dot.edge('rest_r2_response', 'rest_r3_sending', label='decline')
@@ -87,8 +86,7 @@ dot.edge('no_action_goodbye_sending', 'goodbye',
 
 sending_edges = [('deal_sending', 'deal_1d_notification_sending'),
                  ('deal_1d_notification_sending', 'deal_3hr_notification_sending'),
-                 ('deal_3hr_notification_sending', 'dating_notification_sending'),
-                 ('dating_notification_sending', 'dating_feedback_sending'),
+                 ('deal_3hr_notification_sending', 'dating_feedback_sending'),
                  ('dating_feedback_sending', 'dating_done'),
                  ('change_time_notification_sending', 'change_time_sending')
                  ]
@@ -110,9 +108,6 @@ dot.edge('deal_3hr_notification_sending', 'change_time_notification_sending',
          label='Someone triggers change time.',
          color='red')
 
-dot.edge('dating_notification_sending', 'next_month_sending',
-         label='Someone triggers change time next month.',
-         color='red')
 
 dot.edge('dating_feedback_sending', 'next_month_sending',
          label='Someone triggers change time next month.',
@@ -120,5 +115,5 @@ dot.edge('dating_feedback_sending', 'next_month_sending',
 
 
 # dot.attr(ranksep='1.5', nodesep='1.0')
-dot.attr('edge', arrowsize='3', penwidth='3')
+# dot.attr('edge', arrowsize='3', penwidth='3')
 dot.render('flowchart', format='png', cleanup=True)

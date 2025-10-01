@@ -18,7 +18,8 @@
                     endif %} value="{{ session['confirm_data']['place1_url'] if session.get('confirm_data') else '' }}"
                     placeholder="請貼上Google Map網址">
                 {% if lock %}
-                <button class="btn btn-outline-secondary ms-2" type="button" onclick="enableInput('place1')">重填</button>
+                <button class="btn btn-outline-secondary ms-2" type="button"
+                    onclick="enableInput('place1')">清空重填</button>
                 {% endif %}
             </div>
             <div class="invalid-feedback">
@@ -32,7 +33,8 @@
                 <input type="url" class="form-control" id="place2" name="place2" {% if lock %} disabled {% endif %}
                     value="{{ session['confirm_data']['place2_url'] if session.get('confirm_data') else '' }}">
                 {% if lock %}
-                <button class="btn btn-outline-secondary ms-2" type="button" onclick="enableInput('place2')">重填</button>
+                <button class="btn btn-outline-secondary ms-2" type="button"
+                    onclick="enableInput('place2')">清空重填</button>
                 {% endif %}
             </div>
             <div class="invalid-feedback">
@@ -46,7 +48,8 @@
                 <input type="date" class="form-control mb-2" id="time1" name="time1" required {% if lock %} disabled {%
                     endif %} value="{{ session['confirm_data']['time1'] if session.get('confirm_data') else '' }}">
                 {% if lock %}
-                <button class="btn btn-outline-secondary  ms-2" type="button" onclick="enableInput('time1')">重填</button>
+                <button class="btn btn-outline-secondary  ms-2" type="button"
+                    onclick="enableInput('time1')">清空重填</button>
                 {% endif %}
             </div>
         </div>
@@ -56,7 +59,8 @@
                 <input type="date" class="form-control mb-2" id="time2" name="time2" {% if lock %} disabled {% endif %}
                     value="{{ session['confirm_data']['time2'] if session.get('confirm_data') else '' }}">
                 {% if lock %}
-                <button class="btn btn-outline-secondary ms-2" type="button" onclick="enableInput('time2')">重填</button>
+                <button class="btn btn-outline-secondary ms-2" type="button"
+                    onclick="enableInput('time2')">清空重填</button>
                 {% endif %}
             </div>
         </div>
@@ -66,7 +70,8 @@
                 <input type="date" class="form-control mb-2" id="time3" name="time3" {% if lock %} disabled {% endif %}
                     value="{{ session['confirm_data']['time3'] if session.get('confirm_data') else '' }}">
                 {% if lock %}
-                <button class="btn btn-outline-secondary ms-2" type="button" onclick="enableInput('time3')">重填</button>
+                <button class="btn btn-outline-secondary ms-2" type="button"
+                    onclick="enableInput('time3')">清空重填</button>
                 {% endif %}
             </div>
         </div>
