@@ -130,26 +130,26 @@ def router(token, action):
         return render_template('error.html', message='token錯誤❌')
 
 
-@app.route('/<token>/sudden_change_time/<who>', methods=['GET', 'POST'])
+@app.route('/<token>/change_time/<who>/0818', methods=['GET', 'POST'])
 def sudden_change_time(token, who):
     matching_info = get_token_matching(token)
     if who == 'sub':
         member_id = matching_info['subject_id']
+        other_id = matching_info['object_id']
     elif who == 'obj':
         member_id = matching_info['object_id']
+        other_id = matching_info['subject_id']
     else:
         return render_template('error.html', message='錯誤❌')
 
     if request.method == 'POST':
-
-        if matching_info['current_state'] not in ('dating_notification_sending'):
-            return render_template('error.html', message='目前狀態無法使用超臨時改期❌，請聯絡客服做處理！')
+        message = request.form['message']
 
         # insert change_time_message
         change_time_stmt = """
         insert into sudden_change_time_history
-        (member_id, created_at, matching_id)
-        values (%s, now(), %s)
+        (member_id, created_at, matching_id, change_time_message)
+        values (%s, now(), %s, %s)
         """
 
         change_state_stmt = """
@@ -162,7 +162,8 @@ def sudden_change_time(token, who):
 
         with conn.cursor() as curr:
             curr.execute(change_time_stmt, (member_id,
-                                            matching_info['id']))
+                                            matching_info['id'],
+                                            message))
             curr.execute(change_state_stmt, (matching_info['id'],))
         conn.commit()
 
@@ -171,14 +172,14 @@ def sudden_change_time(token, who):
                                message=f"""
                                {get_proper_name(member_id)}已新增一筆超臨時改期紀錄<br>
                                此配對延後至下個月<br>
+                               記得跟對方{get_proper_name(other_id)}講臨時取消！
                                """)
     else:
-        return render_template('confirm.html',
-                               message=f"是否對{get_proper_name(member_id)}觸發超臨時改期？",
-                               btn_name='確認改期',
-                               action_url=url_for(
-                                   'sudden_change_time', token=token, who=who),
-                               alert='確定要觸發超臨時改期嗎？', )
+        return render_template(
+            'change_time.html',
+            header="超臨時改期！",
+            message=f"是否對{get_proper_name(member_id)}觸發超臨時改期？",
+            action_url=url_for('sudden_change_time', token=token, who=who))
 
 
 @app.route('/<token>/change_time/<who>', methods=['GET', 'POST'])
@@ -228,15 +229,14 @@ def change_time(token, who):
         # 檢查這一對是否已經有改期過，如果有，顯示提醒訊息
         # if has_changed_time(matching_info['id']):
         #     return render_template('change_time.html', token=token, member_id=member_id, message="這一對已經有改期過了")
-        return render_template('change_time.html', token=token, who=who,
-                               link_endpoint=url_for(
-                                   'sudden_change_time', token=token, who=who),
+        return render_template('change_time.html',
                                header="臨時改期",
                                message="""
-                            若您因臨時有事要取消本次約會<br>
-                            請向對方說明您的理由<br>
-                            系統將為您轉達給對方
-                            """)
+                                若您因臨時有事要取消本次約會<br>
+                                請向對方說明您的理由<br>
+                                系統將為您轉達給對方
+                            """,
+                               action_url=url_for('change_time', token=token, who=who))
 
 
 @app.route('/invitation', methods=['GET', 'POST'])

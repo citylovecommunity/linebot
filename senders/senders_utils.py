@@ -190,6 +190,10 @@ class BUBBLE:
         self.bubble = self.bubble.replace('##時間##', time)
         return self
 
+    def set_date(self, time):
+        self.bubble = self.bubble.replace('##日期##', time)
+        return self
+
     def set_book_name(self, book_name):
         self.bubble = self.bubble.replace('##訂位名字##', book_name)
         return self

@@ -2,9 +2,11 @@
 
 {% block content %}
 
-<form method="POST" action="{{ url_for('change_time', token=token, who=who) }}">
+<form method="POST" action={{action_url}}>
+
+    <label for="message" class="form-label">改期原因</label>
     <div class="mb-3">
-        <textarea id="message" name="message" class="form-control" rows="2" required></textarea>
+        <textarea id="message" name="message" class="form-control" rows="4" required></textarea>
     </div>
     <button type="submit" class="btn btn-danger" onclick="return confirmCancel()">送出</button>
 </form>

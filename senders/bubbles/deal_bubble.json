@@ -105,6 +105,28 @@
                         "contents": [
                             {
                                 "type": "text",
+                                "text": "訂位日期",
+                                "color": "#aaaaaa",
+                                "size": "sm",
+                                "flex": 2
+                            },
+                            {
+                                "type": "text",
+                                "text": "##日期##",
+                                "wrap": true,
+                                "color": "#666666",
+                                "size": "sm",
+                                "flex": 5
+                            }
+                        ]
+                    },
+                    {
+                        "type": "box",
+                        "layout": "baseline",
+                        "spacing": "sm",
+                        "contents": [
+                            {
+                                "type": "text",
                                 "text": "訂位時間",
                                 "color": "#aaaaaa",
                                 "size": "sm",
