@@ -13,7 +13,7 @@ class MyCollector(Collector):
         current_state = %s
         and selected_time - now() < interval '1 day' ;
         """
-        with conn.cursor(row_factory=namedtuple_row) as cur:
+        with self.conn.cursor(row_factory=namedtuple_row) as cur:
             return cur.execute(stmt, ('deal_1d_notification_sending',)).fetchall()
 
 

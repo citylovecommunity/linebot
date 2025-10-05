@@ -1,0 +1,36 @@
+name: dispatcher
+
+on:
+  schedule:
+    - cron: '0 8-22 * * *'  
+  workflow_dispatch:
+  push:  
+
+jobs:
+  dispatcher:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4.2.2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install the project
+        run: uv sync --locked --all-extras --dev
+
+      - name: Run Script
+        working-directory: senders
+        run: uv run python -m scripts.run_all_dispatchers
+        env: 
+            DB: ${{ secrets.DB }}
+            LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
+            LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_SECRET }}
+            TEST_USER_ID: ${{ secrets.TEST_USER_ID }}
+            ADMIN_LINE_ID: ${{ secrets.ADMIN_LINE_ID }}
+            FORM_WEB_URL: ${{ secrets.FORM_WEB_URL }}
+            SENDER_PRODUCTION: ${{ secrets.SENDER_PRODUCTION }}
+
+
+
+
