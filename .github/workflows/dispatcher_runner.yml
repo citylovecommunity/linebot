@@ -25,7 +25,7 @@ jobs:
         env: 
             DB: ${{ secrets.DB }}
             LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
-            LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_SECRET }}
+            LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
             TEST_USER_ID: ${{ secrets.TEST_USER_ID }}
             ADMIN_LINE_ID: ${{ secrets.ADMIN_LINE_ID }}
             FORM_WEB_URL: ${{ secrets.FORM_WEB_URL }}

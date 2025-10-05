@@ -30,3 +30,4 @@ with psycopg.connect(DB) as conn:
                     f"Skipping {module_name}: MyCollector or MySender not found.")
         except Exception as e:
             print(f"Error running dispatcher {module_name}: {e}")
+            raise
