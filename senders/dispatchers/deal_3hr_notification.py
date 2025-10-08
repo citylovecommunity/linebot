@@ -12,7 +12,8 @@ class MyCollector(Collector):
         select * from
         matching where
         current_state = %s
-        and selected_time - now() < interval '3 hour' ;
+        and current_date = selected_date 
+        and book_time - now() < interval '3 hour' ;
         """
         with self.conn.cursor(row_factory=namedtuple_row) as cur:
             return cur.execute(stmt, ('deal_3hr_notification_sending',)).fetchall()

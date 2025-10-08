@@ -13,7 +13,7 @@ class MyCollector(Collector):
         select * from
         matching where
         current_state = %s
-        and now() - selected_time > interval '1 month' ;
+        and now() - last_sent_at > interval '14 days' ;
         """
         with self.conn.cursor(row_factory=namedtuple_row) as cur:
             return cur.execute(stmt, ('rest_r1_next_month_sending',)).fetchall()

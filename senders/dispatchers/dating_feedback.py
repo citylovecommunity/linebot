@@ -12,7 +12,7 @@ class MyCollector(Collector):
         select * from
         matching where
         current_state = %s
-        and now() - selected_time > interval '3 hours';
+        and current_date - selected_date > 1;
         """
         with self.conn.cursor(row_factory=namedtuple_row) as cur:
             return cur.execute(stmt, ('dating_feedback_sending',)).fetchall()
