@@ -1,5 +1,4 @@
 
-from email import message
 import os
 
 import psycopg
@@ -74,7 +73,7 @@ def get_r1_info(matching_id):
     conn = get_db()
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute("""
-            SELECT place1_url, place2_url, time1, time2, time3, comment
+            SELECT place1_url, place2_url, date1, date2, date3, comment
             FROM matching WHERE id = %s
         """, (matching_id,))
         row = cur.fetchone()
@@ -91,8 +90,14 @@ def change_state(correct_state,
         try:
             current_state = get_current_state(matching_id)
 
-            if current_state != correct_state:
-                raise ValueError('狀態錯誤❌')
+            if isinstance(correct_state, tuple):
+                if correct_state in current_state:
+                    raise ValueError('狀態錯誤❌')
+            elif isinstance(correct_state, str):
+                if current_state != correct_state:
+                    raise ValueError('狀態錯誤❌')
+            else:
+                raise ValueError("沒有支援的type")
 
             with conn.cursor() as curr:
                 stmt = """
@@ -152,20 +157,16 @@ def sudden_change_time(token, who):
         values (%s, now(), %s, %s)
         """
 
-        change_state_stmt = """
-        update matching set current_state = 'next_month_sending',
-        last_change_state_at=now(),
-        updated_at = now() where id = %s;
-        """
-
         conn = get_db()
-
         with conn.cursor() as curr:
             curr.execute(change_time_stmt, (member_id,
                                             matching_info['id'],
                                             message))
-            curr.execute(change_state_stmt, (matching_info['id'],))
         conn.commit()
+
+        change_state('dating_feedback_sending',
+                     'change_time_notification_sending',
+                     matching_info['id'])
 
         return render_template('thank_you.html',
                                header='已成功改期',
@@ -205,18 +206,15 @@ def change_time(token, who):
         values (%s, now(), %s, %s)
         """
 
-        change_state_stmt = """
-        update matching set current_state = 'change_time_notification_sending',
-        last_change_state_at=now(),
-        updated_at = now() where id = %s;
-        """
-
         conn = get_db()
         with conn.cursor() as curr:
             curr.execute(change_time_stmt, (member_id,
                                             matching_info['id'], message))
-            curr.execute(change_state_stmt, (matching_info['id'],))
         conn.commit()
+
+        change_state(('deal_1d_notification_sending', 'deal_3hr_notification_sending'),
+                     'change_time_notification_sending',
+                     matching_info['id'])
 
         return render_template('thank_you.html',
                                header='您已成功改期',
@@ -226,9 +224,6 @@ def change_time(token, who):
                                請耐心等待後續通知<br>
                                """)
     else:
-        # 檢查這一對是否已經有改期過，如果有，顯示提醒訊息
-        # if has_changed_time(matching_info['id']):
-        #     return render_template('change_time.html', token=token, member_id=member_id, message="這一對已經有改期過了")
         return render_template('change_time.html',
                                header="臨時改期",
                                message="""
@@ -299,41 +294,41 @@ def choose_rest(rest_round):
         if rest_round != 3:
             url1 = request.form['place1']
             url2 = request.form['place2']
-            time1 = request.form['time1']
-            time2 = request.form['time2']
-            time3 = request.form['time3']
+            date1 = request.form['date1']
+            date2 = request.form['date2']
+            date3 = request.form['date3']
             comment = request.form.get('comment', '')
         else:
             url1 = session['confirm_data']['place1_url']
             url2 = session['confirm_data']['place2_url']
-            time1 = session['confirm_data']['time1']
-            time2 = session['confirm_data']['time2']
-            time3 = session['confirm_data']['time3']
+            date1 = session['confirm_data']['date1']
+            date2 = session['confirm_data']['date2']
+            date3 = session['confirm_data']['date3']
             comment = request.form.get('comment', '')
 
         # Store for confirmation step
         session['confirm_data'] = {
             'place1_url': url1,
             'place2_url': url2,
-            'time1': time1,
-            'time2': time2,
-            'time3': time3,
+            'date1': date1,
+            'date2': date2,
+            'date3': date3,
             'comment': comment
         }
 
         places = [url1, url2]
-        times = [time1, time2, time3]
+        dates = [date1, date2, date3]
 
         return render_template('confirm_places.html',
                                places=places,
-                               times=times,
+                               dates=dates,
                                comment=comment,
                                go_back_url=url_for(f'rest_r{rest_round}'),
                                confirm_url=url_for(
                                    'confirm_rest', rest_round=rest_round),
                                header="確認地點日期",
                                message="""
-                               再送出之前<br>
+                               送出之前<br>
                                請確認地點和日期是否正確
                                """)
 
@@ -348,7 +343,7 @@ def confirm_rest(rest_round):
                 params = confirm_data.copy()
                 params['matching_id'] = matching_id
 
-                for key in ['time1', 'time2', 'time3']:
+                for key in ['date1', 'date2', 'date3']:
                     if params.get(key) == '':
                         params[key] = None
 
@@ -356,9 +351,9 @@ def confirm_rest(rest_round):
                     update matching set
                     place1_url = %(place1_url)s,
                     place2_url = %(place2_url)s,
-                    time1 = %(time1)s,
-                    time2 = %(time2)s,
-                    time3 = %(time3)s,
+                    date1 = %(date1)s,
+                    date2 = %(date2)s,
+                    date3 = %(date3)s,
                     comment = %(comment)s
                     where id = %(matching_id)s
                     """
@@ -402,7 +397,7 @@ def confirm_booking(rest_round):
                     book_time = %(book_time)s,
                     comment = %(comment)s,
                     selected_place = %(selected_place)s,
-                    selected_time = %(selected_time)s
+                    selected_date = %(selected_date)s
                     where id = %(matching_id)s
                     """
                 with conn.cursor() as curr:
@@ -437,6 +432,7 @@ def confirm_booking(rest_round):
 
 @app.route('/rest_r1', methods=['GET'])
 def rest_r1():
+
     return render_template('submit_places.html',
                            post_to=url_for('choose_rest', rest_round=1),
                            header='約會的餐廳和日期',
@@ -445,8 +441,9 @@ def rest_r1():
                            餐廳請複製貼上Google Map網址<br>
                            <br>
                            若有額外需求（如幾點後方便）<br>
-                           請在底下留言，
-                           系統將為您轉達給對方
+                           請在底下留言
+                           <br>
+                           系統將會把您提供的餐廳日期轉達給對方
                            <br>
                            <br>
                            """,
@@ -457,17 +454,17 @@ def rest_r1():
 def booking(rest_round):
     # Get form data
     selected_place = request.form['selected_place']
-    selected_time = request.form['selected_time']
+    selected_date = request.form['selected_date']
 
     # Store for confirmation step
     session['confirm_data'] = {
         'selected_place': selected_place,
-        'selected_time': selected_time,
+        'selected_date': selected_date,
     }
 
     return render_template('booking_info.html',
                            place=selected_place,
-                           time=selected_time,
+                           date=selected_date,
                            go_back_url=url_for(f'rest_r{rest_round}'),
                            confirm_url=url_for(
                                'confirm_booking', rest_round=rest_round),
@@ -488,20 +485,20 @@ def rest_r2():
     matching_info = session.get('matching_info')
     r1_info = get_r1_info(matching_info['id'])
 
+    places = [r1_info['place1_url'], r1_info['place2_url']]
+    dates = [r1_info['date1'], r1_info['date2'], r1_info['date3']]
+
     return render_template('show_places.html',
-                           place1_url=r1_info['place1_url'],
-                           place2_url=r1_info['place2_url'],
-                           time1=r1_info['time1'],
-                           time2=r1_info['time2'],
-                           time3=r1_info['time3'],
+                           places=places,
+                           dates=dates,
                            booking_url=url_for('booking', rest_round=2),
                            cannot_url=url_for('rest_r2_reject'),
                            comment=r1_info['comment'],
                            header="餐廳時間勾選",
                            message="""
-                           以下是女方提供的餐廳以及方便的時段<br>
+                           以下是女方提供的餐廳以及方便的日期<br>
                            勾選完成後按下藍色按鈕進入訂位畫面<br>
-                           若時間或地點皆不方便，請點選紅色按鈕
+                           若時間或地點不方便，請點選紅色按鈕
                            """
                            )
 
@@ -535,11 +532,11 @@ def rest_r3():
     session['confirm_data'] = r1_info
 
     places = [r1_info['place1_url'], r1_info['place2_url']]
-    times = [r1_info['time1'], r1_info['time2'], r1_info['time3']]
+    dates = [r1_info['date1'], r1_info['date2'], r1_info['date3']]
 
     return render_template('confirm_places.html',
                            places=places,
-                           times=times,
+                           dates=dates,
                            comment=r1_info['comment'],
                            new_message=True,
                            cannot_url=url_for("bye_bye", rest_round=3),

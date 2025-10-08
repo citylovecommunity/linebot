@@ -23,10 +23,10 @@ class MySender(Sender):
         # 先把一些共同有的置換上去
         base_bubble.set_title('約會出席提醒')
         base_bubble.set_city(self.matching_row.city)
+        base_bubble.set_date(
+            self.matching_row.selected_date.strftime('%Y-%m-%d'))
         base_bubble.set_time(
             self.matching_row.book_time.strftime('%H:%M'))
-        base_bubble.set_date(
-            self.matching_row.selected_time.strftime('%Y-%m-%d'))
 
         base_bubble.set_book_name(self.matching_row.book_name)
         base_bubble.set_book_phone(self.matching_row.book_phone)

@@ -10,58 +10,39 @@
     <div class="mb-4">
         <h5>地點</h5>
         <div class="list-group">
+            {% for place in places %}
+            {% if place %}
             <label class="list-group-item d-flex align-items-center shadow-sm rounded-3 mb-2"
                 style="background: #f8f9fa;">
-                <input class="form-check-input me-2" type="radio" name="selected_place" value="{{ place1_url }}"
-                    required style="transform: scale(1.3);">
+                <input class="form-check-input me-2" type="radio" name="selected_place" value="{{ place }}" required
+                    style="transform: scale(1.3);">
                 <div class="flex flex-grow-1 justify-center">
-                    第一家餐廳
+                    <span>第{{ loop.index }}家餐廳</span>
                     <span class="ms-2 text-secondary" style="font-size: 0.95em; font-weight: 400;">
-                        <a href="{{ place1_url }}" target="_blank" class="text-decoration-none">(連結)</a>
-                    </span>
-                </div>
-            </label>
-            {% if place2_url %}
-            <label class="list-group-item d-flex align-items-center shadow-sm rounded-3 mb-2"
-                style="background: #f8f9fa;">
-                <input class="form-check-input me-2" type="radio" name="selected_place" value="{{ place2_url }}"
-                    required style="transform: scale(1.3);">
-                <div class="flex flex-grow-1 justify-center">
-                    第二家餐廳
-                    <span class="ms-2 text-secondary" style="font-size: 0.95em; font-weight: 400;">
-                        <a href="{{ place2_url }}" target="_blank" class="text-decoration-none">(連結)</a>
+                        <a href="{{ place }}" target="_blank" class="text-decoration-none">(連結)</a>
                     </span>
                 </div>
             </label>
             {% endif %}
+            {% endfor %}
         </div>
     </div>
 
     <div class="mb-4">
         <h5>日期</h5>
         <div class="list-group">
+
+            {% for date in dates %}
+            {% if date %}
             <label class="list-group-item d-flex align-items-center shadow-sm rounded-3 mb-2"
                 style="background: #f8f9fa;">
-                <input class="form-check-input me-2" type="radio" name="selected_time" value="{{ time1.date() }}"
-                    required style="transform: scale(1.3);">
-                <span class="flex-grow-1">{{ time1.date() }}</span>
-            </label>
-            {% if time2 %}
-            <label class="list-group-item d-flex align-items-center shadow-sm rounded-3 mb-2"
-                style="background: #f8f9fa;">
-                <input class="form-check-input me-2" type="radio" name="selected_time" value="{{ time2.date() }}"
+                <input class="form-check-input me-2" type="radio" name="selected_date" value="{{ date }}" required
                     style="transform: scale(1.3);">
-                <span class="flex-grow-1">{{ time2.date() }}</span>
+                <span class="flex-grow-1">{{ date }}</span>
             </label>
             {% endif %}
-            {% if time3 %}
-            <label class="list-group-item d-flex align-items-center shadow-sm rounded-3 mb-2"
-                style="background: #f8f9fa;">
-                <input class="form-check-input me-2" type="radio" name="selected_time" value="{{ time3.date() }}"
-                    style="transform: scale(1.3);">
-                <span class="flex-grow-1">{{ time3.date() }}</span>
-            </label>
-            {% endif %}
+            {% endfor %}
+
         </div>
     </div>
 

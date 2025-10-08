@@ -12,20 +12,19 @@ class MyCollector(Collector):
         select * from
         matching where
         current_state = %s
-        and selected_time - now() < interval '1 day' ;
         """
         with self.conn.cursor(row_factory=namedtuple_row) as cur:
-            return cur.execute(stmt, ('deal_1d_notification_sending',)).fetchall()
+            return cur.execute(stmt, ('change_time_notification',)).fetchall()
 
 
 class MySender(Sender):
-    OLD_STATE = 'deal_1d_notification_sending'
-    NEW_STATE = 'deal_3hr_notification_sending'
+    OLD_STATE = 'change_time_notification'
+    NEW_STATE = 'rest_r1_next_time_sending'
 
     def modify_bubble(self):
         def message_factory(member_id):
             message = f"""代表城市：{self.matching_row.city}\n
-            📅 溫馨提醒：明天您有一場與{get_proper_name(member_id)}的約會 😊\n📌 請務必準時抵達，建議您提早 5～10 分鐘到場，避免讓對方久等唷 🙇
+            因某一方臨時有事，與{get_proper_name(member_id)}的約會將延後安排
             """
             return message
 

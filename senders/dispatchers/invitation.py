@@ -1,13 +1,20 @@
 import psycopg
-from config import FORM_WEB_URL, DB
-from senders_utils import load_bubble_raw, get_proper_name, get_introduction_link
-from collector_utils import get_list
-from base import Collector, Sender, SendingInfo, Dispatcher
+from base import Collector, Dispatcher, Sender, SendingInfo
+from config import DB, FORM_WEB_URL
+from psycopg.rows import namedtuple_row
+from senders_utils import (get_introduction_link, get_proper_name,
+                           load_bubble_raw)
 
 
 class MyCollector(Collector):
     def collect(self):
-        return get_list(self.conn, 'invitation')
+        stmt = """
+        select * from
+        matching where
+        current_state = %s;
+        """
+        with conn.cursor(row_factory=namedtuple_row) as cur:
+            return cur.execute(stmt, ('invitation_sending',)).fetchall()
 
 
 class MySender(Sender):
