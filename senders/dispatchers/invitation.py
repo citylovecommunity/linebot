@@ -13,7 +13,7 @@ class MyCollector(Collector):
         matching where
         current_state = %s;
         """
-        with conn.cursor(row_factory=namedtuple_row) as cur:
+        with self.conn.cursor(row_factory=namedtuple_row) as cur:
             return cur.execute(stmt, ('invitation_sending',)).fetchall()
 
 
