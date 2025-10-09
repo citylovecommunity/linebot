@@ -380,18 +380,16 @@ def confirm_rest(rest_round):
 
 @app.route('/confirm_booking/<int:rest_round>', methods=['POST'])
 def confirm_booking(rest_round):
-    import pytz
-    from datetime import datetime
 
     def store_booking_data(booking_data, matching_id):
         if ALLOW_CHANGE_VALUE:
             conn = get_db()
             try:
                 params = booking_data.copy()
-                params['book_time'] = datetime.strptime(
-                    params['book_time'], '%H:%M')
-                params['book_time'] = pytz.timezone(
-                    'Asia/Taipei').localize(params['book_time'])
+                # params['book_time'] = datetime.strptime(
+                #     params['book_time'], '%H:%M')
+                # params['book_time'] = pytz.timezone(
+                #     'Asia/Taipei').localize(params['book_time'])
 
                 params['matching_id'] = matching_id
                 update_stmt = """

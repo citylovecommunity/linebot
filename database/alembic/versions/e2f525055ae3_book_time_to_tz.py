@@ -33,4 +33,12 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Downgrade schema."""
-    pass
+    op.execute(
+        """
+        alter table matching
+        drop book_time;
+        
+        alter table matching
+        add book_time time;
+        """
+    )
