@@ -1,5 +1,3 @@
-
-from email import header, message
 import os
 
 import psycopg
@@ -115,6 +113,7 @@ def change_state(correct_state,
                 """
                 curr.execute(
                     stmt, (matching_id, current_state, new_state))
+
             conn.commit()
         except Exception as e:
             conn.rollback()
@@ -163,7 +162,6 @@ def sudden_change_time(token, who):
             curr.execute(change_time_stmt, (member_id,
                                             matching_info['id'],
                                             message))
-        conn.commit()
 
         change_state('dating_feedback_sending',
                      'change_time_notification_sending',
@@ -211,7 +209,6 @@ def change_time(token, who):
         with conn.cursor() as curr:
             curr.execute(change_time_stmt, (member_id,
                                             matching_info['id'], message))
-        conn.commit()
 
         change_state(('deal_1d_notification_sending', 'deal_3hr_notification_sending'),
                      'change_time_notification_sending',
@@ -360,10 +357,8 @@ def confirm_rest(rest_round):
                     """
                 with conn.cursor() as curr:
                     curr.execute(update_stmt, params)
-
                 conn.commit()
             except Exception as e:
-                conn.rollback()
                 raise e
     data = session.get('confirm_data')
     matching_info = session.get('matching_info')
@@ -385,11 +380,19 @@ def confirm_rest(rest_round):
 
 @app.route('/confirm_booking/<int:rest_round>', methods=['POST'])
 def confirm_booking(rest_round):
+    import pytz
+    from datetime import datetime
+
     def store_booking_data(booking_data, matching_id):
         if ALLOW_CHANGE_VALUE:
             conn = get_db()
             try:
                 params = booking_data.copy()
+                params['book_time'] = datetime.strptime(
+                    params['book_time'], '%H:%M')
+                params['book_time'] = pytz.timezone(
+                    'Asia/Taipei').localize(params['book_time'])
+
                 params['matching_id'] = matching_id
                 update_stmt = """
                     update matching set
@@ -403,6 +406,7 @@ def confirm_booking(rest_round):
                     """
                 with conn.cursor() as curr:
                     curr.execute(update_stmt, params)
+
                 conn.commit()
             except Exception as e:
                 conn.rollback()
