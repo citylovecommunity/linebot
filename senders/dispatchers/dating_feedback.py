@@ -24,8 +24,7 @@ class MySender(Sender):
 
     def modify_bubble(self):
         def message_factory(member_id):
-            message = f"""代表城市：{self.matching_row.city}\n
-            與{get_proper_name(member_id)}約會進行的順利嗎，這裡有份問卷，歡迎給出這次約會體驗回饋🤗🤗🤗
+            message = f"""代表城市：{self.matching_row.city}\n與{get_proper_name(self.conn, member_id)}約會進行的順利嗎，這裡有份問卷，歡迎給出這次約會體驗回饋🤗🤗🤗
             """
             return message
 
