@@ -93,10 +93,10 @@ def change_state(correct_state,
 
             if isinstance(correct_state, tuple):
                 if current_state not in correct_state:
-                    return render_template('error.html', message='狀態錯誤❌')
+                    raise ValueError("沒有支援的type")
             elif isinstance(correct_state, str):
                 if current_state != correct_state:
-                    return render_template('error.html', message='狀態錯誤❌')
+                    raise ValueError("沒有支援的type")
             else:
                 raise ValueError("沒有支援的type")
 
@@ -582,8 +582,11 @@ def rest_r4():
 def bye_bye():
     # 改狀態，弄到下次再說
     matching_info = session.get('matching_info')
-    change_state(('rest_r3_waiting', 'rest_r4_waiting'),
-                 'next_time_sending', matching_info['id'])
+    try:
+        change_state(('rest_r3_waiting', 'rest_r4_waiting'),
+                     'next_time_sending', matching_info['id'])
+    except ValueError as e:
+        return render_template('error.html', message=str(e))
     return render_template(
         'thank_you.html',
         header='下次再約',
