@@ -13,7 +13,7 @@ class MyCollector(Collector):
         matching where
         current_state = %s
         and current_date = selected_date 
-        and book_time - current_time::time < interval '3 hour' ;
+        and book_time - (current_time AT TIME ZONE 'Asia/Taipei')::time < interval '3 hour' ;
         """
         with self.conn.cursor(row_factory=namedtuple_row) as cur:
             return cur.execute(stmt, ('deal_3hr_notification_sending',)).fetchall()
