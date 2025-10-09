@@ -1,4 +1,5 @@
 
+from email import header, message
 import os
 
 import psycopg
@@ -91,11 +92,11 @@ def change_state(correct_state,
             current_state = get_current_state(matching_id)
 
             if isinstance(correct_state, tuple):
-                if correct_state in current_state:
-                    raise ValueError('狀態錯誤❌')
+                if current_state not in correct_state:
+                    return render_template('error.html', message='狀態錯誤❌')
             elif isinstance(correct_state, str):
                 if current_state != correct_state:
-                    raise ValueError('狀態錯誤❌')
+                    return render_template('error.html', message='狀態錯誤❌')
             else:
                 raise ValueError("沒有支援的type")
 
@@ -525,9 +526,7 @@ def rest_r2_reject():
 
 @app.route('/rest_r3', methods=['GET', 'POST'])
 def rest_r3():
-    '''
-    第三輪，女方要勾的時間，沒了就沒了
-    '''
+
     matching_info = session.get('matching_info')
     r1_info = get_r1_info(matching_info['id'])
     session['confirm_data'] = r1_info
@@ -540,7 +539,7 @@ def rest_r3():
                            dates=dates,
                            comment=r1_info['comment'],
                            new_message=True,
-                           cannot_url=url_for("bye_bye", rest_round=3),
+                           cannot_url=url_for("bye_bye"),
                            confirm_url=url_for('choose_rest', rest_round=3),
                            header="""
                            餐廳地點的選擇
@@ -568,7 +567,7 @@ def rest_r4():
                            time3=r1_info['time3'],
                            comment=r1_info['comment'],
                            booking_url=url_for('booking', rest_round=4),
-                           bye_bye_url=url_for('bye_bye', rest_round=4),
+                           bye_bye_url=url_for('bye_bye'),
                            header="""
                            餐廳地點的選擇
                            """,
@@ -577,6 +576,22 @@ def rest_r4():
                             沒問題的話再按下藍色按鈕進入訂餐廳頁面
                            """
                            )
+
+
+@app.route('/bye_bye', methods=['GET', 'POST'])
+def bye_bye():
+    # 改狀態，弄到下次再說
+    matching_info = session.get('matching_info')
+    change_state(('rest_r3_waiting', 'rest_r4_waiting'),
+                 'next_time_sending', matching_info['id'])
+    return render_template(
+        'thank_you.html',
+        header='下次再約',
+        message="""
+        本約會將移至下回安排<br>
+        再請留意系統資訊：）
+        """
+    )
 
 
 if __name__ == '__main__':

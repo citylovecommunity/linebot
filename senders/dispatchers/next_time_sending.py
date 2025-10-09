@@ -12,38 +12,30 @@ class MyCollector(Collector):
         stmt = """
         select * from
         matching where
-        current_state = %s
-        and now() - last_sent_at > interval '14 days' ;
+        current_state = %s;
         """
         with self.conn.cursor(row_factory=namedtuple_row) as cur:
-            return cur.execute(stmt, ('rest_r1_next_month_sending',)).fetchall()
+            return cur.execute(stmt, ('next_time_sending',)).fetchall()
 
 
 class MySender(Sender):
     OLD_STATE = 'next_time_sending'
-    NEW_STATE = 'rest_r1_waiting'
+    NEW_STATE = 'rest_r1_next_month_sending'
 
     def modify_bubble(self):
-        bubble = load_bubble_raw('basic_bubble.json')
+        def message_factory(member_id):
+            message = f"""代表城市：{self.matching_row.city}\n
+            因時間上的問題，與{get_proper_name(member_id)}的約會將延後安排
+            """
+            return message
 
-        bubble.set_title('約會邀請卡')
-        bubble.set_city(self.matching_row.city)
-        form_app_link = f'{FORM_WEB_URL}/{self.matching_row.access_token}/rest_r1'
-        bubble.set_form_app_link(form_app_link)
-        send_to_id = get_gender_id(self.conn, self.matching_row, 'F')
-        rendered_id = get_gender_id(self.conn, self.matching_row, 'M')
+        message_for_obj = message_factory(self.matching_row.subject_id)
+        message_for_sub = message_factory(self.matching_row.object_id)
 
-        intro_link = get_introduction_link(self.conn, rendered_id)
-        name = get_proper_name(self.conn, rendered_id)
-
-        bubble.set_intro_link(intro_link)
-        bubble.set_sent_to_proper_name(name)
-
-        message = '請提供心儀之約會餐廳與時間'
-
-        bubble.set_bubble_message(message)
-
-        return [SendingInfo(send_to_id, bubble.as_dict(), alt='來囉！開啟此趟約會行程確認')]
+        return [SendingInfo(
+            self.matching_row.object_id, message_for_obj, alt=""),
+            SendingInfo(
+            self.matching_row.subject_id, message_for_sub, alt="")]
 
 
 if __name__ == '__main__':
