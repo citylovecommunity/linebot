@@ -7,7 +7,7 @@ WORKDIR /app
 # Copy the rest of the application
 COPY . /app
 
-RUN uv sync --locked
+RUN uv sync
 
 
 # Expose the port uvicorn will run on
