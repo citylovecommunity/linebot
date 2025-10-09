@@ -19,7 +19,7 @@
             <div class="input-group">
                 <input type="url" class="form-control" id="place{{i}}" name="place{{i}}" {% if i==1 %} required {% endif
                     %} {% if lock %} disabled {% endif %}
-                    value="{{ session['confirm_data']['place{{i}}_url'] if session.get('confirm_data') else '' }}"
+                    value="{{ session['confirm_data']['place' ~ i ~ '_url'] if session['confirm_data'] else '' }}"
                     placeholder="請貼上Google Map網址">
                 {% if lock %}
                 <button class="btn btn-outline-secondary ms-2" type="button"
@@ -40,7 +40,7 @@
             <div class="input-group">
                 <input type="date" class="form-control mb-2" id="date{{i}}" name="date{{i}}" {% if i==1 %} required {%
                     endif %} {% if lock %} disabled {% endif %}
-                    value="{{ session['confirm_data']['date{{i}}'] if session.get('confirm_data') else '' }}">
+                    value="{{ session['confirm_data']['date' ~ i] if session['confirm_data'] else '' }}">
                 {% if lock %}
                 <button class="btn btn-outline-secondary  ms-2" type="button"
                     onclick="enableInput('date{{i}}')">清空重填</button>
