@@ -25,7 +25,7 @@ class MySender(Sender):
     def modify_bubble(self):
         def message_factory(member_id):
             message = f"""代表城市：{self.matching_row.city}\n
-            📅 溫馨提醒：明天您有一場與{get_proper_name(member_id)}的約會 😊\n📌 請務必準時抵達，建議您提早 5～10 分鐘到場，避免讓對方久等唷 🙇
+            📅 溫馨提醒：明天您有一場與{get_proper_name(self.conn, member_id)}的約會 😊\n📌 請務必準時抵達，建議您提早 5～10 分鐘到場，避免讓對方久等唷 🙇
             """
             return message
 

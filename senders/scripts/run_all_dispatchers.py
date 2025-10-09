@@ -25,6 +25,7 @@ with psycopg.connect(DB) as conn:
                 print(f"Running dispatcher: {module_name}")
                 dispatcher = Dispatcher(conn, Collector, Sender)
                 dispatcher.send()
+                conn.commit()
             else:
                 print(
                     f"Skipping {module_name}: MyCollector or MySender not found.")
