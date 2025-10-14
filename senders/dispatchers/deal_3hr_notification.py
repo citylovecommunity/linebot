@@ -21,7 +21,7 @@ class MyCollector(Collector):
 
 class MySender(Sender):
     OLD_STATE = 'deal_3hr_notification_sending'
-    NEW_STATE = 'dating_notification_sending'
+    NEW_STATE = 'dating_feedback_sending'
 
     def modify_bubble(self):
         def message_format(name, number):
