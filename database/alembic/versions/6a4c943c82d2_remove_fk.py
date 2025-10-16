@@ -1,8 +1,8 @@
-"""add test member
+"""remove fk
 
-Revision ID: 61fb28e95f76
-Revises: e2f525055ae3
-Create Date: 2025-10-14 14:52:02.535648
+Revision ID: 6a4c943c82d2
+Revises: 61fb28e95f76
+Create Date: 2025-10-15 18:25:22.760498
 
 """
 from typing import Sequence, Union
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '61fb28e95f76'
-down_revision: Union[str, Sequence[str], None] = '7614fdaab3a6'
+revision: str = '6a4c943c82d2'
+down_revision: Union[str, Sequence[str], None] = '61fb28e95f76'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -22,17 +22,15 @@ def upgrade() -> None:
     """Upgrade schema."""
     op.execute(
         """
-        alter table member
-        add column is_test boolean;
+        ALTER TABLE matching
+        DROP CONSTRAINT IF EXISTS object_fk_member;
+        
+        ALTER TABLE matching
+        DROP CONSTRAINT IF EXISTS subject_fk_member;
         """
     )
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.execute(
-        """
-    alter table member
-    drop column is_test;
-    """
-    )
+    pass
