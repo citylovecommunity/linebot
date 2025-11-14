@@ -55,14 +55,14 @@ def get_gender_id(conn, matching_row, gender):
 
 
 def get_introduction_link(conn, member_id):
-    # 如果是女的，回傳盲約網址
+    # 如果是男的，回傳盲約網址，因為是女的要看＝＝
 
     with conn.cursor() as curr:
         stmt = """
         select 
-        case when gender = 'M' then
+        case when gender = 'F' then
             user_info ->> '會員介紹頁網址'
-        else then 
+        else  
             user_info ->> '盲約介紹卡一'
         end
         from member

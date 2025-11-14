@@ -20,11 +20,13 @@ class MyCollector(Collector):
 
 class MySender(Sender):
     OLD_STATE = 'dating_feedback_sending'
-    NEW_STATE = 'dating done'
+    NEW_STATE = 'dating_done'
+
+    FEEDBACK_URL = 'https://forms.gle/1hfkrArcXvcjtWZG7'
 
     def modify_bubble(self):
         def message_factory(member_id):
-            message = f"""代表城市：{self.matching_row.city}\n與{get_proper_name(self.conn, member_id)}約會進行的順利嗎，這裡有份問卷，歡迎給出這次約會體驗回饋🤗🤗🤗
+            message = f"""代表城市：{self.matching_row.city}\n與{get_proper_name(self.conn, member_id)}約會進行的順利嗎，這裡有份問卷，{FEEDBACK_URL}，歡迎給出這次約會體驗回饋🤗🤗🤗
             """
             return message
 
