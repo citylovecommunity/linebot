@@ -12,27 +12,33 @@ class MyCollector(Collector):
     """
 
     def collect(self):
+        # stmt = """
+        # select *
+        #     from
+        #     (select *,
+        #             ROW_NUMBER() over (partition by object_id
+        #                                 order by grading_metric desc) as rn
+        #     from
+        #         (select *
+        #         from matching
+        #         where current_state = 'liked_sending'
+        #             and object_id not in
+        #             (select object_id
+        #             from matching
+        #             where current_state not in ('invitation_sending',
+        #                                         'goodbye',
+        #                                         'liked_sending',
+        #                                         'rest_r1_next_month_sending',
+        #                                         'dating_done')
+        #             group by object_id
+        #             having count(*) >= 3))) t
+        #     where rn <= 3;
+        # """
+
         stmt = """
-        select *
-            from
-            (select *,
-                    ROW_NUMBER() over (partition by object_id
-                                        order by grading_metric desc) as rn
-            from
-                (select *
-                from matching
-                where current_state = 'liked_sending'
-                    and object_id not in
-                    (select object_id
-                    from matching
-                    where current_state not in ('invitation_sending',
-                                                'goodbye',
-                                                'liked_sending', 
-                                                'rest_r1_next_month_sending',
-                                                'dating_done')
-                    group by object_id
-                    having count(*) >= 3))) t
-            where rn <= 3;
+        select * from
+        matching where
+        current_state = 'liked_sending';
         """
         with self.conn.cursor(row_factory=namedtuple_row) as cur:
             return cur.execute(stmt).fetchall()

@@ -24,7 +24,7 @@ class MySender(Sender):
 
     def modify_bubble(self):
         def message_factory(member_id):
-            message = f"""代表城市：{self.matching_row.city}\n由於時間因素，與{get_proper_name(self.conn, member_id)}的約會將延後安排\n請等待後續系統消息
+            message = f"""代表城市：{self.matching_row.city}\n由於時間因素，與{get_proper_name(self.conn, member_id)}的約會將延後安排\n請等待後續消息
             """
             return message
 

@@ -218,7 +218,7 @@ def change_time(token, who):
                                header='您已成功改期',
                                message="""
                                本配對已成功改期<br>
-                               系統將重新為您安排配對<br>
+                               我們將重新為您安排配對<br>
                                請耐心等待後續通知<br>
                                """)
     else:
@@ -227,7 +227,7 @@ def change_time(token, who):
                                message="""
                                 若您因臨時有事要取消本次約會<br>
                                 請向對方說明您的理由<br>
-                                系統將為您轉達給對方
+                                我們將為您轉達給對方
                             """,
                                action_url=url_for('change_time', token=token, who=who))
 
@@ -272,7 +272,7 @@ def liked():
         return render_template('thank_you.html',
                                header="✅您已確認相遇",
                                message="""
-                            屬於你們的連結已悄然展開<br>系統將安排接下來的約會流程<br>讓浪漫的相遇在每個細節中綻放
+                            屬於你們的連結已悄然展開<br>我們將安排接下來的約會流程<br>讓浪漫的相遇在每個細節中綻放
                             """)
 
     return render_template('confirm.html',
@@ -373,8 +373,8 @@ def confirm_rest(rest_round):
     return render_template('thank_you.html',
                            header="✅成功送出餐廳選項",
                            message="""
-                            系統將知會對方協助訂位<br>
-                            請耐心等待系統通知<br>
+                            我們將知會對方協助訂位<br>
+                            請耐心等待後續通知<br>
                            """)
 
 
@@ -428,7 +428,7 @@ def confirm_booking(rest_round):
                            header="✅成功傳送訂位資訊",
                            message="""
                             感謝您成功訂位<br>
-                            系統將通知雙方約會資訊<br>
+                            我們將通知雙方約會資訊<br>
                             祝您約會順利！<br>
                            """)
 
@@ -446,7 +446,7 @@ def rest_r1():
                            若有額外需求（如幾點後方便）<br>
                            請在底下留言
                            <br>
-                           系統將會把您提供的餐廳日期轉達給對方
+                           我們將會把您提供的餐廳日期轉達給對方
                            <br>
                            <br>
                            """,
@@ -521,7 +521,7 @@ def rest_r2_reject():
                            點按重填按鈕<br>
                            重新填入自己方便的時間或地點<br>
                            並麻煩將重新填寫的原因也寫下<br>
-                           系統將會轉達給女方作確認
+                           我們將會轉達給女方作確認
                            """
                            )
 
@@ -594,7 +594,7 @@ def bye_bye():
         header='下次再約',
         message="""
         本約會將移至下回安排<br>
-        再請留意系統資訊：）
+        再請留意接下來的資訊：）
         """
     )
 

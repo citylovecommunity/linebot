@@ -210,6 +210,8 @@ class BUBBLE:
         return self
 
     def set_message(self, message):
+        if not message:
+            message = ":)))"
         self.bubble = self.bubble.replace('##約會留言##', message)
         return self
 
