@@ -226,23 +226,26 @@
                 "type": "button",
                 "action": {
                     "type": "uri",
-                    "label": "約會餐廳",
-                    "uri": "http://rest_url"
+                    "label": "介紹卡連結",
+                    "uri": "http://intro_url"
                 },
-                "style": "link"
+                "height": "sm",
+                "style": "primary",
+                "color": "#fc8403"
             },
             {
                 "type": "button",
                 "action": {
                     "type": "uri",
-                    "label": "介紹卡連結",
-                    "uri": "http://intro_url"
+                    "label": "約會餐廳",
+                    "uri": "http://rest_url"
                 },
-                "height": "md"
+                "style": "link",
+                "height": "sm"
             },
             {
                 "type": "button",
-                "style": "secondary",
+                "style": "link",
                 "height": "sm",
                 "action": {
                     "type": "uri",

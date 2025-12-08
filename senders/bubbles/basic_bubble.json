@@ -100,12 +100,15 @@
                     "type": "uri",
                     "label": "介紹卡連結",
                     "uri": "http://intro_url"
-                }
+                },
+                "style": "primary",
+                "color": "#fc8403",
+                "height": "md"
             },
             {
                 "type": "button",
-                "style": "primary",
-                "height": "sm",
+                "style": "link",
+                "height": "md",
                 "action": {
                     "type": "uri",
                     "label": "開啟邀請卡",

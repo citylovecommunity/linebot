@@ -25,7 +25,7 @@ class MySender(Sender):
 
     def modify_bubble(self):
         def message_format(name, number):
-            message = f"""提醒您再3小時後即將與{name}約會\n\n這是對方的電話號碼：{number}\n\n若有任何問題，請別害羞直接與對方聯繫。\n\n祝您約會愉快！"""
+            message = f"""提醒您再3小時後即將與{name}約會\n\n這是對方的電話號碼：{number}\n\n若有任何問題，請別害羞直接與對方聯繫。\n有裝Whoscall的用戶再請留意陌生來電\n\n祝您約會愉快！"""
             return message
 
         message_for_obj = message_format(get_proper_name(

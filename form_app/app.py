@@ -34,7 +34,7 @@ def close_db(e=None):
 def get_token_matching(token):
     conn = get_db()
     with conn.cursor(row_factory=dict_row) as curr:
-        stmt = "select id, subject_id, object_id, current_state from matching where access_token = %s;"
+        stmt = "select * from matching where access_token = %s;"
         result = curr.execute(stmt, (token,)).fetchone()
         return result
 
@@ -241,7 +241,7 @@ def invitation():
             change_state('invitation_waiting', 'liked_sending',
                          matching_info['id'])
         except ValueError as e:
-            return render_template('error.html', message=str(e))
+            pass
         return render_template('thank_you.html',
                                message="""
                                已傳送邀請給對方<br>
@@ -268,7 +268,7 @@ def liked():
             change_state('liked_waiting', 'rest_r1_sending',
                          matching_info['id'])
         except ValueError as e:
-            return render_template('error.html', message=str(e))
+            pass
         return render_template('thank_you.html',
                                header="✅您已確認相遇",
                                message="""
@@ -276,7 +276,7 @@ def liked():
                             """)
 
     return render_template('confirm.html',
-                           message=f"""{name}有意願認識您<br>是否答應赴約交個新朋友呢？""",
+                           message=f"""{name}有意願認識您<br>你們的匹配程度有{matching_info['grading_metric']}分！<br>是否要交個朋友呢？""",
                            header='邀請回覆',
                            btn_name='可以',
                            action_url=url_for('liked'))
@@ -368,7 +368,7 @@ def confirm_rest(rest_round):
                      matching_info['id'])
         store_confirm_data(data, matching_info['id'])
     except ValueError as e:
-        return render_template('error.html', message=str(e))
+        pass
 
     return render_template('thank_you.html',
                            header="✅成功送出餐廳選項",
@@ -422,7 +422,7 @@ def confirm_booking(rest_round):
                      matching_info['id'])
         store_booking_data(data, matching_info['id'])
     except ValueError as e:
-        return render_template('error.html', message=str(e))
+        pass
 
     return render_template('thank_you.html',
                            header="✅成功傳送訂位資訊",
@@ -588,7 +588,7 @@ def bye_bye():
         change_state(('rest_r3_waiting', 'rest_r4_waiting'),
                      'next_time_sending', matching_info['id'])
     except ValueError as e:
-        return render_template('error.html', message=str(e))
+        pass
     return render_template(
         'thank_you.html',
         header='下次再約',

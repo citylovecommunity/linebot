@@ -56,6 +56,7 @@ def get_gender_id(conn, matching_row, gender):
 
 def get_introduction_link(conn, member_id):
     # 如果是男的，回傳盲約網址，因為是女的要看＝＝
+    # 如果第四周男生也要用盲約，超蠢，我之後再用
 
     with conn.cursor() as curr:
         stmt = """
