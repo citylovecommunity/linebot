@@ -9,12 +9,13 @@ from senders_utils import (get_introduction_link, get_proper_name,
 class MyCollector(Collector):
     def collect(self):
         stmt = """
-        select * from
-        matching where
-        current_state = %s;
+        select ma.* from
+        matching ma
+        where
+        current_state = 'invitation_sending';
         """
         with self.conn.cursor(row_factory=namedtuple_row) as cur:
-            return cur.execute(stmt, ('invitation_sending',)).fetchall()
+            return cur.execute(stmt).fetchall()
 
 
 class MySender(Sender):

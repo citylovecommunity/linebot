@@ -8,37 +8,33 @@ from senders_utils import (get_introduction_link, get_proper_name,
 
 class MyCollector(Collector):
     """
-    liked，但是如果obj_id有超過3個正在約會中的state，就不要；如果有多比滿足，依照分數排序選三個來送
+    亂搞，他媽的我放棄＝＝，有錯再說媽的
     """
 
     def collect(self):
-        # stmt = """
-        # select *
-        #     from
-        #     (select *,
-        #             ROW_NUMBER() over (partition by object_id
-        #                                 order by grading_metric desc) as rn
-        #     from
-        #         (select *
-        #         from matching
-        #         where current_state = 'liked_sending'
-        #             and object_id not in
-        #             (select object_id
-        #             from matching
-        #             where current_state not in ('invitation_sending',
-        #                                         'goodbye',
-        #                                         'liked_sending',
-        #                                         'rest_r1_next_month_sending',
-        #                                         'dating_done')
-        #             group by object_id
-        #             having count(*) >= 3))) t
-        #     where rn <= 3;
-        # """
-
         stmt = """
-        select * from
-        matching where
-        current_state = 'liked_sending';
+         select *
+            from
+            (select *,
+                    ROW_NUMBER() over (partition by object_id
+                                        order by grading_metric desc) as rn
+            from
+                (select *
+                from matching
+                where current_state = 'liked_sending'
+                    and object_id not in
+                    (select object_id
+                    from matching
+                    where current_state not in ('invitation_sending',
+                                                'invitation_waiting',
+                                                'goodbye',
+                                                'liked_sending',
+                                                'liked_waiting',
+                                                'rest_r1_next_month_sending',
+                                                'dating_done')
+                    group by object_id
+                    having count(*) >= 3))) t
+            where rn = 1;
         """
         with self.conn.cursor(row_factory=namedtuple_row) as cur:
             return cur.execute(stmt).fetchall()
