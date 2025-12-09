@@ -13,8 +13,6 @@ app.config['TEMPLATES_AUTO_RELOAD'] = True
 load_dotenv()
 app.secret_key = os.getenv('secret_key')
 DB = os.getenv('DB')
-ALLOW_CHANGE_STATE = os.getenv('ALLOW_CHANGE_STATE')
-ALLOW_CHANGE_VALUE = os.getenv('ALLOW_CHANGE_VALUE')
 
 
 def get_db():
@@ -82,42 +80,40 @@ def get_r1_info(matching_id):
 def change_state(correct_state,
                  new_state,
                  matching_id):
-    if ALLOW_CHANGE_STATE:
-        conn = get_db()
-        # check state，如果有人不在正確的state，本次操作取消
 
-        try:
-            current_state = get_current_state(matching_id)
+    conn = get_db()
+    try:
+        current_state = get_current_state(matching_id)
 
-            if isinstance(correct_state, tuple):
-                if current_state not in correct_state:
-                    raise ValueError("沒有支援的type")
-            elif isinstance(correct_state, str):
-                if current_state != correct_state:
-                    raise ValueError("沒有支援的type")
-            else:
+        if isinstance(correct_state, tuple):
+            if current_state not in correct_state:
                 raise ValueError("沒有支援的type")
+        elif isinstance(correct_state, str):
+            if current_state != correct_state:
+                raise ValueError("沒有支援的type")
+        else:
+            raise ValueError("沒有支援的type")
 
-            with conn.cursor() as curr:
-                stmt = """
+        with conn.cursor() as curr:
+            stmt = """
                 update matching set current_state = %s,
                 last_change_state_at=now(),
                 updated_at = now() where id=%s;
                 """
-                curr.execute(
-                    stmt, (new_state, matching_id,))
+            curr.execute(
+                stmt, (new_state, matching_id,))
 
-                stmt = """
+            stmt = """
                 insert into matching_state_history (matching_id, old_state, new_state, created_at)
                 values (%s, %s, %s, now());
                 """
-                curr.execute(
-                    stmt, (matching_id, current_state, new_state))
+            curr.execute(
+                stmt, (matching_id, current_state, new_state))
 
-            conn.commit()
-        except Exception as e:
-            conn.rollback()
-            raise e
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
 
 
 @app.route('/<token>/<action>', methods=['GET'])
@@ -335,17 +331,17 @@ def choose_rest(rest_round):
 def confirm_rest(rest_round):
 
     def store_confirm_data(confirm_data, matching_id):
-        if ALLOW_CHANGE_VALUE:
-            conn = get_db()
-            try:
-                params = confirm_data.copy()
-                params['matching_id'] = matching_id
 
-                for key in ['date1', 'date2', 'date3']:
-                    if params.get(key) == '':
-                        params[key] = None
+        conn = get_db()
+        try:
+            params = confirm_data.copy()
+            params['matching_id'] = matching_id
 
-                update_stmt = """
+            for key in ['date1', 'date2', 'date3']:
+                if params.get(key) == '':
+                    params[key] = None
+
+            update_stmt = """
                     update matching set
                     place1_url = %(place1_url)s,
                     place2_url = %(place2_url)s,
@@ -355,11 +351,11 @@ def confirm_rest(rest_round):
                     comment = %(comment)s
                     where id = %(matching_id)s
                     """
-                with conn.cursor() as curr:
-                    curr.execute(update_stmt, params)
-                conn.commit()
-            except Exception as e:
-                raise e
+            with conn.cursor() as curr:
+                curr.execute(update_stmt, params)
+            conn.commit()
+        except Exception as e:
+            raise e
     data = session.get('confirm_data')
     matching_info = session.get('matching_info')
     try:
@@ -382,17 +378,17 @@ def confirm_rest(rest_round):
 def confirm_booking(rest_round):
 
     def store_booking_data(booking_data, matching_id):
-        if ALLOW_CHANGE_VALUE:
-            conn = get_db()
-            try:
-                params = booking_data.copy()
-                # params['book_time'] = datetime.strptime(
-                #     params['book_time'], '%H:%M')
-                # params['book_time'] = pytz.timezone(
-                #     'Asia/Taipei').localize(params['book_time'])
 
-                params['matching_id'] = matching_id
-                update_stmt = """
+        conn = get_db()
+        try:
+            params = booking_data.copy()
+            # params['book_time'] = datetime.strptime(
+            #     params['book_time'], '%H:%M')
+            # params['book_time'] = pytz.timezone(
+            #     'Asia/Taipei').localize(params['book_time'])
+
+            params['matching_id'] = matching_id
+            update_stmt = """
                     update matching set
                     book_phone = %(book_phone)s,
                     book_name = %(book_name)s,
@@ -402,13 +398,13 @@ def confirm_booking(rest_round):
                     selected_date = %(selected_date)s
                     where id = %(matching_id)s
                     """
-                with conn.cursor() as curr:
-                    curr.execute(update_stmt, params)
+            with conn.cursor() as curr:
+                curr.execute(update_stmt, params)
 
-                conn.commit()
-            except Exception as e:
-                conn.rollback()
-                raise e
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            raise e
     data = session.get('confirm_data')
     matching_info = session.get('matching_info')
 
@@ -597,6 +593,11 @@ def bye_bye():
         再請留意接下來的資訊：）
         """
     )
+
+
+@app.route("/version")
+def version():
+    return {"version": "v1.2.3", "build": "2025-12-09T16:00:00Z"}
 
 
 if __name__ == '__main__':
