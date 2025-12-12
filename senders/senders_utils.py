@@ -128,30 +128,6 @@ real_sending_info = namedtuple(
     'real_sending_info', ['body', 'send_to'])
 
 
-def send_bubble_to_member_id(conn, member_id, bubble, alt_text='嘻嘻', production=SENDER_PRODUCTION):
-    user_id = get_user_id(conn, member_id)
-    body = bubble
-    if production:
-        if user_id:
-            #
-            # send_bubble(user_id[0], bubble, alt_text)
-            pass
-        else:
-            name = get_user_name(conn, member_id)
-            body = f'會員 {name} 沒有綁定 LINE 帳號⚠️⚠️⚠️'
-            user_id = ADMIN_LINE_ID
-            line_bot_api.push_message(user_id,
-                                      TextMessage(
-                                          text=body,
-                                          alt_text=alt_text,
-                                      ))
-    else:
-        user_id = TEST_USER_ID
-        send_bubble(TEST_USER_ID, body, alt_text)
-
-    return real_sending_info(body_to_str(body), user_id)
-
-
 def body_to_str(body):
     if isinstance(body, str):
         return body
@@ -161,21 +137,20 @@ def body_to_str(body):
         return ''
 
 
-def send_normal_text(conn, member_id, message, production=SENDER_PRODUCTION):
-    user_id = get_user_id(conn, member_id)
-    if production:
-        if user_id:
-            line_bot_api.push_message(user_id[0], TextMessage(text=message))
-        else:
-            name = get_user_name(conn, member_id)
-            user_id = ADMIN_LINE_ID
-            line_bot_api.push_message(ADMIN_LINE_ID, TextMessage(
-                text=f'會員 {name} 沒有綁定 LINE 帳號⚠️⚠️⚠️',
-            ))
-    else:
+def send_bubble_to_member_id(conn, member_id, bubble, alt_text='嘻嘻', production=SENDER_PRODUCTION):
+    user_id = get_user_id(conn, member_id)[0]
+    body = bubble
+    if not production:
         user_id = TEST_USER_ID
-        line_bot_api.push_message(TEST_USER_ID, TextMessage(text=message))
+    send_bubble(user_id, body, alt_text)
+    return real_sending_info(body_to_str(body), user_id)
 
+
+def send_normal_text(conn, member_id, message, production=SENDER_PRODUCTION):
+    user_id = get_user_id(conn, member_id)[0]
+    if not production:
+        user_id = TEST_USER_ID
+    line_bot_api.push_message(user_id, TextMessage(text=message))
     return real_sending_info(message, user_id)
 
 
