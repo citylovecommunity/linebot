@@ -272,7 +272,7 @@ def liked():
                             """)
 
     return render_template('confirm.html',
-                           message=f"""{name}有意願認識您<br>你們的匹配程度有{matching_info['grading_metric']}分！<br>是否要交個朋友呢？""",
+                           message=f"""{name}有意願認識您<br>你們的匹配程度有{matching_info['obj_grading_metric']}分！<br>是否要交個朋友呢？""",
                            header='邀請回覆',
                            btn_name='可以',
                            action_url=url_for('liked'))
