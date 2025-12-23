@@ -6,18 +6,20 @@ from flask import (Flask, g, redirect, render_template, request, session,
                    url_for)
 from psycopg.rows import dict_row
 
-app = Flask(__name__)
-
-app.config['TEMPLATES_AUTO_RELOAD'] = True
-
 load_dotenv()
-app.secret_key = os.getenv('secret_key')
-DB = os.getenv('DB')
+
+app = Flask(__name__)
+env = os.environ.get("FLASK_ENV", "development")
+
+if env == "production":
+    app.config.from_object("config.ProductionConfig")
+else:
+    app.config.from_object("config.DevelopmentConfig")
 
 
 def get_db():
     if 'db' not in g:
-        g.db = psycopg.connect(DB)
+        g.db = psycopg.connect(app.config["DB"])
     return g.db
 
 
@@ -322,8 +324,7 @@ def choose_rest(rest_round):
                                    'confirm_rest', rest_round=rest_round),
                                header="確認地點日期",
                                message="""
-                               送出之前<br>
-                               請確認地點和日期是否正確
+                               送出之前，請確認地點和日期是否正確
                                """)
 
 
@@ -437,10 +438,9 @@ def rest_r1():
                            header='約會的餐廳和日期',
                            message="""
                            請提供心儀的餐廳選項和日期<br>
-                           餐廳請複製貼上Google Map網址<br>
+                           餐廳可以直接在欄位搜尋，或是貼上Google Map網址<br>
                            <br>
-                           若有額外需求（如幾點後方便）<br>
-                           請在底下留言
+                           若有額外需求（如幾點後方便），請在底下留言
                            <br>
                            我們將會把您提供的餐廳日期轉達給對方
                            <br>
