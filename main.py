@@ -55,11 +55,19 @@ async def handle_callback(request: Request):
     webhook_body = json.loads(body)
 #    await debug_event_record(body)
     for event in webhook_body['events']:
-        if re.search(pattern, event['message']['text']):
-            await binding_phone_to_line(event)
-        elif event["type"] == "postback":
-            handle_postback(event)
+        event_type = event.get("type")
 
+        # 1️⃣ 文字訊息（例如你原本的綁電話邏輯）
+        if event_type == "message":
+            message = event.get("message", {})
+            if message.get("type") == "text":
+                text = message.get("text", "")
+                if re.search(pattern, text):
+                    await binding_phone_to_line(event)
+
+        # 2️⃣ Postback（我已抵達 / 看到 / 沒看到）
+        elif event_type == "postback":
+            await handle_postback(event)
     return 'OK'
 
 
