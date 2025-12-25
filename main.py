@@ -69,7 +69,7 @@ async def handle_callback(request: Request):
 
         # 2️⃣ Postback（我已抵達 / 看到 / 沒看到）
         elif event_type == "postback":
-            await handle_postback(event)
+            handle_postback(event)
     return 'OK'
 
 
