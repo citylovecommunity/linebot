@@ -98,31 +98,31 @@ def handle_arrived(user_id, reply_token):
     # # ③ 更新狀態（建議在 push 前）
     # mark_user_arrived(date_id, user_id)
 
-    push_seen_question(TEST_USER_ID)
+#     push_seen_question(TEST_USER_ID)
 
 
-def push_seen_question(other_user_id):
-    message = TextSendMessage(
-        text="對方已抵達，你是否已看到對方？",
-        quick_reply=QuickReply(
-            items=[
-                QuickReplyButton(
-                    action=PostbackAction(
-                        label="👀 我看到對方了",
-                        data=f"action=seen"
-                    )
-                ),
-                QuickReplyButton(
-                    action=PostbackAction(
-                        label="❓ 還沒看到",
-                        data=f"action=not_seen"
-                    )
-                )
-            ]
-        )
-    )
+# def push_seen_question(other_user_id):
+#     message = TextSendMessage(
+#         text="對方已抵達，你是否已看到對方？",
+#         quick_reply=QuickReply(
+#             items=[
+#                 QuickReplyButton(
+#                     action=PostbackAction(
+#                         label="👀 我看到對方了",
+#                         data=f"action=seen"
+#                     )
+#                 ),
+#                 QuickReplyButton(
+#                     action=PostbackAction(
+#                         label="❓ 還沒看到",
+#                         data=f"action=not_seen"
+#                     )
+#                 )
+#             ]
+#         )
+#     )
 
-    line_bot_api.push_message(other_user_id, message)
+#     line_bot_api.push_message(other_user_id, message)
 
 
 async def debug_event_record(body):
