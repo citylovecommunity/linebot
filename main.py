@@ -11,10 +11,17 @@ from linebot.v3.messaging import (AsyncApiClient, AsyncMessagingApi,
                                   TextMessage)
 from linebot.v3.webhook import WebhookParser
 from linebot.v3.webhooks import MessageEvent, TextMessageContent
+from linebot.models import TextSendMessage
+
+from senders.config import TEST_USER_ID
+
 
 # get channel_secret and channel_access_token from your environment variable
 channel_secret = os.getenv('LINE_CHANNEL_SECRET', None)
 channel_access_token = os.getenv('LINE_CHANNEL_ACCESS_TOKEN', None)
+
+TEST_USER_ID = os.getenv('TEST_USER_ID')
+
 if channel_secret is None:
     print('Specify LINE_CHANNEL_SECRET as environment variable.')
     sys.exit(1)
@@ -52,8 +59,42 @@ async def handle_callback(request: Request):
     for event in webhook_body['events']:
         if re.search(pattern, event['message']['text']):
             await binding_phone_to_line(event)
+        elif event["type"] == "postback":
+            handle_postback(event)
 
     return 'OK'
+
+
+def handle_postback(event):
+    data = event["postback"]["data"]
+    user_id = event["source"]["userId"]
+    reply_token = event["replyToken"]
+
+    if data == "action=arrived":
+        handle_arrived(user_id, reply_token)
+
+
+def handle_arrived(user_id, reply_token):
+    # ① 回覆按按鈕的使用者（一定要先）
+    line_bot_api.reply_message(
+        reply_token,
+        TextSendMessage(text="已通知對方，請稍候 🙌")
+    )
+
+    # # ② 查詢約會資訊
+    # date_id = get_current_date_id(user_id)
+    # other_user_id = get_other_user(date_id, user_id)
+
+    # # ③ 更新狀態（建議在 push 前）
+    # mark_user_arrived(date_id, user_id)
+
+    # ④ 用 push 通知另一方
+    line_bot_api.push_message(
+        TEST_USER_ID,
+        TextSendMessage(
+            text="對方已抵達，你是否已看到對方？"
+        )
+    )
 
 
 async def debug_event_record(body):
