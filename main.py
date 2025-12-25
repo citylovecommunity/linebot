@@ -83,8 +83,10 @@ def handle_postback(event):
 def handle_arrived(user_id, reply_token):
     # ① 回覆按按鈕的使用者（一定要先）
     line_bot_api.reply_message(
-        reply_token,
-        TextSendMessage(text="已通知對方，請稍候 🙌")
+        ReplyMessageRequest(
+            reply_token=reply_token,
+            messages=[TextMessage(text="已通知對方，請稍候 🙌")]
+        )
     )
 
     # # ② 查詢約會資訊
