@@ -69,22 +69,22 @@ async def handle_callback(request: Request):
 
         # 2️⃣ Postback（我已抵達 / 看到 / 沒看到）
         elif event_type == "postback":
-            handle_postback(event)
+            await handle_postback(event)
     return 'OK'
 
 
-def handle_postback(event):
+async def handle_postback(event):
     data = event["postback"]["data"]
     user_id = event["source"]["userId"]
     reply_token = event["replyToken"]
 
     if data == "action=arrived":
-        handle_arrived(user_id, reply_token)
+        await handle_arrived(user_id, reply_token)
 
 
-def handle_arrived(user_id, reply_token):
+async def handle_arrived(user_id, reply_token):
     # ① 回覆按按鈕的使用者（一定要先）
-    line_bot_api.reply_message(
+    await line_bot_api.reply_message(
         ReplyMessageRequest(
             reply_token=reply_token,
             messages=[TextMessage(text="已通知對方，請稍候 🙌")]
