@@ -29,7 +29,7 @@ class MySender(Sender):
             self.matching_row.book_time.strftime('%H:%M'))
 
         base_bubble.set_book_name(self.matching_row.book_name)
-        base_bubble.set_book_phone(self.matching_row.book_phone)
+        # base_bubble.set_book_phone(self.matching_row.book_phone)
         base_bubble.set_message(self.matching_row.comment)
         base_bubble.set_rest_url(self.matching_row.selected_place)
         base_bubble.set_rest_name(show_google_map_name(

@@ -127,28 +127,6 @@
                         "contents": [
                             {
                                 "type": "text",
-                                "text": "訂位時間",
-                                "color": "#aaaaaa",
-                                "size": "sm",
-                                "flex": 2
-                            },
-                            {
-                                "type": "text",
-                                "text": "##時間##",
-                                "wrap": true,
-                                "color": "#666666",
-                                "size": "sm",
-                                "flex": 5
-                            }
-                        ]
-                    },
-                    {
-                        "type": "box",
-                        "layout": "baseline",
-                        "spacing": "sm",
-                        "contents": [
-                            {
-                                "type": "text",
                                 "text": "訂位大名",
                                 "color": "#aaaaaa",
                                 "size": "sm",
@@ -157,28 +135,6 @@
                             {
                                 "type": "text",
                                 "text": "##訂位名字##",
-                                "wrap": true,
-                                "color": "#666666",
-                                "size": "sm",
-                                "flex": 5
-                            }
-                        ]
-                    },
-                    {
-                        "type": "box",
-                        "layout": "baseline",
-                        "spacing": "sm",
-                        "contents": [
-                            {
-                                "type": "text",
-                                "text": "訂位電話",
-                                "color": "#aaaaaa",
-                                "size": "sm",
-                                "flex": 2
-                            },
-                            {
-                                "type": "text",
-                                "text": "##訂位電話##",
                                 "wrap": true,
                                 "color": "#666666",
                                 "size": "sm",
@@ -242,16 +198,6 @@
                 },
                 "style": "link",
                 "height": "sm"
-            },
-            {
-                "type": "button",
-                "style": "link",
-                "height": "sm",
-                "action": {
-                    "type": "uri",
-                    "label": "我要改期",
-                    "uri": "http://form_app_url"
-                }
             },
             {
                 "type": "box",
