@@ -34,7 +34,12 @@ def close_db(e=None):
 def get_token_matching(token):
     conn = get_db()
     with conn.cursor(row_factory=dict_row) as curr:
-        stmt = "select * from matching where access_token = %s;"
+        stmt = """select id, subject_id, object_id, current_state, 
+        place1_url, place2_url,
+        date1, date2, date3, selected_place,
+        selected_date, comment, created_at, 
+        book_name, city, grading_metric, obj_grading_metric
+        from matching where access_token = %s;"""
         result = curr.execute(stmt, (token,)).fetchone()
         return result
 
@@ -556,13 +561,12 @@ def rest_r4():
     matching_info = session.get('matching_info')
     r1_info = get_r1_info(matching_info['id'])
     session['confirm_data'] = r1_info
+    places = [r1_info['place1_url'], r1_info['place2_url']]
+    dates = [r1_info['date1'], r1_info['date2'], r1_info['date3']]
 
     return render_template('show_places.html',
-                           place1_url=r1_info['place1_url'],
-                           place2_url=r1_info['place2_url'],
-                           time1=r1_info['time1'],
-                           time2=r1_info['time2'],
-                           time3=r1_info['time3'],
+                           places=places,
+                           dates=dates,
                            comment=r1_info['comment'],
                            booking_url=url_for('booking', rest_round=4),
                            bye_bye_url=url_for('bye_bye'),
