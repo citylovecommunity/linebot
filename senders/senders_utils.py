@@ -221,7 +221,7 @@ class BUBBLE:
         return self
 
     def as_dict(self):
-        return json.loads(self.bubble)
+        return json.loads(self.bubble, strict=False)
 
 
 def change_state(conn, old_state, new_state, matching_id):
