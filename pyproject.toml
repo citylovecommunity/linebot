@@ -9,9 +9,11 @@ dependencies = [
     "fastapi>=0.115.13",
     "line-bot-sdk>=3.17.1",
     "psycopg[binary]>=3.2.9",
+    "pydantic-settings>=2.12.0",
     "pytest>=8.4.1",
     "python-dotenv>=1.1.0",
     "requests>=2.32.4",
+    "shared",
     "uvicorn[standard]>=0.34.3",
 ]
 
@@ -19,5 +21,12 @@ dependencies = [
 members = [
     "form_app",
     "flow_charts",
-    "database",
+    "shared/database",
+    "senders",
+    "webhook",
+    "shared",
+    "alembic"
 ]
+
+[tool.uv.sources]
+shared = { workspace = true }

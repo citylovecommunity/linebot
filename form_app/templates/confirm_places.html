@@ -8,12 +8,16 @@
 <div class="col-lg-6 mx-auto">
     <h2 class="mb-3">地點</h2>
     <ul class="list-group mb-4">
-        {% for place in places %}
-        {% if place %}
+
+        {% for i in range(1,3) %}
+        {% if data["place" ~ i ~ "_name"] %}
+        {% set place_id = data['place' ~ i ~ '_id']%}
         <li class="list-group-item">
-            <span>第{{ loop.index }}家餐廳：</span>
-            <a href="{{ place }}" target="_blank" class="text-decoration-none">
-                {{ place }}
+            <span>第{{ i }}家餐廳：</span>
+            <a href="https://www.google.com/maps/search/?api=1&query=Google&query_place_id={{ place_id }}"
+                target="_blank">
+
+                <i class="bi bi-geo-alt-fill"></i> {{ data["place" ~ i ~ "_name"] }}
             </a>
         </li>
         {% endif %}
@@ -22,19 +26,21 @@
 
     <h2 class="mb-3">日期</h2>
     <ul class="list-group mb-4">
-        {% for date in dates %}
-        <li class="list-group-item">{{ date }}</li>
+        {% for i in range(1,4) %}
+        {% if data["date" ~ i ] %}
+        <li class="list-group-item">{{ data["date" ~ i ]| smart_date }}</li>
+        {% endif %}
         {% endfor %}
     </ul>
 
-    {% if comment %}
+
     <h2 class="mb-3">留言</h2>
     <div class="alert alert-secondary mb-4">
-        <em>{{ comment }}</em>
+        <em>{{ data.comment }}</em>
     </div>
-    {% endif %}
 
-    <form method="post" action="{{ confirm_url }}" class="mb-5">
+
+    <form method="post" class="mb-5">
         {% if new_message %}
         <div class="mb-3">
             <label for="comment" class="form-label">留言給對方（選填）</label>

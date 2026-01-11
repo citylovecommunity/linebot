@@ -1,9 +1,11 @@
-from sqlalchemy.orm import mapped_column, Mapped, relationship
+from datetime import date, datetime, time
+from typing import Any, Dict, List
+
 from sqlalchemy import ForeignKey
 from sqlalchemy.dialects.postgresql.json import JSONB
-from datetime import datetime, time, date
-from typing import List, Dict, Any
-from base import Base
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from .base import Base
 
 
 class Member(Base):
@@ -32,6 +34,10 @@ class Member(Base):
     )
     line_info: Mapped["Line_Info"] = relationship(back_populates="member")
 
+    def get_proper_name(self):
+        surname = '先生' if self.gender == 'M' else '小姐'
+        return self.name[0] + surname
+
 
 class Line_Info(Base):
     __tablename__ = "line_info"
@@ -54,11 +60,18 @@ class Matching(Base):
     access_token: Mapped[str]
     last_sent_at: Mapped[datetime]
     place1_url: Mapped[str]
+    place1_name: Mapped[str]
+    place1_id: Mapped[str]
+
     place2_url: Mapped[str]
+    place2_name: Mapped[str]
+    place2_id: Mapped[str]
+
     date1: Mapped[date]
     date2: Mapped[date]
     date3: Mapped[date]
     selected_place: Mapped[str]
+
     comment: Mapped[str]
     created_at: Mapped[datetime]
     book_phone: Mapped[str]
@@ -69,6 +82,7 @@ class Matching(Base):
     last_change_state_at: Mapped[datetime]
     grading_metric: Mapped[int]
     obj_grading_metric: Mapped[int]
+    pause: Mapped[bool]
 
     subject: Mapped["Member"] = relationship(
         "Member",
@@ -88,14 +102,46 @@ class Matching(Base):
         back_populates="matching"
     )
 
+    messages: Mapped[List["Message"]] = relationship(
+        "Message",
+        foreign_keys="[Message.match_id]",
+        back_populates="match"
+    )
+
+    def get_partner(self, current_user_id: int):
+        """
+        Returns the User object of the partner given a current_user_id.
+        """
+        if self.subject_id == current_user_id:
+            return self.object
+        elif self.object_id == current_user_id:
+            return self.subject
+        else:
+            # Optional: Handle case where user is not part of this match
+            raise ValueError(
+                f"User {current_user_id} is not in this matching.")
+
 
 class Matching_State_History(Base):
     __tablename__ = "matching_state_history"
     id: Mapped[int] = mapped_column(primary_key=True)
     matching_id: Mapped[int] = mapped_column(ForeignKey("matching.id"))
-    old_sate: Mapped[str]
+    old_state: Mapped[str]
     new_state: Mapped[str]
     created_at: Mapped[datetime]
 
     matching: Mapped["Matching"] = relationship(
         "Matching", foreign_keys=matching_id, back_populates="matching_state_histories")
+
+
+class Message(Base):
+    __tablename__ = "message"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    content: Mapped[str]
+    timestamp: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    user_id: Mapped[int] = mapped_column(ForeignKey("member.id"))
+    match_id: Mapped[int] = mapped_column(ForeignKey("matching.id"))
+
+    user: Mapped["Member"] = relationship("Member")
+    match: Mapped["Matching"] = relationship(
+        "Matching", back_populates="messages")

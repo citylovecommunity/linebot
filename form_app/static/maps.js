@@ -1,52 +1,41 @@
-async function initMap() {
-    // Request needed libraries.
-    await google.maps.importLibrary('places');
+async function initAutocomplete() {
+    // 1. WAIT for the library to load. 
+    // This connects to the snippet you pasted in HTML.
+    const { Autocomplete } = await google.maps.importLibrary("places");
 
-    // Get the existing input elements
-    const place1Input = document.getElementById('place1');
-    const place2Input = document.getElementById('place2');
+    // 2. Loop through your inputs (same logic as before)
+    ['1', '2'].forEach(i => {
+        const nameInput = document.getElementById(`place_input_${i}`);
+        const idInput = document.getElementById(`place_id_${i}`);
 
-    // Attach autocomplete to place1 input
-    if (place1Input) {
-        const autocomplete1 = new google.maps.places.Autocomplete(place1Input);
-        autocomplete1.addListener('place_changed', () => {
-            const place = autocomplete1.getPlace();
-            // Construct Google Maps URL using place ID
-            const url = `https://www.google.com/maps/place/?q=place_id:${place.place_id}`;
-            place1Input.value = url;
-            // Store the full place data in a hidden input for server processing
-            let hidden1 = document.getElementById('place1_data');
-            if (!hidden1) {
-                hidden1 = document.createElement('input');
-                hidden1.type = 'hidden';
-                hidden1.id = 'place1_data';
-                hidden1.name = 'place1_data';
-                place1Input.parentNode.appendChild(hidden1);
-            }
-            hidden1.value = JSON.stringify(place);
-        });
-    }
+        if (nameInput && idInput) {
+            // 3. Use the imported 'Autocomplete' class directly
+            const autocomplete = new Autocomplete(nameInput, {
+                types: ['restaurant'],
+                fields: ['place_id', 'name', 'formatted_address'],
+                componentRestrictions: { country: "tw" },
+            });
 
-    // Attach autocomplete to place2 input
-    if (place2Input) {
-        const autocomplete2 = new google.maps.places.Autocomplete(place2Input);
-        autocomplete2.addListener('place_changed', () => {
-            const place = autocomplete2.getPlace();
-            // Construct Google Maps URL using place ID
-            const url = `https://www.google.com/maps/place/?q=place_id:${place.place_id}`;
-            place2Input.value = url;
-            // Store the full place data in a hidden input for server processing
-            let hidden2 = document.getElementById('place2_data');
-            if (!hidden2) {
-                hidden2 = document.createElement('input');
-                hidden2.type = 'hidden';
-                hidden2.id = 'place2_data';
-                hidden2.name = 'place2_data';
-                place2Input.parentNode.appendChild(hidden2);
-            }
-            hidden2.value = JSON.stringify(place);
-        });
-    }
+            autocomplete.addListener('place_changed', () => {
+                const place = autocomplete.getPlace();
+
+                if (!place.place_id) {
+                    idInput.value = "";
+                    return;
+                }
+
+                // Update Hidden ID and Visible Name
+                idInput.value = place.place_id;
+                nameInput.value = place.name;
+            });
+
+            // Clear ID if user modifies text
+            nameInput.addEventListener('input', () => {
+                idInput.value = "";
+            });
+        }
+    });
 }
 
-initMap();
+// 4. Trigger the async function immediately
+initAutocomplete();

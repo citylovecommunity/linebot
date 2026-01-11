@@ -5,12 +5,31 @@ Confirm
 {% endblock %}
 
 {% block content %}
-<form method="post" action="{{ action_url }}">
+{% if matching.current_state == 'invitation_waiting' %}
+
+<form method="post">
     <div class="d-flex justify-content-center gap-3 mt-4">
-        <button type="submit" name="action" class="btn btn-primary btn-lg px-5 py-2" {% if alert
+        <button type="submit" name="action" value="accept" class="btn btn-primary btn-lg px-5 py-2" {% if alert
             %}onclick="return confirm('{{ alert }}');" {% endif %}>
-            {{ btn_name }}
+            確認
+        </button>
+
+        <button type="submit" name="action" value="reject" class="btn btn-danger btn-lg px-5 py-2">
+            婉拒
         </button>
     </div>
 </form>
+{% else %}
+
+<div class="alert alert-secondary">
+    {% if matching.current_state == 'invitation_accepted' %}
+    <h3>已成功 🎉</h3>
+    <p>我們將通知對方，請耐心等待對方的回覆</p>
+    {% elif matching.current_state == 'invitation_rejected' %}
+    <h3>已婉拒</h3>
+    <p>您已婉拒此次邀約，我們將為您提供更好的配對</p>
+    {% endif %}
+</div>
+
+{% endif %}
 {% endblock %}

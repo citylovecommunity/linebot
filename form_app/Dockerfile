@@ -1,17 +1,17 @@
 FROM python:3.12-slim-trixie
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Set working directory
+# Copy the shared library first
+COPY ./shared/ /tmp/shared
+
+# 2. Copy the specific service files
+COPY ./form_app /app
 WORKDIR /app
 
-# Copy the rest of the application
-COPY . /app
+# Install the shared folder as a package
+RUN uv pip install /tmp/shared
+RUN uv pip install -r requirements.txt
 
-RUN uv sync
-
-
-# Expose the port uvicorn will run on
 EXPOSE 5678
 
-# Command to run the app
 CMD ["uv", "run", "gunicorn", "-w", "4", "-b", "0.0.0.0:5678", "app:app"]

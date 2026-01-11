@@ -1,7 +1,174 @@
+/* Custom Modern Styles */
 body {
-    background-image: url('images/letter_phone.png');
-    background-size: cover;
-    background-repeat: no-repeat;
-    background-position: center center;
-    min-height: 100vh;
+    background-color: #f4f6f9;
+    /* Light grey background for contrast */
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
+
+.modern-card {
+    border: none;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    background: white;
+    transition: transform 0.2s;
+    overflow: hidden;
+}
+
+.card-header-clean {
+    background-color: white;
+    border-bottom: 1px solid #f0f0f0;
+    font-weight: 700;
+    color: #444;
+    padding: 1.25rem;
+}
+
+/* Action Section Styling */
+.action-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.status-badge {
+    background-color: #e9ecef;
+    color: #495057;
+    padding: 8px 16px;
+    border-radius: 50px;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+/* Chat Styling */
+.chat-container {
+    height: 400px;
+    overflow-y: auto;
+    padding: 20px;
+    background-color: #f8f9fa;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.chat-bubble {
+    max-width: 75%;
+    padding: 10px 15px;
+    border-radius: 18px;
+    position: relative;
+    font-size: 0.95rem;
+    line-height: 1.4;
+}
+
+/* Logic to differentiate sender/receiver */
+.msg-incoming {
+    align-self: flex-start;
+    background-color: white;
+    border-bottom-left-radius: 4px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    color: #333;
+}
+
+.msg-outgoing {
+    align-self: flex-end;
+    background-color: #0d6efd;
+    /* Bootstrap Primary Blue */
+    color: white;
+    border-bottom-right-radius: 4px;
+    box-shadow: 0 2px 4px rgba(13, 110, 253, 0.2);
+}
+
+.msg-time {
+    font-size: 0.7rem;
+    opacity: 0.7;
+    margin-top: 4px;
+    display: block;
+    text-align: right;
+}
+
+/* Date Display */
+.date-display {
+    text-align: center;
+    padding: 10px;
+}
+
+.date-day {
+    font-size: 3rem;
+    font-weight: 800;
+    line-height: 1;
+    color: #2c3e50;
+}
+
+.date-month {
+    font-size: 1.2rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #7f8c8d;
+}
+
+/* Dashboard Specific Styles */
+.dashboard-header {
+    margin-bottom: 2rem;
+}
+
+.match-card {
+    transition: all 0.3s ease;
+    cursor: pointer;
+    text-decoration: none;
+    /* Remove underline from anchor wrap */
+    color: inherit;
+    display: block;
+    height: 100%;
+    /* Ensure equal height in grid */
+}
+
+.match-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.match-card:hover .card-title {
+    color: #0d6efd;
+    /* Highlight name on hover */
+}
+
+.avatar-large {
+    width: 60px;
+    height: 60px;
+    font-size: 1.5rem;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%);
+    color: white;
+    margin-bottom: 1rem;
+}
+
+.location-tag {
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+/* Status dots */
+.status-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 5px;
+}
+
+.status-active {
+    background-color: #198754;
+}
+
+/* Green */
+.status-pending {
+    background-color: #ffc107;
+}
+
+/* Yellow */
+.status-closed {
+    background-color: #6c757d;
+}
+
+/* Grey */
