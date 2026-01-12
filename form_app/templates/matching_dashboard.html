@@ -1,111 +1,138 @@
-<!DOCTYPE html>
-<html lang="zh-Hant">
+{% extends "base.html" %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}Flask App{% endblock %}</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
+{% block content %}
 
 
 <div class="container py-5">
 
-    <div class="row mb-4">
+    <div class="row mb-5">
         <div class="col-12">
-            {% if action_required %}
-            <div class="modern-card action-card p-4 text-center">
-                <div class="mb-3">
-                    <i class="bi bi-bell-fill display-4"></i>
-                </div>
-                <h3 class="fw-bold">Action Required</h3>
-
-                {% if action_type == 'accept_reject' %}
-                <p class="fs-5 opacity-75 mb-4">Your partner is waiting! Do you want to proceed with this date?</p>
-                <form action="{{ url_for('handle_decision', match_id=match.id) }}" method="POST"
-                    class="d-flex justify-content-center gap-3">
-                    <button name="dec" value="accept" class="btn btn-light btn-lg px-4 text-success fw-bold">
-                        <i class="bi bi-check-circle-fill me-2"></i>Yes, let's go
-                    </button>
-                    <button name="dec" value="reject" class="btn btn-outline-light btn-lg px-4">
-                        <i class="bi bi-x-circle me-2"></i>No thanks
-                    </button>
-                </form>
-
-                {% elif action_type == 'book_restaurant' %}
-                <p class="fs-5 opacity-75 mb-4">It's your turn to choose the perfect spot.</p>
-                <a href="{{ url_for('restaurant_picker', match_id=match.id) }}"
-                    class="btn btn-light btn-lg px-5 text-primary fw-bold">
-                    <i class="bi bi-shop-window me-2"></i>Pick Restaurant
-                </a>
-                {% endif %}
-            </div>
-            {% else %}
-            <div class="modern-card p-4 text-center">
-                <p class="text-muted mb-2">Current Status</p>
-                <div class="status-badge d-inline-block">
-                    {{ match.status_display_name }}
-                </div>
-                <div class="mt-2 small text-muted">
-                    <i class="bi bi-hourglass-split"></i> Waiting for partner...
+            <div class="modern-card p-4">
+                <div class="step-indicator d-flex justify-content-between text-center">
+                    <div class="step-item {{ 'step-completed' if status_step > 1 else 'step-active' }}">
+                        <div class="step-dot"><i class="bi bi-people-fill"></i></div>
+                        <small class="fw-bold">配對中</small>
+                    </div>
+                    <div
+                        class="step-item {{ 'step-completed' if status_step > 2 else ('step-active' if status_step == 2 else '') }}">
+                        <div class="step-dot"><i class="bi bi-calendar-range"></i></div>
+                        <small class="fw-bold">約會規劃中</small>
+                    </div>
+                    <div class="step-item {{ 'step-completed' if status_step == 3 }}">
+                        <div class="step-dot"><i class="bi bi-check-lg"></i></div>
+                        <small class="fw-bold">配對完成</small>
+                    </div>
                 </div>
             </div>
-            {% endif %}
         </div>
     </div>
 
     <div class="row g-4">
         <div class="col-lg-4">
-            <div class="modern-card mb-4 h-100">
-                <div class="card-header-clean">
-                    <i class="bi bi-calendar-event me-2 text-primary"></i> Target Date
-                </div>
-                <div class="card-body d-flex align-items-center justify-content-center">
-                    {% if match.scheduled_date %}
-                    <div class="date-display">
-                        <div class="date-month">{{ match.scheduled_date.strftime('%B') }}</div>
-                        <div class="date-day">{{ match.scheduled_date.strftime('%d') }}</div>
-                        <div class="text-muted mt-2">{{ match.scheduled_date.strftime('%Y') }}</div>
+
+            <div class="card border-0 shadow-sm rounded-4 mb-4">
+                <div class="card-body p-4 text-center">
+                    <div class="mb-3">
+                        <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3 py-1 fw-normal">
+                            <i class="bi bi-stars me-1"></i> 你的配對
+                        </span>
                     </div>
-                    {% else %}
-                    <div class="text-center py-4 text-muted">
-                        <i class="bi bi-calendar-x fs-1 mb-2 d-block opacity-25"></i>
-                        Date not set yet
+
+                    <div class="mx-auto mb-3 bg-gradient-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm"
+                        style="width: 64px; height: 64px; font-size: 1.5rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        {{ partner.name[0] | upper }}
                     </div>
-                    {% endif %}
+
+                    <h5 class="fw-bold mb-1">{{ partner.get_proper_name() }}</h5>
+                    <p class="text-muted small mb-3">Matched on {{ matching.created_at.strftime('%b %d') }}</p>
+
+                    <a href="{{ partner.get_introduction_link() }}" target="_blank"
+                        class="text-decoration-none text-primary fw-bold small hover-lift">
+                        開啟介紹卡 <i class="bi bi-box-arrow-up-right ms-1 small"></i>
+                    </a>
                 </div>
             </div>
 
-            <div class="modern-card mt-4">
-                <div class="card-header-clean">
-                    <i class="bi bi-people me-2 text-primary"></i> The Match
+            <div class="modern-card h-100 {{ 'border-success' if status_step == 3 }}">
+                <div class="card-header-clean d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-calendar-event me-2 text-primary"></i> 約會</span>
+                    {% if status_step == 3 %}
+                    <span class="badge bg-success">Confirmed!</span>
+                    {% endif %}
                 </div>
+
                 <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3"
-                            style="width: 40px; height: 40px;">
-                            {{ current_user.name[0] | upper }}
-                        </div>
-                        <div>
-                            <small class="text-muted d-block">You</small>
-                            <strong>{{ current_user.name }}</strong>
+                    {% if status_step == 1 and not is_proposal_pending %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-cup-hot fs-1 mb-2 d-block opacity-50"></i>
+                        <p>尚未安排約會</p>
+                        <button class="btn btn-primary w-100" data-bs-toggle="modal" data-bs-target="#proposalModal">
+                            提議約會！
+                        </button>
+                    </div>
+
+                    {% elif is_proposal_pending %}
+                    <div class="alert {{ 'alert-info' if proposed_by_me else 'alert-warning' }}">
+                        <h6 class="alert-heading fw-bold">
+                            {% if proposed_by_me %} 您已提出約會 {% else %} 新的約會提議！ {% endif %}
+                        </h6>
+                        <hr>
+                        <p class="mb-1"><strong><i class="bi bi-shop"></i> 地點:</strong> {{ proposal.restaurant_name
+                            }}</p>
+                        <p class="mb-1"><strong><i class="bi bi-clock"></i> 時間:</strong> {{ proposal.proposed_datetime
+                            }}</p>
+                        <p class="mb-0 small text-muted">
+                            <em>訂位資訊: {{ "我需要訂位" if proposal.booker_role == 'me' and proposal.proposer_id == user_id
+                                else "我無需訂位" }}</em>
+                        </p>
+                    </div>
+
+                    {% if not proposed_by_me %}
+                    <form
+                        action="{{ url_for('dashboard_bp.handle_proposal', matching_id=matching.id, user_id=user_id) }}"
+                        method="POST" class="d-grid gap-2">
+                        <button name="action" value="accept" class="btn btn-success">
+                            <i class="bi bi-check-lg me-2"></i>接受約會
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal"
+                            data-bs-target="#proposalModal">
+                            <i class="bi bi-pencil me-2"></i>更改提案
+                        </button>
+                    </form>
+                    {% else %}
+                    <div class="text-center text-muted small">
+                        等待 {{ partner.get_proper_name() }} 回覆...
+                    </div>
+                    {% endif %}
+
+                    {% elif status_step == 3 %}
+                    <div class="text-center mb-3">
+                        <h2 class="text-success fw-bold">{{ matching.selected_date.strftime('%d') }}</h2>
+                        <h5 class="text-uppercase text-muted">{{ matching.selected_date.strftime('%B') }}</h5>
+                        <div class="badge bg-light text-dark border p-2 mt-2">
+                            {{ matching.selected_date.strftime('%H:%M') }}
                         </div>
                     </div>
-                    <hr class="opacity-25">
-                    <div class="d-flex align-items-center">
-                        <div class="bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center me-3"
-                            style="width: 40px; height: 40px;">
-                            {{ partner.name[0] | upper }}
-                        </div>
-                        <div>
-                            <small class="text-muted d-block">Partner</small>
-                            <strong>{{ partner.name }}</strong>
-                        </div>
+                    <div class="border-top pt-3">
+                        <p class="mb-1"><strong>地點:</strong> {{ matching.selected_place }}</p>
+                        <p class="small text-muted mb-3">
+                            {% if matching.booker_id == current_user.id %}
+                            <span class="text-danger"><i class="bi bi-exclamation-circle"></i> 別忘記訂位</span>
+                            {% else %}
+                            <span class="text-success"><i class="bi bi-info-circle"></i> 對方會處理訂位</span>
+                            {% endif %}
+                        </p>
+
+                        <form
+                            action="{{ url_for('dashboard_bp.handle_proposal', matching_id=matching.id, user_id=user_id) }}"
+                            method="POST">
+                            <button class="btn btn-outline-danger btn-sm w-100" value="reject" name="action">
+                                取消約會
+                            </button>
+                        </form>
+
                     </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -113,38 +140,32 @@
         <div class="col-lg-8">
             <div class="modern-card h-100">
                 <div class="card-header-clean d-flex justify-content-between align-items-center">
-                    <span><i class="bi bi-chat-dots me-2 text-primary"></i> Conversation</span>
+                    <span><i class="bi bi-chat-dots me-2 text-primary"></i> 約會</span>
                     <span class="badge bg-light text-dark">{{ messages|length }} messages</span>
                 </div>
 
                 <div class="chat-container" id="messageBox">
                     {% for msg in messages %}
                     {% set is_me = (msg.user.id == current_user.id) %}
-
+                    {% if msg.is_system_notification %}
+                    <div class="text-center my-3">
+                        <span class="badge bg-light text-muted fw-normal border px-3 py-2">{{ msg.content }}</span>
+                    </div>
+                    {% else %}
                     <div class="chat-bubble {{ 'msg-outgoing' if is_me else 'msg-incoming' }}">
                         {% if not is_me %}
-                        <div class="fw-bold small mb-1">{{ msg.user.name }}</div>
+                        <div class="fw-bold small mb-1">{{ msg.user.get_proper_name() }}</div>
                         {% endif %}
-
                         {{ msg.content }}
-
-                        <span class="msg-time">
-                            {{ msg.timestamp.strftime('%H:%M') }}
-                            {% if is_me %}<i class="bi bi-check-all ms-1"></i>{% endif %}
-                        </span>
-                    </div>
-                    {% endfor %}
-
-                    {% if messages|length == 0 %}
-                    <div class="text-center text-muted mt-5">
-                        <p>No messages yet. Break the ice! 🧊</p>
+                        <span class="msg-time">{{ msg.timestamp.strftime('%H:%M') }}</span>
                     </div>
                     {% endif %}
+                    {% endfor %}
                 </div>
 
                 <div class="p-3 border-top bg-white">
                     <form method="POST">
-                        <div class="input-group">
+                        <div class=" input-group">
                             <input type="text" name="message_content" class="form-control border-0 bg-light"
                                 placeholder="Type a message..." style="padding: 12px;" required>
                             <button class="btn btn-primary px-4"><i class="bi bi-send-fill"></i></button>
@@ -156,8 +177,47 @@
     </div>
 </div>
 
+<div class="modal fade" id="proposalModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">約會排程 🌹</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form
+                action="{{ url_for('dashboard_bp.submit_proposal', matching_id=matching.id, user_id=current_user.id) }}"
+                method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">餐廳/地點</label>
+                        <input type="text" name="restaurant" class="form-control" placeholder="例： 北車饗食天堂" required
+                            value="{{ proposal.restaurant if proposal else '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">日期/時間</label>
+                        <input type="datetime-local" name="date_time" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">誰訂位</label>
+                        <select name="booker" class="form-select">
+                            <option value="me">我來訂位</option>
+                            <option value="partner">麻煩對方訂位</option>
+                            <option value="none">不用訂位，直接去</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary">提出約會</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
-    // Automatically scroll to bottom of chat
     var messageBox = document.getElementById("messageBox");
     messageBox.scrollTop = messageBox.scrollHeight;
 </script>
+
+{% endblock %}
