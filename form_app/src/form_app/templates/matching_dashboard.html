@@ -62,7 +62,7 @@
                 </div>
 
                 <div class="card-body">
-                    {% if status_step == 1 and not is_proposal_pending %}
+                    {% if status_step == 1 %}
                     <div class="text-center py-4 text-muted">
                         <i class="bi bi-cup-hot fs-1 mb-2 d-block opacity-50"></i>
                         <p>尚未安排約會</p>
@@ -71,10 +71,10 @@
                         </button>
                     </div>
 
-                    {% elif is_proposal_pending %}
+                    {% elif status_step == 2 %}
                     <div class="alert {{ 'alert-info' if proposed_by_me else 'alert-warning' }}">
                         <h6 class="alert-heading fw-bold">
-                            {% if proposed_by_me %} 您已提出約會 {% else %} 新的約會提議！ {% endif %}
+                            {% if proposal.proposer_id == current_user.id %} 您已提出約會 {% else %} 新的約會提議！ {% endif %}
                         </h6>
                         <hr>
                         <p class="mb-1"><strong><i class="bi bi-shop"></i> 地點:</strong> {{ proposal.restaurant_name
@@ -87,12 +87,12 @@
                         </p>
                     </div>
 
-                    {% if not proposed_by_me %}
+                    {% if proposal.proposer_id != current_user.id %}
                     <form
                         action="{{ url_for('dashboard_bp.handle_proposal', matching_id=matching.id, user_id=user_id) }}"
                         method="POST" class="d-grid gap-2">
                         <button name="action" value="accept" class="btn btn-success">
-                            <i class="bi bi-check-lg me-2"></i>接受約會
+                            <i class="bi bi-check-lg me-2"></i>接受提議
                         </button>
                         <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal"
                             data-bs-target="#proposalModal">
@@ -100,21 +100,27 @@
                         </button>
                     </form>
                     {% else %}
-                    <div class="text-center text-muted small">
+                    <div class="text-center text-muted small mb-3">
                         等待 {{ partner.get_proper_name() }} 回覆...
                     </div>
+                    <form action="{{ url_for('dashboard_bp.handle_proposal', matching_id=matching.id) }}" method="POST">
+                        <button class="btn btn-outline-danger btn-sm w-100" value="reject" name="action"
+                            onclick="return confirm('確定要取消提議嗎？這項操作無法復原。');">
+                            取消提議
+                        </button>
+                    </form>
                     {% endif %}
 
                     {% elif status_step == 3 %}
                     <div class="text-center mb-3">
-                        <h2 class="text-success fw-bold">{{ matching.selected_date.strftime('%d') }}</h2>
-                        <h5 class="text-uppercase text-muted">{{ matching.selected_date.strftime('%B') }}</h5>
+                        <h2 class="text-success fw-bold">{{ proposal.proposed_datetime.strftime('%d') }}</h2>
+                        <h5 class="text-uppercase text-muted">{{ proposal.proposed_datetime.strftime('%B') }}</h5>
                         <div class="badge bg-light text-dark border p-2 mt-2">
                             {{ matching.selected_date.strftime('%H:%M') }}
                         </div>
                     </div>
                     <div class="border-top pt-3">
-                        <p class="mb-1"><strong>地點:</strong> {{ matching.selected_place }}</p>
+                        <p class="mb-1"><strong>地點:</strong> {{ proposal.restaurant_name }}</p>
                         <p class="small text-muted mb-3">
                             {% if matching.booker_id == current_user.id %}
                             <span class="text-danger"><i class="bi bi-exclamation-circle"></i> 別忘記訂位</span>
@@ -123,8 +129,7 @@
                             {% endif %}
                         </p>
 
-                        <form
-                            action="{{ url_for('dashboard_bp.handle_proposal', matching_id=matching.id, user_id=user_id) }}"
+                        <form action="{{ url_for('dashboard_bp.handle_proposal', matching_id=matching.id) }}"
                             method="POST">
                             <button class="btn btn-outline-danger btn-sm w-100" value="reject" name="action">
                                 取消約會
@@ -164,7 +169,8 @@
                 </div>
 
                 <div class="p-3 border-top bg-white">
-                    <form method="POST">
+                    <form method="POST"
+                        action="{{ url_for('dashboard_bp.submit_message', matching_id = matching.id) }}">
                         <div class=" input-group">
                             <input type="text" name="message_content" class="form-control border-0 bg-light"
                                 placeholder="Type a message..." style="padding: 12px;" required>
@@ -184,9 +190,7 @@
                 <h5 class="modal-title">約會排程 🌹</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form
-                action="{{ url_for('dashboard_bp.submit_proposal', matching_id=matching.id, user_id=current_user.id) }}"
-                method="POST">
+            <form action="{{ url_for('dashboard_bp.submit_proposal', matching_id=matching.id) }}" method="POST">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">餐廳/地點</label>
