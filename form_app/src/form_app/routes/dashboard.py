@@ -1,12 +1,13 @@
 
+from typing import Optional
 from flask import (Blueprint, abort, flash, redirect, render_template, request,
                    url_for)
 from flask_login import current_user, login_required
 
 from form_app.database import get_db
-from shared.database.models import DateProposal, Matching, Member, Message
+from shared.database.models import DateProposal, Matching, Message
 
-bp = Blueprint('dashboard_bp', __name__)
+bp = Blueprint('dashboard_bp', __name__, url_prefix="/dashboard")
 
 
 def get_matching_or_abort(matching_id) -> Matching:
@@ -33,36 +34,82 @@ def get_matching_or_abort(matching_id) -> Matching:
     return matching
 
 
-@bp.route('/')
-# @login_required
-def dashboard():
-    return render_template('dashboard.html',
-                           current_user=current_user)
-
-
 @bp.route('/debug-user')
 def debug_user():
     return {
         "is_authenticated": current_user.is_authenticated,
         "is_anonymous": current_user.is_anonymous,
         "is_active": current_user.is_active if hasattr(current_user, 'is_active') else "N/A",
-        "user_id": current_user.get_id() if hasattr(current_user, 'get_id') else "N/A"
+        "user_id": current_user.get_id() if hasattr(current_user, 'get_id') else "N/A",
     }
+
+
+@bp.route('/')
+@login_required
+def dashboard():
+    return render_template('dashboard.html',
+                           current_user=current_user)
 
 
 @bp.route('/<int:matching_id>', methods=['GET', 'POST'])
 @login_required
 def matching_detail(matching_id):
     matching = get_matching_or_abort(matching_id)
+
+    # --- PART 1: Handle Pending Logic (Double Opt-In) ---
+    if matching.is_pending:
+
+        # 1. Handle Button Clicks (POST)
+        if request.method == 'POST':
+            action = request.form.get('action')
+
+            if action == 'reject':
+                # Single veto rule: One rejection cancels the whole match
+                matching.status = 'cancelled'
+                # db.session.commit()
+                flash('Matching rejected.', 'info')
+                return redirect(url_for('bp.index'))
+
+            elif action == 'agree':
+                # Double opt-in logic
+                # activate_by should record this user's 'yes'
+                # AND update matching.status to 'active' ONLY if both have said yes.
+                matching.activate_by(current_user.id)
+                # db.session.commit()
+
+                # Check status immediately after the update
+                if matching.is_active:
+                    flash('It\'s a match! Dashboard is now active.', 'success')
+                    # Redirect to self -> falls through to Part 2 below
+                    return redirect(url_for('bp.matching_detail', matching_id=matching.id))
+                else:
+                    flash('Accepted! Waiting for partner to confirm.', 'success')
+                    # Redirect to self -> caught by Part 1 "Waiting" view below
+                    return redirect(url_for('bp.matching_detail', matching_id=matching.id))
+
+        # 2. Handle View (GET)
+        # We need to know if THIS user has already agreed
+        # Assuming you have a method/property checking the association table or column
+        if matching.has_accepted(current_user.id):
+            # User already clicked agree, but match is still pending (partner hasn't clicked)
+            return render_template('matching_pending_waiting.html', matching=matching)
+        else:
+            # User has not voted yet
+            return render_template('matching_pending_decision.html', matching=matching)
+
+    # --- PART 2: Handle Active State (Existing Logic) ---
+    # If we are here, the matching is NOT pending. It acts as the "Active" dashboard.
+
     partner = matching.get_partner(current_user.id)
     proposal = matching.ui_proposal
     messages = matching.messages
-    if proposal is None:
-        status_step = 1
-    elif proposal.status == 'pending':
-        status_step = 2
-    elif proposal.status == 'confirmed':
-        status_step = 3
+
+    status_step = 1
+    if proposal:
+        if proposal.is_pending:
+            status_step = 2
+        elif proposal.is_confirmed:
+            status_step = 3
 
     return render_template('matching_dashboard.html',
                            matching=matching,
@@ -123,15 +170,15 @@ def submit_proposal(matching_id):
     return redirect(url_for('.matching_detail', matching_id=matching_id))
 
 
-@bp.route('/handle_proposal/<int:matching_id>', methods=['POST'])
+@bp.route('/handle_proposal/<int:matching_id>/<int:proposal_id>', methods=['POST'])
 @login_required
-def handle_proposal(matching_id):
+def handle_proposal(matching_id, proposal_id):
     # 1. Fetch the Match and Proposal
     db = get_db()
     matching = get_matching_or_abort(matching_id)
 
     action = request.form.get('action')  # 'accept' or 'reject'
-    proposal = matching.ui_proposal
+    proposal: Optional[DateProposal] = db.query(DateProposal).get(proposal_id)
 
     # 3. Handle "ACCEPT"
     if action == 'accept':
@@ -139,32 +186,29 @@ def handle_proposal(matching_id):
         # D. Create System Message (So it shows in chat)
         sys_msg = Message(
             matching=matching,
-            user_id=current_user.id,  # Attributed to the acceptor
+            user_id=current_user,  # Attributed to the acceptor
             content=f"✅ 接受在{proposal.restaurant_name}的約會提議!",
             is_system_notification=True
         )
 
-        matching.ui_proposal.status = 'confirmed'
+        proposal.confirm()
         db.add(sys_msg)
 
-        flash("Date confirmed! See you there.", "success")
+        flash("Date confirmed!", "success")
 
     # 4. Handle "REJECT"
     elif action == 'reject':
         # A. Create System Message
         sys_msg = Message(
             matching=matching,
-            user_id=current_user.id,
+            user=current_user,
             content=f"❌ {proposal.restaurant_name}提議已取消",
             is_system_notification=True
         )
-        matching.ui_proposal.status = 'canceled'
+        proposal.delete()
 
         db.add(sys_msg)
         flash("Proposal declined.", "info")
-
-    # 5. Cleanup (Crucial!)
-    # Regardless of accept/reject, the 'pending proposal' is now gone.
 
     db.commit()
 

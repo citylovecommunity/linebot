@@ -43,7 +43,7 @@ def login():
         remember = True if request.form.get('remember') else False
 
         db = get_db()
-        user = db.query.filter_by(email=email).first()
+        user = db.query(Member).where(Member.phone_number == phone).first()
 
         if not user or not verify_password(user.password_hash, password):
             flash('Please check your login details and try again.', 'danger')
@@ -58,7 +58,7 @@ def login():
 
         next_page = request.args.get('next')
         if not next_page or not next_page.startswith('/'):
-            next_page = url_for('dashboard_bp.dashboard')
+            next_page = url_for('index')
 
         return redirect(next_page)
 

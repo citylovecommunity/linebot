@@ -1,12 +1,12 @@
 
 from datetime import timedelta
 
-from flask import Flask, session
+from flask import Flask, session, redirect, url_for
 
 from form_app.config import BaseConfig
 from form_app.database import init_db
 from form_app.routes import dashboard, admin, auth
-from flask_login import LoginManager
+from flask_login import LoginManager, current_user
 from form_app.database import get_db
 from shared.database.models import Member
 
@@ -26,12 +26,20 @@ login_manager.init_app(app)
 @login_manager.user_loader
 def load_user(user_id):
     db = get_db()
-    return db.query(Member).get(int(user_id))
+    return db.get(Member, int(user_id))
 
 
 app.register_blueprint(dashboard.bp)
 app.register_blueprint(admin.admin_bp)
 app.register_blueprint(auth.auth_bp)
+
+
+@app.route('/')
+def index():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard_bp.dashboard'))
+    else:
+        return redirect(url_for('auth_bp.login'))
 
 
 @app.route('/logout')

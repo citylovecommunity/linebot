@@ -3,54 +3,71 @@
 {% block content %}
 <div class="container py-5">
 
-    <div class="d-flex justify-content-between align-items-center dashboard-header">
-        <div>
-            <h2 class="fw-bold text-dark">你的配對</h2>
-            <p class="text-muted">你有<strong>{{ matches|length }}</strong>個進行中的配對！</p>
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-center dashboard-header pb-3">
+
+        <div class="mb-3 mb-md-0 text-center text-md-start">
+            <h2 class="fw-bold text-dark mb-1">{{ current_user.get_proper_name() }}的配對</h2>
+            <p class="text-muted small mb-0">你有 <strong>{{ current_user.all_matches|length }}</strong> 個進行中的配對！</p>
         </div>
-        <div class="btn-group">
-            <button class="btn btn-white border active">全部</button>
-            <button class="btn btn-white border">需要動作</button>
-            <button class="btn btn-white border">已排程</button>
+
+        <div class="d-flex flex-wrap justify-content-center gap-2" id="match-filters">
+            <button class="btn btn-sm btn-outline-dark rounded-pill px-3 active" data-filter="all">全部</button>
+            <button class="btn btn-sm btn-outline-dark rounded-pill px-3" data-filter="PENDING">新配對</button>
+            <button class="btn btn-sm btn-outline-dark rounded-pill px-3" data-filter="ACTIVE">配對中</button>
+            <button class="btn btn-sm btn-outline-dark rounded-pill px-3" data-filter="COMPLETED">已完成</button>
+            <button class="btn btn-sm btn-outline-dark rounded-pill px-3" data-filter="CANCELLED">已取消</button>
         </div>
     </div>
 
-    <div class="row g-4">
+    <div class="row g-4" id="matches-container">
         {% for matching in current_user.all_matches %}
-        <div class="col-md-6 col-lg-4">
+        <div class="col-md-6 col-lg-4 match-item" data-status="{{ matching.status.value }}">
 
-            <a href="{{ url_for('dashboard_bp.matching_detail', matching_id=matching.id) }}" class="match-card">
-                <div class="modern-card p-4 h-100">
+            <a href="{{ url_for('dashboard_bp.matching_detail', matching_id=matching.id) }}"
+                class="match-card text-decoration-none text-dark">
+                <div class="modern-card p-4 h-100 shadow-sm position-relative">
 
-                    <div class="d-flex justify-content-between mb-3">
-                        {% if matching.action_required_by_user %}
-                        <span
-                            class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 rounded-pill px-3">
-                            <i class="bi bi-exclamation-circle-fill me-1"></i> Action Required
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+
+                        {% if matching.is_pending %}
+                        <span class="badge rounded-pill bg-primary bg-opacity-10 text-primary">
+                            <i class="bi bi-stars me-1"></i> 新配對
                         </span>
-                        {% elif matching.current_state == 'scheduled' %}
-                        <span class="badge bg-success bg-opacity-10 text-success rounded-pill px-3">
-                            <i class="bi bi-calendar-check me-1"></i> Scheduled
+                        {% elif matching.is_active %}
+                        <span class="badge rounded-pill bg-success bg-opacity-10 text-success">
+                            <i class="bi bi-activity me-1"></i> 配對中
+                        </span>
+                        {% elif matching.is_completed %}
+                        <span class="badge rounded-pill bg-secondary bg-opacity-10 text-secondary">
+                            <i class="bi bi-check-circle me-1"></i> 已完成
+                        </span>
+                        {% elif matching.is_cancelled %}
+                        <span class="badge rounded-pill bg-danger bg-opacity-10 text-danger">
+                            <i class="bi bi-x-circle me-1"></i> 已取消
                         </span>
                         {% else %}
-                        <span class="badge bg-secondary bg-opacity-10 text-secondary rounded-pill px-3">
-                            {{ matching.status_display_name }}
+                        <span class="badge rounded-pill bg-light text-dark border">
+                            {{ matching.status.value }}
                         </span>
                         {% endif %}
 
-                        <small class="text-muted">#匹配分數{{ matching.get_grading(current_user.id) }}</small>
+                        <small class="text-muted fw-bold">
+                            <i class="bi bi-trophy-fill text-warning"></i>
+                            {{ matching.get_grading(current_user.id) }}%
+                        </small>
                     </div>
 
-                    <div class="d-flex align-items-center">
-                        <div class="avatar-large me-3 shadow-sm">
-                            {{ matching.get_partner(current_user.id).name[0]}}
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="avatar-large me-3 shadow-sm bg-white d-flex align-items-center justify-content-center"
+                            style="width:50px; height:50px; border-radius:50%; font-size:1.2rem; border:1px solid #eee;">
+                            {{ matching.get_partner(current_user.id).name[0] }}
                         </div>
 
-                        <div>
-                            <h5 class="card-title fw-bold mb-1">{{
-                                matching.get_partner(current_user.id).get_proper_name() }}
+                        <div style="line-height: 1.2;">
+                            <h5 class="card-title fw-bold mb-1">
+                                {{ matching.get_partner(current_user.id).get_proper_name() }}
                             </h5>
-                            <div class="location-tag">
+                            <div class="location-tag small text-muted">
                                 <i class="bi bi-geo-alt-fill text-danger opacity-75"></i>
                                 {{ matching.city }}
                             </div>
@@ -60,22 +77,23 @@
                     <hr class="my-3 opacity-25">
 
                     <div class="d-flex justify-content-between align-items-center">
-                        <small class="text-muted">
+                        <small class="text-muted text-truncate" style="max-width: 80%;">
                             {% if matching.last_message %}
                             <i class="bi bi-chat-left-text me-1"></i> {{ matching.last_message.content[:20] }}
                             {% else %}
-                            <i class="bi bi-stars"></i> New Match!
+                            <span class="text-primary fst-italic">
+                                <i class="bi bi-chat-dots"></i> 開始對話...
+                            </span>
                             {% endif %}
                         </small>
 
-                        <div class="btn btn-sm btn-light rounded-circle">
+                        <div class="btn btn-sm btn-light rounded-circle shadow-sm">
                             <i class="bi bi-chevron-right"></i>
                         </div>
                     </div>
 
                 </div>
             </a>
-
         </div>
         {% endfor %}
 
@@ -91,4 +109,37 @@
     </div>
 
 </div>
+
+<script>
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const filterButtons = document.querySelectorAll('#match-filters button');
+        const matchItems = document.querySelectorAll('.match-item');
+
+        filterButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                // 1. Remove 'active' class from all buttons
+                filterButtons.forEach(btn => btn.classList.remove('active'));
+                // 2. Add 'active' class to clicked button
+                button.classList.add('active');
+
+                const filterValue = button.getAttribute('data-filter');
+
+                matchItems.forEach(item => {
+                    const itemStatus = item.getAttribute('data-status');
+
+                    // Logic: 
+                    // If filter is 'all', show everything.
+                    // Otherwise, check if item's status matches the filter.
+                    // Note: You might need to adjust logic if one button maps to multiple DB statuses
+                    if (filterValue === 'all' || itemStatus === filterValue) {
+                        item.style.display = 'block'; // Or 'flex' depending on your layout, but block works for Bootstrap cols
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            });
+        });
+    });
+</script>
 {% endblock %}

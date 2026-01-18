@@ -224,3 +224,52 @@ body {
     padding: 1rem;
     background: #f8f9fa;
 }
+
+
+
+/* 1. Base Card setup */
+.modern-card {
+    border-top: 5px solid transparent;
+    /* Reserve space for the color stripe */
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+/* 2. STATUS: PENDING (New) - Blue & Attention Grabbing */
+.match-item[data-status="pending"] .modern-card {
+    border-top-color: #0d6efd;
+    /* Bootstrap Primary Blue */
+    background-color: #f8fbff;
+    /* Very subtle blue tint */
+}
+
+/* 3. STATUS: ACTIVE (In Progress) - Green & Energetic */
+.match-item[data-status="active"] .modern-card {
+    border-top-color: #198754;
+    /* Bootstrap Success Green */
+    border-left: 1px solid #d1e7dd;
+    border-right: 1px solid #d1e7dd;
+    border-bottom: 1px solid #d1e7dd;
+}
+
+/* 4. STATUS: COMPLETED - Gray & Stable */
+.match-item[data-status="completed"] .modern-card {
+    border-top-color: #6c757d;
+    /* Bootstrap Secondary Gray */
+    background-color: #f8f9fa;
+}
+
+/* 5. STATUS: CANCELLED - Red & Faded (Ghosted) */
+.match-item[data-status="cancelled"] .modern-card {
+    border-top-color: #dc3545;
+    /* Bootstrap Danger Red */
+    opacity: 0.6;
+    /* Fade the whole card out */
+    filter: grayscale(100%);
+    /* Optional: Make it black and white */
+}
+
+.match-item[data-status="cancelled"] .modern-card:hover {
+    opacity: 1;
+    /* Bring it back on hover */
+    filter: grayscale(0%);
+}

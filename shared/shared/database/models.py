@@ -1,25 +1,57 @@
+
+import enum
 from datetime import date, datetime, time
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import ForeignKey
 from sqlalchemy.dialects.postgresql.json import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import Enum as SAEnum
 
-from .base import Base
+from shared.database.base import Base
+
+
+class ProposalStatus(enum.Enum):
+    PENDING = "PENDING"
+    CONFIRMED = "CONFIRMED"
+    DELETED = "DELETED"
+
+
+class MatchingStatus(enum.Enum):
+    PENDING = "PENDING"
+    ACTIVE = "ACTIVE"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
 
 
 class Member(Base):
     __tablename__ = "member"
     id: Mapped[int] = mapped_column(primary_key=True)
+
+    def get_id(self):
+        # Convert the primary key to a string
+        return str(self.id)
+
     name: Mapped[str]
     gender: Mapped[str]
     phone_number: Mapped[str]
     is_active: Mapped[bool]
+    updated_at: Mapped[datetime] = mapped_column(onupdate=datetime.now)
+
     is_test: Mapped[bool]
+
     email: Mapped[str]
     id_card_no: Mapped[str]
     fill_form_at: Mapped[datetime]
     user_info: Mapped[Dict[str, Any]] = mapped_column(JSONB, nullable=True)
+
+    @property
+    def is_authenticated(self):
+        return True
+
+    @property
+    def is_anonymous(self):
+        return True
 
     matches_as_subject: Mapped[list["Matching"]] = relationship(
         "Matching",
@@ -32,6 +64,16 @@ class Member(Base):
         foreign_keys="Matching.object_id",
         back_populates="object"
     )
+
+    @property
+    def all_matches(self):
+        """Returns a combined list of matches where user is subject or object."""
+        return self.matches_as_subject + self.matches_as_object
+
+    password_hash: Mapped[str]
+
+    is_admin:  Mapped[bool] = mapped_column(default=False)
+
     line_info: Mapped["Line_Info"] = relationship(back_populates="member")
 
     def get_proper_name(self):
@@ -63,6 +105,63 @@ class Matching(Base):
         ForeignKey("member.id"))
     created_mode: Mapped[str]
     current_state: Mapped[str]
+
+    status: Mapped[MatchingStatus] = mapped_column(
+        SAEnum(
+            MatchingStatus,
+            native_enum=False,
+            values_callable=lambda x: [e.value for e in x]
+        ),
+        default=MatchingStatus.PENDING
+    )
+
+    subject_accepted: Mapped[bool]
+    object_accepted: Mapped[bool]
+
+    @property
+    def is_active(self):
+        return self.status is MatchingStatus.ACTIVE
+
+    @property
+    def is_pending(self):
+        return self.status is MatchingStatus.PENDING
+
+    @property
+    def is_completed(self):
+        return self.status is MatchingStatus.COMPLETED
+
+    @property
+    def is_cancelled(self):
+        return self.status is MatchingStatus.CANCELLED
+
+    def activate(self):
+        self.status = MatchingStatus.ACTIVE
+
+    def complete(self):
+        self.status = MatchingStatus.COMPLETED
+
+    def cancel(self):
+        self.status = MatchingStatus.CANCELLED
+
+    def activate_by(self, user_id):
+        """Records acceptance and activates match if both agree."""
+        if user_id == self.user_a_id:
+            self.subject_accepted = True
+        elif user_id == self.user_b_id:
+            self.object_accepted = True
+
+        # Check if BOTH have accepted
+        if self.subject_accepted and self.object_accepted:
+            self.status = MatchingStatus.ACTIVE
+
+    def has_accepted(self, user_id):
+        """Helper to check if a specific user has already agreed."""
+        if user_id == self.subject_id:
+            return self.subject_accepted
+        elif user_id == self.object_id:
+            return self.object_accepted
+        return False
+
     access_token: Mapped[str]
     last_sent_at: Mapped[datetime]
     place1_url: Mapped[str]
@@ -80,12 +179,14 @@ class Matching(Base):
     selected_date: Mapped[date]
 
     comment: Mapped[str]
-    created_at: Mapped[datetime]
+    created_at: Mapped[datetime] = mapped_column(default=datetime.now)
     book_phone: Mapped[str]
     book_name: Mapped[str]
     book_time: Mapped[time]
     city: Mapped[str]
-    updated_at: Mapped[datetime]
+
+    updated_at: Mapped[datetime] = mapped_column(onupdate=datetime.now)
+
     last_change_state_at: Mapped[datetime]
     grading_metric: Mapped[int]
     obj_grading_metric: Mapped[int]
@@ -130,6 +231,29 @@ class Matching(Base):
         back_populates="matching",
         foreign_keys="Message.matching_id"
     )
+
+    proposals: Mapped[List["DateProposal"]] = relationship(
+        back_populates="matching",
+        order_by="desc(DateProposal.created_at)"
+    )
+
+    @property
+    def pending_proposal(self):
+        """Returns the single pending proposal, or None."""
+        return next((p for p in self.proposals if p.status is ProposalStatus.PENDING), None)
+
+    @property
+    def confirmed_proposal(self):
+        """Returns the single confirmed proposal, or None."""
+        return next((p for p in self.proposals if p.status is ProposalStatus.CONFIRMED), None)
+
+    @property
+    def ui_proposal(self):
+        """
+        Determines which proposal the UI should care about.
+        Priority: Pending > Confirmed > None
+        """
+        return self.pending_proposal or self.confirmed_proposal
 
     def get_user(self, current_user_id: int):
         """
@@ -208,15 +332,42 @@ class DateProposal(Base):
     restaurant_name: Mapped[str] = mapped_column(nullable=False)
     proposed_datetime: Mapped[datetime] = mapped_column(nullable=False)
     booker_role: Mapped[str] = mapped_column(default="none")
-    status: Mapped[str] = mapped_column(default="pending")
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(onupdate=datetime.now)
+
+    status: Mapped[ProposalStatus] = mapped_column(
+        SAEnum(
+            ProposalStatus,
+            native_enum=False,
+            values_callable=lambda x: [e.value for e in x]
+        ),
+        default=ProposalStatus.PENDING
+    )
+
+    created_at: Mapped[datetime] = mapped_column(default=datetime.now)
 
     matching: Mapped["Matching"] = relationship(
-        "Matching",
-        foreign_keys=[matching_id],
-        backref="date_proposals"
+        back_populates="proposals"
     )
+
     proposer: Mapped["Member"] = relationship(
         "Member",
         foreign_keys=[proposer_id]
     )
+
+    @property
+    def is_pending(self):
+        return self.status is ProposalStatus.PENDING
+
+    @property
+    def is_confirmed(self):
+        return self.status is ProposalStatus.CONFIRMED
+
+    @property
+    def is_deleted(self):
+        return self.status is ProposalStatus.DELETED
+
+    def confirm(self):
+        self.status = ProposalStatus.CONFIRMED
+
+    def delete(self):
+        self.status = ProposalStatus.DELETED
