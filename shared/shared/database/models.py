@@ -5,11 +5,10 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy import DateTime
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import ForeignKey
+from sqlalchemy import ForeignKey, func
 from sqlalchemy.dialects.postgresql.json import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from shared.database.base import Base
+from sqlalchemy.orm import DeclarativeBase
 
 
 class ProposalStatus(enum.Enum):
@@ -24,6 +23,10 @@ class MatchingStatus(enum.Enum):
     CANCELLED = "CANCELLED"
 
 
+class Base(DeclarativeBase):
+    pass
+
+
 class Member(Base):
     __tablename__ = "member"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -34,17 +37,30 @@ class Member(Base):
 
     name: Mapped[str]
     gender: Mapped[str]
-    phone_number: Mapped[str]
-    is_active: Mapped[bool]
+    phone_number: Mapped[str] = mapped_column(
+        unique=True, index=True, nullable=False)
+
+    is_active: Mapped[bool] = mapped_column(default=True)
     updated_at: Mapped[datetime] = mapped_column(onupdate=datetime.now)
-    birthday: Mapped[date]
 
-    is_test: Mapped[bool]
+    birthday: Mapped[Optional[date]]
 
-    email: Mapped[str]
-    id_card_no: Mapped[str]
+    is_test: Mapped[bool] = mapped_column(default=False)
+
+    email: Mapped[Optional[str]]
+    id_card_no: Mapped[Optional[str]]
     fill_form_at: Mapped[datetime]
     user_info: Mapped[Dict[str, Any]] = mapped_column(JSONB, nullable=True)
+
+    rank: Mapped[Optional[str]]
+    marital_status: Mapped[Optional[str]]
+
+    height: Mapped[Optional[int]]
+
+    pref_min_height: Mapped[Optional[int]]
+    pref_max_height: Mapped[Optional[int]]
+    pref_oldest_birth_year: Mapped[Optional[int]]
+    pref_youngest_birth_year: Mapped[Optional[int]]
 
     @property
     def is_authenticated(self):
@@ -71,11 +87,15 @@ class Member(Base):
         """Returns a combined list of matches where user is subject or object."""
         return self.matches_as_subject + self.matches_as_object
 
-    password_hash: Mapped[str]
+    password_hash: Mapped[Optional[str]]
 
-    is_admin:  Mapped[bool] = mapped_column(default=False)
+    is_admin:  Mapped[Optional[bool]] = mapped_column(default=False)
 
-    line_info: Mapped["Line_Info"] = relationship(back_populates="member")
+    line_info: Mapped[Optional["Line_Info"]] = relationship(
+        back_populates="member",
+        primaryjoin="Member.phone_number == Line_Info.phone_number",
+        foreign_keys="Line_Info.phone_number"
+    )
 
     def get_proper_name(self):
         surname = '先生' if self.gender == 'M' else '小姐'
@@ -90,10 +110,22 @@ class Member(Base):
 
 class Line_Info(Base):
     __tablename__ = "line_info"
-    phone_number: Mapped[str] = mapped_column(
-        ForeignKey("member.phone_number"), primary_key=True)
+
+    # 1. Remove ForeignKey here.
+    # This allows this column to hold values that don't exist in the 'member' table.
+    phone_number: Mapped[str] = mapped_column(primary_key=True)
+
     user_id: Mapped[str]
-    member: Mapped["Member"] = relationship(back_populates="line_info")
+
+    # 2. Define the relationship explicitly.
+    member: Mapped[Optional["Member"]] = relationship(
+        "Member",
+        # Tell SQLAlchemy exactly how to join the tables
+        primaryjoin="Member.phone_number == Line_Info.phone_number",
+        # Explicitly label which column acts as the "foreign key" for this link
+        foreign_keys=[phone_number],
+        back_populates="line_info"
+    )
 
 
 class Matching(Base):
@@ -104,8 +136,6 @@ class Matching(Base):
 
     object_id: Mapped[int] = mapped_column(
         ForeignKey("member.id"))
-    created_mode: Mapped[str]
-    current_state: Mapped[str]
 
     status: Mapped[MatchingStatus] = mapped_column(
         SAEnum(
@@ -116,12 +146,10 @@ class Matching(Base):
         default=MatchingStatus.ACTIVE
     )
 
-    cool_name: Mapped[str]
+    cool_name: Mapped[Optional[str]]
 
-    subject_accepted: Mapped[bool]
-    object_accepted: Mapped[bool]
-
-    cancel_by_id: Mapped[int] = mapped_column(ForeignKey('member.id'))
+    cancel_by_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey('member.id'))
 
     cancel_by: Mapped["Member"] = relationship(
         foreign_keys=[cancel_by_id],
@@ -169,35 +197,13 @@ class Matching(Base):
             return self.object_accepted
         return False
 
-    access_token: Mapped[str]
-    last_sent_at: Mapped[datetime]
-    place1_url: Mapped[str]
-    place1_name: Mapped[str]
-    place1_id: Mapped[str]
-
-    place2_url: Mapped[str]
-    place2_name: Mapped[str]
-    place2_id: Mapped[str]
-
-    date1: Mapped[date]
-    date2: Mapped[date]
-    date3: Mapped[date]
-    selected_place: Mapped[str]
-    selected_date: Mapped[date]
-
-    comment: Mapped[str]
     created_at: Mapped[datetime] = mapped_column(default=datetime.now)
-    book_phone: Mapped[str]
-    book_name: Mapped[str]
-    book_time: Mapped[time]
-    city: Mapped[str]
 
-    updated_at: Mapped[datetime] = mapped_column(onupdate=datetime.now)
+    updated_at: Mapped[Optional[datetime]
+                       ] = mapped_column(onupdate=datetime.now)
 
-    last_change_state_at: Mapped[datetime]
     grading_metric: Mapped[int]
     obj_grading_metric: Mapped[int]
-    pause: Mapped[bool]
 
     subject: Mapped["Member"] = relationship(
         "Member",
@@ -209,12 +215,6 @@ class Matching(Base):
         "Member",
         foreign_keys=[object_id],
         back_populates="matches_as_object"
-    )
-
-    matching_state_histories: Mapped[list["Matching_State_History"]] = relationship(
-        "Matching_State_History",
-        foreign_keys="Matching_State_History.matching_id",
-        back_populates="matching"
     )
 
     # 1. The actual column in the database to store the ID
@@ -299,18 +299,6 @@ class Matching(Base):
                 f"User {current_user_id} is not in this matching.")
 
 
-class Matching_State_History(Base):
-    __tablename__ = "matching_state_history"
-    id: Mapped[int] = mapped_column(primary_key=True)
-    matching_id: Mapped[int] = mapped_column(ForeignKey("matching.id"))
-    old_state: Mapped[str]
-    new_state: Mapped[str]
-    created_at: Mapped[datetime]
-
-    matching: Mapped["Matching"] = relationship(
-        "Matching", foreign_keys=matching_id, back_populates="matching_state_histories")
-
-
 class Message(Base):
     __tablename__ = "message"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -390,3 +378,25 @@ class DateProposal(Base):
             return self.matching.get_partner(self.proposer_id)
         else:
             return None
+
+
+class UserMatchScore(Base):
+    __tablename__ = 'user_match_scores'
+
+    # Composite Primary Key: One score per pair of users
+    source_user_id: Mapped[int] = mapped_column(
+        ForeignKey('member.id'), primary_key=True)
+    target_user_id: Mapped[int] = mapped_column(
+        ForeignKey('member.id'), primary_key=True)
+
+    score: Mapped[float]
+
+    # Audit fields
+    updated_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(), onupdate=func.now())
+    # e.g. "v1", "v2" - helpful if you change rules later!
+    logic_version: Mapped[str]
+
+    # Optional: Store WHY they got this score?
+    # useful for debugging: {"hobbies": +10, "height": -5}
+    breakdown: Mapped[Dict[str, Any]] = mapped_column(JSONB, nullable=True)

@@ -7,7 +7,10 @@ requires-python = ">=3.12"
 dependencies = [
     "beautifulsoup4>=4.13.5",
     "fastapi>=0.115.13",
+    "form-app",
+    "gspread>=6.2.1",
     "line-bot-sdk>=3.17.1",
+    "pandas>=2.3.3",
     "psycopg[binary]>=3.2.9",
     "pydantic-settings>=2.12.0",
     "pytest>=8.4.1",
@@ -30,3 +33,4 @@ members = [
 
 [tool.uv.sources]
 shared = { workspace = true }
+form-app = { workspace = true }

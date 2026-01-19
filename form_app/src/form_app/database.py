@@ -3,7 +3,7 @@ from flask import g
 
 from sqlalchemy.orm import Session
 
-from shared.database.base import get_session_factory
+from shared.database.session_maker import get_session_factory
 
 # 1. Define a global placeholder for the Session Factory
 # We will fill this ONE TIME when the app starts.

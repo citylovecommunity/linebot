@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 from sqlalchemy import select
 
-from shared.database.base import get_session_factory
+from shared.database.session_maker import get_session_factory
 from shared.database.models import Member
 from shared.security import hash_password
 

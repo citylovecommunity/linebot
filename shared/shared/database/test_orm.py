@@ -1,4 +1,4 @@
-from base import SessionLocal
+from shared.database.session_maker import SessionLocal
 from models import Line_Info, Matching, Member
 
 

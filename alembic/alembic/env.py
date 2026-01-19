@@ -7,8 +7,7 @@ from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
-from shared.database.base import Base
-from shared.database.models import Member, Matching, Matching_State_History
+from shared.database.models import Base
 
 load_dotenv()
 

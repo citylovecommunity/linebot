@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from sqlalchemy import select, func
 
 
-from shared.database.base import get_session_factory
+from shared.database.session_maker import get_session_factory
 from shared.database.models import Member, Matching
 from shared.cool_name import generate_funny_name
 import random
