@@ -3,9 +3,10 @@ import os
 from dotenv import load_dotenv
 from sqlalchemy import select, func
 
+
 from shared.database.base import get_session_factory
 from shared.database.models import Member, Matching
-
+from shared.cool_name import generate_funny_name
 import random
 
 load_dotenv()
@@ -25,12 +26,14 @@ with SessionFactory() as session:
         .limit(10)\
         .all()
 
+    print(random_user.id)
+
     for user in ten_others:
         new_match = Matching(subject=random_user,
                              object=user,
-                             city='台北',
+                             cool_name=generate_funny_name(),
                              grading_metric=random.randint(0, 100),
-                             obj_grading_metric=random.randint(0, 100)
+                             obj_grading_metric=random.randint(0, 100),
                              )
         session.add(new_match)
     session.commit()

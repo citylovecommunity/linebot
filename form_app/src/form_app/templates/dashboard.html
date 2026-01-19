@@ -12,7 +12,6 @@
 
         <div class="d-flex flex-wrap justify-content-center gap-2" id="match-filters">
             <button class="btn btn-sm btn-outline-dark rounded-pill px-3 active" data-filter="all">全部</button>
-            <button class="btn btn-sm btn-outline-dark rounded-pill px-3" data-filter="PENDING">新配對</button>
             <button class="btn btn-sm btn-outline-dark rounded-pill px-3" data-filter="ACTIVE">配對中</button>
             <button class="btn btn-sm btn-outline-dark rounded-pill px-3" data-filter="COMPLETED">已完成</button>
             <button class="btn btn-sm btn-outline-dark rounded-pill px-3" data-filter="CANCELLED">已取消</button>
@@ -52,7 +51,7 @@
                         {% endif %}
 
                         <small class="text-muted fw-bold">
-                            <i class="bi bi-trophy-fill text-warning"></i>
+                            <i class="bi bi-heart-fill text-danger"></i>
                             {{ matching.get_grading(current_user.id) }}%
                         </small>
                     </div>
@@ -67,9 +66,9 @@
                             <h5 class="card-title fw-bold mb-1">
                                 {{ matching.get_partner(current_user.id).get_proper_name() }}
                             </h5>
-                            <div class="location-tag small text-muted">
-                                <i class="bi bi-geo-alt-fill text-danger opacity-75"></i>
-                                {{ matching.city }}
+                            <div class="location-tag small text-muted mb-2">
+                                <i class="bi bi-hash text-warning opacity-75 fw-bold"></i>
+                                {{ matching.cool_name }}
                             </div>
                         </div>
                     </div>

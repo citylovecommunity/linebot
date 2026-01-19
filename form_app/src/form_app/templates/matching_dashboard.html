@@ -1,7 +1,14 @@
+{% set zh_months = {
+1: '一月', 2: '二月', 3: '三月', 4: '四月',
+5: '五月', 6: '六月', 7: '七月', 8: '八月',
+9: '九月', 10: '十月', 11: '十一月', 12: '十二月'
+} %}
+
+
+
 {% extends "base.html" %}
 
 {% block content %}
-
 
 <div class="container py-5">
 
@@ -16,7 +23,7 @@
                     <div
                         class="step-item {{ 'step-completed' if status_step > 2 else ('step-active' if status_step == 2 else '') }}">
                         <div class="step-dot"><i class="bi bi-calendar-range"></i></div>
-                        <small class="fw-bold">約會規劃中</small>
+                        <small class="fw-bold">任務規劃中</small>
                     </div>
                     <div class="step-item {{ 'step-completed' if status_step == 3 }}">
                         <div class="step-dot"><i class="bi bi-check-lg"></i></div>
@@ -36,6 +43,11 @@
                         <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3 py-1 fw-normal">
                             <i class="bi bi-stars me-1"></i> 你的配對
                         </span>
+                        {% if matching.status == 'cancelled' %}
+                        <span class="badge bg-danger rounded-pill px-3 py-1 fw-normal ms-1">
+                            Cancelled
+                        </span>
+                        {% endif %}
                     </div>
 
                     <div class="mx-auto mb-3 bg-gradient-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm"
@@ -44,18 +56,46 @@
                     </div>
 
                     <h5 class="fw-bold mb-1">{{ partner.get_proper_name() }}</h5>
+
+                    <div class="location-tag small text-muted mb-2">
+                        <i class="bi bi-hash text-warning opacity-75 fw-bold"></i>
+                        {{ matching.cool_name }}
+                    </div>
+
                     <p class="text-muted small mb-3">Matched on {{ matching.created_at.strftime('%b %d') }}</p>
 
                     <a href="{{ partner.get_introduction_link() }}" target="_blank"
-                        class="text-decoration-none text-primary fw-bold small hover-lift">
+                        class="text-decoration-none text-primary fw-bold small hover-lift mb-3 d-block">
                         開啟介紹卡 <i class="bi bi-box-arrow-up-right ms-1 small"></i>
                     </a>
+
+                    <div class="border-top pt-3 mt-2">
+                        {% if matching.is_cancelled and matching.cancel_by_id == current_user.id%}
+                        <form action="{{ url_for('dashboard_bp.update_match_status', matching_id=matching.id) }}"
+                            method="POST">
+                            <button type="submit" name="action" value="active"
+                                class="btn btn-outline-success btn-sm w-100">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i> 恢復配對 (Revert)
+                            </button>
+                        </form>
+                        {% elif not matching.is_cancelled %}
+                        <form action="{{ url_for('dashboard_bp.update_match_status', matching_id=matching.id) }}"
+                            method="POST">
+                            <button type="submit" name="action" value="cancelled"
+                                class="btn btn-light text-muted btn-sm w-100"
+                                onclick="return confirm('確定要取消此配對嗎？取消後將無法傳送訊息。');">
+                                <i class="bi bi-slash-circle me-1"></i> 取消配對 (Cancel)
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
 
+            {% if not matching.is_cancelled %}
             <div class="modern-card flex-grow-1 {{ 'border-success' if status_step == 3 }}">
                 <div class="card-header-clean d-flex justify-content-between align-items-center">
-                    <span><i class="bi bi-calendar-event me-2 text-primary"></i> 約會</span>
+                    <span><i class="bi bi-calendar-event me-2 text-primary"></i> 任務</span>
                     {% if status_step == 3 %}
                     <span class="badge bg-success">Confirmed!</span>
                     {% endif %}
@@ -64,17 +104,17 @@
                 <div class="card-body">
                     {% if status_step == 1 %}
                     <div class="text-center py-4 text-muted">
-                        <i class="bi bi-cup-hot fs-1 mb-2 d-block opacity-50"></i>
-                        <p>尚未安排約會</p>
+                        <i class="bi bi-rocket-takeoff-fill fs-1 mb-2 d-block opacity-50"></i>
+                        <p>尚未安排任務</p>
                         <button class="btn btn-primary w-100" data-bs-toggle="modal" data-bs-target="#proposalModal">
-                            提議約會！
+                            提議任務！
                         </button>
                     </div>
 
                     {% elif status_step == 2 %}
                     <div class="alert {{ 'alert-info' if proposed_by_me else 'alert-warning' }}">
                         <h6 class="alert-heading fw-bold">
-                            {% if proposal.proposer_id == current_user.id %} 您已提出約會 {% else %} 新的約會提議！ {% endif %}
+                            {% if proposal.proposer_id == current_user.id %} 您已提出任務 {% else %} 新的任務提議！ {% endif %}
                         </h6>
                         <hr>
                         <p class="mb-1"><strong><i class="bi bi-shop"></i> 地點:</strong> {{ proposal.restaurant_name
@@ -82,8 +122,15 @@
                         <p class="mb-1"><strong><i class="bi bi-clock"></i> 時間:</strong> {{ proposal.proposed_datetime
                             }}</p>
                         <p class="mb-0 small text-muted">
-                            <em>訂位資訊: {{ "我需要訂位" if proposal.booker_role == 'me' and proposal.proposer_id == user_id
-                                else "我無需訂位" }}</em>
+                            <em>訂位資訊:
+                                {% if proposal.who_reservation is none %}
+                                無需訂位
+                                {% elif proposal.who_reservation == current_user.id %}
+                                我需要訂位
+                                {% else %}
+                                對方處理訂位
+                                {% endif %}
+                            </em>
                         </p>
                     </div>
 
@@ -107,8 +154,8 @@
                         action="{{ url_for('dashboard_bp.handle_proposal', matching_id=matching.id, proposal_id=proposal.id) }}"
                         method="POST">
                         <button class="btn btn-outline-danger btn-sm w-100" value="reject" name="action"
-                            onclick="return confirm('確定要取消提議嗎？這項操作無法復原。');">
-                            取消提議
+                            onclick="return confirm('確定要更改提議嗎？這項操作無法復原。');">
+                            更改任務提議
                         </button>
                     </form>
                     {% endif %}
@@ -116,26 +163,42 @@
                     {% elif status_step == 3 %}
                     <div class="text-center mb-3">
                         <h2 class="text-success fw-bold">{{ proposal.proposed_datetime.strftime('%d') }}</h2>
-                        <h5 class="text-uppercase text-muted">{{ proposal.proposed_datetime.strftime('%B') }}</h5>
+                        <h5 class="text-uppercase text-muted">
+                            {{ zh_months[proposal.proposed_datetime.month] }}
+                        </h5>
                         <div class="badge bg-light text-dark border p-2 mt-2">
-                            {{ matching.selected_date.strftime('%H:%M') }}
+                            {{ proposal.proposed_datetime.strftime('%H:%M') }}
                         </div>
                     </div>
                     <div class="border-top pt-3">
                         <p class="mb-1"><strong>地點:</strong> {{ proposal.restaurant_name }}</p>
                         <p class="small text-muted mb-3">
-                            {% if matching.booker_id == current_user.id %}
-                            <span class="text-danger"><i class="bi bi-exclamation-circle"></i> 別忘記訂位</span>
+                            {# CASE 1: No one needs to reserve #}
+                            {% if proposal.who_reservation is none %}
+                            <span class="text-secondary">
+                                <i class="bi bi-dash-circle"></i> 無需訂位
+                            </span>
+
+                            {# CASE 2: I am the one responsible (ID matches me) #}
+                            {% elif proposal.who_reservation == current_user.id %}
+                            <span class="text-danger fw-bold">
+                                <i class="bi bi-exclamation-circle-fill"></i> 請記得訂位 (您負責)
+                            </span>
+
+                            {# CASE 3: The other person is responsible #}
                             {% else %}
-                            <span class="text-success"><i class="bi bi-info-circle"></i> 對方會處理訂位</span>
+                            <span class="text-success">
+                                <i class="bi bi-check-circle-fill"></i> 對方會處理訂位
+                            </span>
                             {% endif %}
                         </p>
 
                         <form
                             action="{{ url_for('dashboard_bp.handle_proposal', matching_id=matching.id, proposal_id=proposal.id) }}"
                             method="POST">
-                            <button class="btn btn-outline-danger btn-sm w-100" value="reject" name="action">
-                                取消約會
+                            <button class="btn btn-outline-danger btn-sm w-100" value="reject" name="action"
+                                onclick="return confirm('確定要更改提議嗎？這項操作無法復原。');">
+                                更改任務提議
                             </button>
                         </form>
 
@@ -143,6 +206,15 @@
                     {% endif %}
                 </div>
             </div>
+            {% else %}
+            <div
+                class="modern-card flex-grow-1 border-0 bg-light d-flex align-items-center justify-content-center text-muted">
+                <div class="text-center p-4">
+                    <i class="bi bi-slash-circle fs-1 mb-2"></i>
+                    <p class="mb-0">配對已取消，無法安排任務。</p>
+                </div>
+            </div>
+            {% endif %}
         </div>
 
         <div class="col-lg-8">
@@ -172,6 +244,12 @@
                 </div>
 
                 <div class="p-3 border-top bg-white">
+                    {% if matching.is_cancelled %}
+                    <div class="alert alert-secondary mb-0 text-center py-2">
+                        <i class="bi bi-lock-fill me-2"></i>
+                        配對已取消，對話功能暫時關閉。
+                    </div>
+                    {% else %}
                     <form method="POST"
                         action="{{ url_for('dashboard_bp.submit_message', matching_id = matching.id) }}">
                         <div class=" input-group">
@@ -180,6 +258,7 @@
                             <button class="btn btn-primary px-4"><i class="bi bi-send-fill"></i></button>
                         </div>
                     </form>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -190,7 +269,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">約會排程 🌹</h5>
+                <h5 class="modal-title">任務排程 🕵️‍♂️</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form action="{{ url_for('dashboard_bp.submit_proposal', matching_id=matching.id) }}" method="POST">
@@ -215,7 +294,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                    <button type="submit" class="btn btn-primary">提出約會</button>
+                    <button type="submit" class="btn btn-primary">提出任務</button>
                 </div>
             </form>
         </div>

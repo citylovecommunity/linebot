@@ -1,12 +1,13 @@
 
 import enum
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timezone
 from typing import Any, Dict, List, Optional
 
+from sqlalchemy import DateTime
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy import ForeignKey
 from sqlalchemy.dialects.postgresql.json import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import Enum as SAEnum
 
 from shared.database.base import Base
 
@@ -18,7 +19,6 @@ class ProposalStatus(enum.Enum):
 
 
 class MatchingStatus(enum.Enum):
-    PENDING = "PENDING"
     ACTIVE = "ACTIVE"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
@@ -37,6 +37,7 @@ class Member(Base):
     phone_number: Mapped[str]
     is_active: Mapped[bool]
     updated_at: Mapped[datetime] = mapped_column(onupdate=datetime.now)
+    birthday: Mapped[date]
 
     is_test: Mapped[bool]
 
@@ -112,19 +113,23 @@ class Matching(Base):
             native_enum=False,
             values_callable=lambda x: [e.value for e in x]
         ),
-        default=MatchingStatus.PENDING
+        default=MatchingStatus.ACTIVE
     )
+
+    cool_name: Mapped[str]
 
     subject_accepted: Mapped[bool]
     object_accepted: Mapped[bool]
 
+    cancel_by_id: Mapped[int] = mapped_column(ForeignKey('member.id'))
+
+    cancel_by: Mapped["Member"] = relationship(
+        foreign_keys=[cancel_by_id],
+    )
+
     @property
     def is_active(self):
         return self.status is MatchingStatus.ACTIVE
-
-    @property
-    def is_pending(self):
-        return self.status is MatchingStatus.PENDING
 
     @property
     def is_completed(self):
@@ -136,12 +141,14 @@ class Matching(Base):
 
     def activate(self):
         self.status = MatchingStatus.ACTIVE
+        self.cancel_by_id = None
 
     def complete(self):
         self.status = MatchingStatus.COMPLETED
 
-    def cancel(self):
+    def cancel(self, cancel_id):
         self.status = MatchingStatus.CANCELLED
+        self.cancel_by_id = cancel_id
 
     def activate_by(self, user_id):
         """Records acceptance and activates match if both agree."""
@@ -308,7 +315,10 @@ class Message(Base):
     __tablename__ = "message"
     id: Mapped[int] = mapped_column(primary_key=True)
     content: Mapped[str]
-    timestamp: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc)
+    )
     user_id: Mapped[int] = mapped_column(ForeignKey("member.id"))
     matching_id: Mapped[int] = mapped_column(ForeignKey("matching.id"))
     is_system_notification: Mapped[bool] = mapped_column(default=False)
@@ -371,3 +381,12 @@ class DateProposal(Base):
 
     def delete(self):
         self.status = ProposalStatus.DELETED
+
+    @property
+    def who_reservation(self):
+        if self.booker_role == 'me':
+            return self.proposer_id
+        elif self.booker_role == 'partner':
+            return self.matching.get_partner(self.proposer_id)
+        else:
+            return None

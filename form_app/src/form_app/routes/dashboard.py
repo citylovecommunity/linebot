@@ -56,50 +56,6 @@ def dashboard():
 def matching_detail(matching_id):
     matching = get_matching_or_abort(matching_id)
 
-    # --- PART 1: Handle Pending Logic (Double Opt-In) ---
-    if matching.is_pending:
-
-        # 1. Handle Button Clicks (POST)
-        if request.method == 'POST':
-            action = request.form.get('action')
-
-            if action == 'reject':
-                # Single veto rule: One rejection cancels the whole match
-                matching.status = 'cancelled'
-                # db.session.commit()
-                flash('Matching rejected.', 'info')
-                return redirect(url_for('bp.index'))
-
-            elif action == 'agree':
-                # Double opt-in logic
-                # activate_by should record this user's 'yes'
-                # AND update matching.status to 'active' ONLY if both have said yes.
-                matching.activate_by(current_user.id)
-                # db.session.commit()
-
-                # Check status immediately after the update
-                if matching.is_active:
-                    flash('It\'s a match! Dashboard is now active.', 'success')
-                    # Redirect to self -> falls through to Part 2 below
-                    return redirect(url_for('bp.matching_detail', matching_id=matching.id))
-                else:
-                    flash('Accepted! Waiting for partner to confirm.', 'success')
-                    # Redirect to self -> caught by Part 1 "Waiting" view below
-                    return redirect(url_for('bp.matching_detail', matching_id=matching.id))
-
-        # 2. Handle View (GET)
-        # We need to know if THIS user has already agreed
-        # Assuming you have a method/property checking the association table or column
-        if matching.has_accepted(current_user.id):
-            # User already clicked agree, but match is still pending (partner hasn't clicked)
-            return render_template('matching_pending_waiting.html', matching=matching)
-        else:
-            # User has not voted yet
-            return render_template('matching_pending_decision.html', matching=matching)
-
-    # --- PART 2: Handle Active State (Existing Logic) ---
-    # If we are here, the matching is NOT pending. It acts as the "Active" dashboard.
-
     partner = matching.get_partner(current_user.id)
     proposal = matching.ui_proposal
     messages = matching.messages
@@ -110,6 +66,8 @@ def matching_detail(matching_id):
             status_step = 2
         elif proposal.is_confirmed:
             status_step = 3
+        elif proposal.is_cancelled:
+            status_step = 4
 
     return render_template('matching_dashboard.html',
                            matching=matching,
@@ -152,6 +110,10 @@ def submit_proposal(matching_id):
         flash("Please fill in all fields!", "danger")
         return redirect(url_for('.matching_detail', matching_id=matching_id))
 
+    # 必須先把之前的取消掉
+    if matching.ui_proposal:
+        matching.ui_proposal.delete()
+
     # 2. Save to DB (using the ORM strategy we discussed)
     from datetime import datetime
     new_proposal = DateProposal(
@@ -167,6 +129,23 @@ def submit_proposal(matching_id):
 
     # 3. Notify and Redirect
     flash("Proposal sent successfully!", "success")
+    return redirect(url_for('.matching_detail', matching_id=matching_id))
+
+
+@bp.route('/update_match_status/<int:matching_id>', methods=['POST'])
+def update_match_status(matching_id):
+    db = get_db()
+    matching = get_matching_or_abort(matching_id)
+
+    action = request.form.get('action')
+    if action == 'active':
+        matching.activate()
+        flash("Matching Activated!", "success")
+    elif action == 'cancelled':
+        matching.cancel(current_user.id)
+        flash("Matching Cancelled!", "success")
+    db.commit()
+
     return redirect(url_for('.matching_detail', matching_id=matching_id))
 
 
@@ -186,7 +165,7 @@ def handle_proposal(matching_id, proposal_id):
         # D. Create System Message (So it shows in chat)
         sys_msg = Message(
             matching=matching,
-            user_id=current_user,  # Attributed to the acceptor
+            user_id=current_user.id,  # Attributed to the acceptor
             content=f"✅ 接受在{proposal.restaurant_name}的約會提議!",
             is_system_notification=True
         )
@@ -201,7 +180,7 @@ def handle_proposal(matching_id, proposal_id):
         # A. Create System Message
         sys_msg = Message(
             matching=matching,
-            user=current_user,
+            user_id=current_user.id,
             content=f"❌ {proposal.restaurant_name}提議已取消",
             is_system_notification=True
         )
