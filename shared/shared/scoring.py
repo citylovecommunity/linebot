@@ -1,3 +1,6 @@
+from shared.database.models import Member, Line_Info
+from sqlalchemy.sql.expression import exists
+
 
 class UserProfileAdapter:
     """
@@ -17,7 +20,7 @@ class UserProfileAdapter:
     def _parse_list(self, key):
         """Handles splitting by both ',' and '、'"""
         val = self.raw.get(key, "")
-        if not val or val == "無":
+        if not val or val == "無" or val == '不限':
             return set()
         # Replace ideographic comma with standard comma, then split
         normalized = val.replace("、", ",").replace("，", ",")
@@ -43,6 +46,18 @@ class UserProfileAdapter:
         return self._parse_int("您的身高 (CM)")
 
     @property
+    def diet(self):
+        return self.raw.get("您的飲食習慣")
+
+    @property
+    def job(self):
+        return self.raw.get("會員之職業類別")
+
+    @property
+    def religion(self):
+        return self.raw.get('宗教信仰')
+
+    @property
     def location_prefs(self):
         return self._parse_list("可約會地區 (可複選)")
 
@@ -54,7 +69,24 @@ class UserProfileAdapter:
     def dealbreakers(self):
         return self._parse_list("您完全無法接受的對象條件 (可複選)")
 
+    @property
+    def dealbreakers_diet(self):
+        return self._parse_list("不能接受的飲食習慣")
+
+    @property
+    def dealbreakers_job(self):
+        return self._parse_list("無法接受之職業類別")
+
+    @property
+    def dealbreakers_religion(self):
+        return self._parse_list("無法接受的宗教信仰")
+
+    @property
+    def datable_place(self):
+        return self._parse_list("可約會地區 (可複選)")
+
     # --- Match Preferences ---
+
     @property
     def pref_min_height(self):
         return self._parse_int("您期待認識的對象最低身高", 0)
@@ -74,35 +106,25 @@ class UserProfileAdapter:
         return self._parse_int("您期待認識的對象最小年紀", 2030)
 
 
-def get_candidates_filtered(session, me):
-    # 1. Setup Ranges (Logic from your JSON)
-    min_h = me.pref_min_height
-    max_h = me.pref_max_height
-    # Remember: Oldest Year = Smaller Number (1980 < 2000)
-    oldest_year = me.pref_oldest_birth_year
-    youngest_year = me.pref_youngest_birth_year
+def get_eligible_matching_pool(session):
+    """
+    Returns a Query object containing ONLY users who have the 'Right to Enter'.
+    Criteria:
+    1. Member is active
+    2. Web URL is provided
+    3. Phone Number exists in LineInfo table
+    """
+    return session.query(Member).filter(
+        # Rule 1: Active
+        Member.is_active == True,
 
-    query = session.query(User).filter(
-        User.id != me.id,
-        User.gender != me.gender,  # Basic Gender Filter
+        # Rule 2: Has Web URL (Not Null and Not Empty)
+        Member.user_info['會員介紹頁網址'].astext != None,
+        Member.user_info['會員介紹頁網址'].astext != '',
 
-        # --- AGE & HEIGHT (Inscribed in SQL) ---
-        User.height.between(min_h, max_h),
-        User.birth_year.between(oldest_year, youngest_year),
+        # Rule 3: Exists in Line Info (The Join Check)
+        exists().where(Line_Info.phone_number == Member.phone_number)
     )
-
-    # --- DEALBREAKERS (Inscribed in SQL) ---
-    # This only works if you made 'marital_status' a real column!
-
-    # Example: If I can't accept "Divorced"
-    if "離婚" in me.dealbreakers:
-        query = query.filter(User.marital_status != "離婚")
-
-    # Example: If I can't accept "Smokers"
-    if "抽菸" in me.dealbreakers:
-        query = query.filter(User.is_smoker == False)
-
-    return query.all()
 
 
 def calculate_match_score(me_adapter, candidate_adapter):
@@ -118,11 +140,11 @@ def calculate_match_score(me_adapter, candidate_adapter):
     rank = candidate_adapter.raw.get("排約等級一", "B").strip().upper()
 
     if rank == "A":
-        score += 10
-        breakdown['rank_bonus'] = "+10 (Grade A)"
+        score += 40
+        breakdown['rank_bonus'] = "+40 (Grade A)"
     elif rank == "C":
-        score -= 10
-        breakdown['rank_penalty'] = "-10 (Grade C)"
+        score -= 30
+        breakdown['rank_penalty'] = "-30 (Grade C)"
     # Grade B is neutral (no change)
 
     # --- 2. ATTRIBUTES (Skin, Appearance, etc.) ---
@@ -135,8 +157,8 @@ def calculate_match_score(me_adapter, candidate_adapter):
     candidate_skin = candidate_adapter.raw.get("會員本人的膚色", "")
 
     if desired_skin != "不限" and desired_skin in candidate_skin:
-        score += 5
-        breakdown['skin_match'] = 5
+        score += 10
+        breakdown['skin_match'] = "+10"
 
     # --- 3. HOBBIES (Intersection) ---
     common = me_adapter.hobbies.intersection(candidate_adapter.hobbies)
@@ -148,5 +170,23 @@ def calculate_match_score(me_adapter, candidate_adapter):
     # --- 4. DEALBREAKERS (Safety Net) ---
     # Even if SQL filtered most, we double check here for complex ones
     # e.g. "Specific Job Types" or "Zodiac Signs" if you added those
+
+    # 職業類別、飲食習慣、宗教信仰、約會地區
+    if candidate_adapter.job in me_adapter.dealbreakers_job:
+        score -= 20
+        breakdown['job'] = f"-20"
+
+    if candidate_adapter.diet in me_adapter.dealbreakers_diet:
+        score -= 20
+        breakdown['diet'] = f"-20"
+
+    if candidate_adapter.religion in me_adapter.dealbreakers_religion:
+        score -= 20
+        breakdown['religion'] = f"-20"
+
+    if len(candidate_adapter.datable_place) > 0 and len(candidate_adapter.datable_place) > 0\
+            and len(candidate_adapter.datable_place.intersection(candidate_adapter.datable_place)) == 0:
+        score -= 20
+        breakdown['datable_place'] = f"-20"
 
     return score, breakdown

@@ -1,6 +1,6 @@
 
 import enum
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import DateTime
@@ -97,14 +97,17 @@ class Member(Base):
         foreign_keys="Line_Info.phone_number"
     )
 
-    def get_proper_name(self):
+    @property
+    def proper_name(self):
         surname = '先生' if self.gender == 'M' else '小姐'
         return self.name[0] + surname
 
-    def get_introduction_link(self):
+    @property
+    def introduction_link(self):
         return self.user_info.get('會員介紹頁網址')
 
-    def get_blind_introduction_link(self):
+    @property
+    def blind_introduction_link(self):
         return self.user_info.get('盲約介紹卡一')
 
 
@@ -202,6 +205,7 @@ class Matching(Base):
     updated_at: Mapped[Optional[datetime]
                        ] = mapped_column(onupdate=datetime.now)
 
+    # TODO:改這個
     grading_metric: Mapped[int]
     obj_grading_metric: Mapped[int]
 
@@ -394,8 +398,6 @@ class UserMatchScore(Base):
     # Audit fields
     updated_at: Mapped[datetime] = mapped_column(
         server_default=func.now(), onupdate=func.now())
-    # e.g. "v1", "v2" - helpful if you change rules later!
-    logic_version: Mapped[str]
 
     # Optional: Store WHY they got this score?
     # useful for debugging: {"hobbies": +10, "height": -5}

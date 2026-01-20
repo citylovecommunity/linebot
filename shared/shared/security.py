@@ -1,7 +1,8 @@
 from werkzeug.security import generate_password_hash, check_password_hash
+from typing import Optional
 
 
-def hash_password(plain_password: str) -> str:
+def hash_password(plain_password: Optional[str]) -> str:
     """
     Generates a secure hash for the given password.
 
@@ -12,7 +13,9 @@ def hash_password(plain_password: str) -> str:
         str: The hashed password string (salt included).
     """
     # method='pbkdf2:sha256' is standard, but you can use 'scrypt' for higher security
-    return generate_password_hash(plain_password, method='pbkdf2:sha256')
+    if plain_password is None:
+        return None
+    return generate_password_hash(plain_password)
 
 
 def verify_password(stored_hash: str, plain_password: str) -> bool:

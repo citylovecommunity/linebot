@@ -7,10 +7,10 @@ import gspread
 from dotenv import load_dotenv
 from sqlalchemy.dialects.postgresql import insert
 
-from shared.database.session_maker import get_session_factory
 from shared.database.models import Member
-# Assumes you saved the UserProfileAdapter class from our previous conversation in logic.py
+from shared.database.session_maker import get_session_factory
 from shared.scoring import UserProfileAdapter
+from shared.security import hash_password
 
 load_dotenv()
 
@@ -42,6 +42,18 @@ def parse_chinese_datetime(text):
         return dt_naive.replace(tzinfo=TZ)
     except Exception as e:
         print(f"Date Parse Error for {text}: {e}")
+        return None
+
+
+def parse_birthday(date_str):
+    if not date_str:
+        return None
+    # Adjust format to match your specific raw data (e.g., '1990/05/20')
+    # If your data varies, use dateutil.parser.parse(date_str).date()
+    try:
+        # Example assuming YYYY/MM/DD or YYYY-MM-DD
+        return datetime.strptime(date_str, "%Y/%m/%d").strftime("%Y%m%d")
+    except ValueError:
         return None
 
 
@@ -79,6 +91,7 @@ def transform_data(raw_records):
             "gender": row.get('您的性別', '')[0] if row.get('您的性別') else None,
             "email": row.get('您的通訊郵件'),
             "id_card_no": row.get('您的身分證字號'),
+            "birthday": parse_birthday(row.get("您的出生年月日")),
 
             # Status Flags
             # Logic from your pandas map
@@ -87,11 +100,9 @@ def transform_data(raw_records):
             "fill_form_at": parse_chinese_datetime(row.get('時間戳記')),
 
             # --- THE NEW INSCRIBED COLUMNS (Extracted via Adapter) ---
-            "birth_year": adapter.birth_year,
             "height": adapter.height,
             "rank": row.get("排約等級一", "B"),
             "marital_status": row.get("您目前的感情狀況", "Single"),
-            "location_city": row.get("您的居住地", ""),
 
             # Preferences
             "pref_min_height": adapter.pref_min_height,
@@ -99,9 +110,12 @@ def transform_data(raw_records):
             "pref_oldest_birth_year": adapter.pref_oldest_birth_year,
             "pref_youngest_birth_year": adapter.pref_youngest_birth_year,
 
+
             # The Payload
             "user_info": row
         }
+        member_dict['password_hash'] = hash_password(member_dict['birthday'])
+
         clean_data_list.append(member_dict)
 
     return clean_data_list
@@ -117,15 +131,20 @@ def load_data_bulk(clean_data):
 
     session = SessionLocal()
     try:
+        # 有傻逼電話號碼重複
+        unique_data_map = {row['phone_number']: row for row in clean_data}
+        deduplicated_data = list(unique_data_map.values())
+
         # 1. Prepare the Insert Statement
-        stmt = insert(Member).values(clean_data)
+        stmt = insert(Member).values(deduplicated_data)
 
         # 2. Define the Upsert Logic (ON CONFLICT DO UPDATE)
         # We want to update everything EXCEPT 'id' and maybe 'created_at'
         update_dict = {
             col.name: col
             for col in stmt.excluded
-            if col.name != 'id'  # Protect ID
+            # Protect ID
+            if col.name not in ['id']
         }
 
         # 3. Execute
