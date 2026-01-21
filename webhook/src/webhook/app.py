@@ -145,7 +145,7 @@ def run_binding(match, line_user_id):
         else:
             # --- Step 3: Success Case - Create New Record ---
             new_info = Line_Info(
-                line_user_id=line_user_id,
+                user_id=line_user_id,
                 phone_number=target_phone
             )
             session.add(new_info)
