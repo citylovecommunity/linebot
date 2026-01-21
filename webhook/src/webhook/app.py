@@ -129,7 +129,7 @@ def run_binding(match, line_user_id):
     # --- Step 1: Check if YOU (the Line User) are already bound ---
     # We assume your model is named 'Line_Info'
     existing_user_record = session.query(Line_Info).filter_by(
-        line_user_id=line_user_id).first()
+        user_id=line_user_id).first()
 
     if existing_user_record:
         # STRICT RULE: Existing users cannot change numbers
