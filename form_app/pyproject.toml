@@ -15,10 +15,11 @@ dependencies = [
     "sqlalchemy>=2.0.43",
 ]
 
-[dependency-groups]
-dev = [
-    "debugpy>=1.8.19",
-]
+
+[build-system]
+requires = ["uv_build>=0.9.26,<0.10.0"]
+build-backend = "uv_build"
+
 
 [tool.uv.sources]
 shared = { workspace = true }

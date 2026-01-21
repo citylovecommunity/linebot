@@ -18,6 +18,29 @@
         </div>
     </div>
 
+    {% if missing_items %}
+    <div class="card border-warning mb-3">
+        <div class="card-header bg-warning text-dark">
+            <strong>⚠️ 配對功能暫停中</strong>
+        </div>
+        <div class="card-body">
+            <p>請完成以下步驟以恢復每週配對資格：</p>
+            <ul>
+                {% if 'line_info' in missing_items %}
+                <li>
+                    綁定 LINE 帳號
+                </li>
+                {% endif %}
+                {% if 'introduction_link' in missing_items %}
+                <li>
+                    設置介紹卡連結
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="row g-4" id="matches-container">
         {% for matching in current_user.all_matches %}
         <div class="col-md-6 col-lg-4 match-item" data-status="{{ matching.status.value }}">
@@ -64,7 +87,7 @@
 
                         <div style="line-height: 1.2;">
                             <h5 class="card-title fw-bold mb-1">
-                                {{ matching.get_partner(current_user.id).get_proper_name() }}
+                                {{ matching.get_partner(current_user.id).proper_name }}
                             </h5>
                             <div class="location-tag small text-muted mb-2">
                                 <i class="bi bi-hash text-warning opacity-75 fw-bold"></i>

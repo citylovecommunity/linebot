@@ -1,0 +1,12 @@
+services:
+  form_app:
+    image: ctlove_app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - DB=${DEV_DB_URL}
+      - secret_key=${secret_key}
+    ports:
+      - "5678:5678"
+    command: ["uv", "run", "gunicorn", "-w", "1", "-b", "0.0.0.0:5678", "form_app.app:app"]

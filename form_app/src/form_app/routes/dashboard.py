@@ -47,8 +47,11 @@ def debug_user():
 @bp.route('/')
 @login_required
 def dashboard():
+    missing_items = current_user.missing_requirements
+
     return render_template('dashboard.html',
-                           current_user=current_user)
+                           current_user=current_user,
+                           missing_items=missing_items)
 
 
 @bp.route('/<int:matching_id>', methods=['GET', 'POST'])
