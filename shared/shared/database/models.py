@@ -41,7 +41,8 @@ class Member(Base):
         unique=True, index=True, nullable=False)
 
     is_active: Mapped[bool] = mapped_column(default=True)
-    updated_at: Mapped[datetime] = mapped_column(onupdate=datetime.now)
+    updated_at: Mapped[datetime] = mapped_column(
+        onupdate=datetime.now, default=datetime.now)
 
     birthday: Mapped[Optional[date]]
 
@@ -97,8 +98,20 @@ class Member(Base):
         foreign_keys="Line_Info.phone_number"
     )
 
-    def get_grading(self, user_id):
-        pass
+    @property
+    def is_match_ready(self):
+        """Returns True if the user has all requirements for matching."""
+        return bool(self.line_info and self.introduction_link)
+
+    @property
+    def missing_requirements(self):
+        """Returns a list of specific missing items."""
+        missing = []
+        if not self.line_info:
+            missing.append("line_info")
+        if not self.introduction_link:
+            missing.append("introduction_link")
+        return missing
 
     @property
     def proper_name(self):
@@ -206,7 +219,7 @@ class Matching(Base):
     created_at: Mapped[datetime] = mapped_column(default=datetime.now)
 
     updated_at: Mapped[Optional[datetime]
-                       ] = mapped_column(onupdate=datetime.now)
+                       ] = mapped_column(onupdate=datetime.now, default=datetime.now)
 
     grading_metric: Mapped[int]
     obj_grading_metric: Mapped[int]
@@ -336,7 +349,8 @@ class DateProposal(Base):
     restaurant_name: Mapped[str] = mapped_column(nullable=False)
     proposed_datetime: Mapped[datetime] = mapped_column(nullable=False)
     booker_role: Mapped[str] = mapped_column(default="none")
-    updated_at: Mapped[datetime] = mapped_column(onupdate=datetime.now)
+    updated_at: Mapped[datetime] = mapped_column(
+        onupdate=datetime.now, default=datetime.now)
 
     status: Mapped[ProposalStatus] = mapped_column(
         SAEnum(

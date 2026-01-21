@@ -593,6 +593,7 @@ dependencies = [
     { name = "networkx" },
     { name = "python-dotenv" },
     { name = "shared" },
+    { name = "webhook" },
 ]
 
 [package.metadata]
@@ -602,6 +603,7 @@ requires-dist = [
     { name = "networkx", specifier = ">=3.6.1" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
     { name = "shared", editable = "shared" },
+    { name = "webhook", editable = "webhook" },
 ]
 
 [[package]]
@@ -1307,7 +1309,21 @@ wheels = [
 [[package]]
 name = "webhook"
 version = "0.1.0"
-source = { virtual = "webhook" }
+source = { editable = "webhook" }
+dependencies = [
+    { name = "flask" },
+    { name = "line-bot-sdk" },
+    { name = "shared" },
+    { name = "sqlalchemy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "flask", specifier = ">=3.1.2" },
+    { name = "line-bot-sdk", specifier = ">=3.21.0" },
+    { name = "shared", editable = "shared" },
+    { name = "sqlalchemy", specifier = ">=2.0.45" },
+]
 
 [[package]]
 name = "werkzeug"
