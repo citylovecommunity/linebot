@@ -1,10 +1,21 @@
 import os
 import re
 
-from flask import Flask, abort, g, request
+from flask import Flask, abort, g, request, session
+from linebot import (
+    WebhookParser
+)
 from linebot import LineBotApi, WebhookHandler
-from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, TextMessage, TextSendMessage
+from linebot.v3.exceptions import InvalidSignatureError
+from linebot.v3.webhooks import MessageEvent, TextMessageContent, UserSource
+from linebot.v3.messaging import (
+    Configuration,
+    ApiClient,
+    MessagingApi,
+    ReplyMessageRequest,
+    TextMessage,
+)
+
 
 from shared.database.models import Line_Info
 from shared.database.session_maker import get_session_factory
@@ -24,6 +35,13 @@ DB = os.getenv('DB')
 
 line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(CHANNEL_SECRET)
+
+
+parser = WebhookParser(CHANNEL_SECRET)
+
+configuration = Configuration(
+    access_token=CHANNEL_ACCESS_TOKEN
+)
 
 
 def get_db():
@@ -51,10 +69,6 @@ def close_db(error):
 
 @app.route("/callback", methods=['POST'])
 def callback():
-    """
-    Main webhook endpoint that LINE sends requests to.
-    """
-    # get X-Line-Signature header value
     signature = request.headers['X-Line-Signature']
 
     # get request body as text
@@ -65,64 +79,72 @@ def callback():
     try:
         handler.handle(body, signature)
     except InvalidSignatureError:
-        print("Invalid signature. Please check your channel access token/secret.")
         abort(400)
 
     return 'OK'
 
 
-@handler.add(MessageEvent, message=TextMessage)
+@handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
-    msg = event.message.text.strip()
-    line_user_id = event.source.user_id
+    text = event.message.text
+    with ApiClient(configuration) as api_client:
+        line_bot_api = MessagingApi(api_client)
+        if check_bind_match(text):
+            reply_msg = run_binding(text, event.source.user_id)
 
-    # Get the DB session
-    session = get_db()
+            line_bot_api.reply_message(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[
+                        TextMessage(text=reply_msg),
+                    ]
+                )
+            )
 
-    # 1. Regex Match
+
+def check_bind_match(msg):
     pattern = r"^綁定\s*(09\d{8})$"
     match = re.match(pattern, msg)
+    return match
 
-    if match:
-        target_phone = match.group(1)
 
-        # --- Step 1: Check if YOU (the Line User) are already bound ---
-        # We assume your model is named 'Line_Info'
-        existing_user_record = session.query(Line_Info).filter_by(
-            line_user_id=line_user_id).first()
+def run_binding(match, line_user_id):
 
-        if existing_user_record:
-            # STRICT RULE: Existing users cannot change numbers
-            reply_text = "❌ 您已經綁定過手機，如要更改請洽服務人員。"
+    session = get_db()
+    target_phone = match.group(1)
 
+    # --- Step 1: Check if YOU (the Line User) are already bound ---
+    # We assume your model is named 'Line_Info'
+    existing_user_record = session.query(Line_Info).filter_by(
+        line_user_id=line_user_id).first()
+
+    if existing_user_record:
+        # STRICT RULE: Existing users cannot change numbers
+        reply_text = "❌ 您已經綁定過手機，如要更改請洽服務人員。"
+
+    else:
+        # --- Step 2: Check if the PHONE is already used by someone else ---
+        phone_taken = session.query(Line_Info).filter_by(
+            phone_number=target_phone).first()
+
+        if phone_taken:
+            reply_text = f"❌ 手機號碼 {target_phone} 已經被其他帳號綁定了。"
         else:
-            # --- Step 2: Check if the PHONE is already used by someone else ---
-            phone_taken = session.query(Line_Info).filter_by(
-                phone_number=target_phone).first()
+            # --- Step 3: Success Case - Create New Record ---
+            new_info = Line_Info(
+                line_user_id=line_user_id,
+                phone_number=target_phone
+            )
+            session.add(new_info)
 
-            if phone_taken:
-                reply_text = f"❌ 手機號碼 {target_phone} 已經被其他帳號綁定了。"
-            else:
-                # --- Step 3: Success Case - Create New Record ---
-                new_info = Line_Info(
-                    line_user_id=line_user_id,
-                    phone_number=target_phone
-                )
-                session.add(new_info)
-
-                try:
-                    session.commit()
-                    reply_text = f"✅ 綁定成功！\n您的號碼：{target_phone}"
-                except Exception as e:
-                    session.rollback()
-                    app.logger.error(f"Database Error: {e}")
-                    reply_text = "系統發生錯誤，請稍後再試。"
-
-        # Send Reply
-        line_bot_api.reply_message(
-            event.reply_token,
-            TextSendMessage(text=reply_text)
-        )
+            try:
+                session.commit()
+                reply_text = f"✅ 綁定成功！\n您的號碼：{target_phone}"
+            except Exception as e:
+                session.rollback()
+                app.logger.error(f"Database Error: {e}")
+                reply_text = "系統發生錯誤，請稍後再試。"
+    return reply_text
 
 
 if __name__ == "__main__":
