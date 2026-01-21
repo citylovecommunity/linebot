@@ -1,26 +1,19 @@
 # etl_pipeline.py
-import os
+
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import gspread
-from dotenv import load_dotenv
+from config import SessionFactory
 from sqlalchemy.dialects.postgresql import insert
 
 from shared.database.models import Member
-from shared.database.session_maker import get_session_factory
-from shared.scoring import UserProfileAdapter
+from shared.matching.scoring import UserProfileAdapter
 from shared.security import hash_password
-
-load_dotenv()
 
 # --- Config ---
 TZ = ZoneInfo('Asia/Taipei')
-DB_URL = os.getenv("DB")
 SHEET_NAME = "(後台綁定)城遇訪談表單 (回覆)"
-
-# --- Setup Connection ---
-SessionLocal = get_session_factory(DB_URL)
 
 
 def parse_chinese_datetime(text):
@@ -129,7 +122,7 @@ def load_data_bulk(clean_data):
         print("No data to load.")
         return
 
-    session = SessionLocal()
+    session = SessionFactory()
     try:
         # 有傻逼電話號碼重複
         unique_data_map = {row['phone_number']: row for row in clean_data}

@@ -6,7 +6,7 @@
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-center dashboard-header pb-3">
 
         <div class="mb-3 mb-md-0 text-center text-md-start">
-            <h2 class="fw-bold text-dark mb-1">{{ current_user.get_proper_name() }}的配對</h2>
+            <h2 class="fw-bold text-dark mb-1">{{ current_user.proper_name }}的配對</h2>
             <p class="text-muted small mb-0">你有 <strong>{{ current_user.all_matches|length }}</strong> 個進行中的配對！</p>
         </div>
 

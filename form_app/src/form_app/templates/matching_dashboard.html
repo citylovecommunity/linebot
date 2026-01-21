@@ -55,7 +55,7 @@
                         {{ partner.name[0] | upper }}
                     </div>
 
-                    <h5 class="fw-bold mb-1">{{ partner.get_proper_name() }}</h5>
+                    <h5 class="fw-bold mb-1">{{ partner.proper_name }}</h5>
 
                     <div class="location-tag small text-muted mb-2">
                         <i class="bi bi-hash text-warning opacity-75 fw-bold"></i>
@@ -64,7 +64,7 @@
 
                     <p class="text-muted small mb-3">Matched on {{ matching.created_at.strftime('%b %d') }}</p>
 
-                    <a href="{{ partner.get_introduction_link() }}" target="_blank"
+                    <a href="{{ partner.introduction_link }}" target="_blank"
                         class="text-decoration-none text-primary fw-bold small hover-lift mb-3 d-block">
                         開啟介紹卡 <i class="bi bi-box-arrow-up-right ms-1 small"></i>
                     </a>
@@ -234,7 +234,7 @@
                     {% else %}
                     <div class="chat-bubble {{ 'msg-outgoing' if is_me else 'msg-incoming' }}">
                         {% if not is_me %}
-                        <div class="fw-bold small mb-1">{{ msg.user.get_proper_name() }}</div>
+                        <div class="fw-bold small mb-1">{{ msg.user.proper_name }}</div>
                         {% endif %}
                         {{ msg.content }}
                         <span class="msg-time">{{ msg.timestamp.strftime('%H:%M') }}</span>

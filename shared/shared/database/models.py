@@ -97,6 +97,9 @@ class Member(Base):
         foreign_keys="Line_Info.phone_number"
     )
 
+    def get_grading(self, user_id):
+        pass
+
     @property
     def proper_name(self):
         surname = '先生' if self.gender == 'M' else '小姐'
@@ -205,7 +208,6 @@ class Matching(Base):
     updated_at: Mapped[Optional[datetime]
                        ] = mapped_column(onupdate=datetime.now)
 
-    # TODO:改這個
     grading_metric: Mapped[int]
     obj_grading_metric: Mapped[int]
 

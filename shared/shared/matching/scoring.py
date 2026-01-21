@@ -1,5 +1,10 @@
-from shared.database.models import Member, Line_Info
+from collections import defaultdict
+
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import exists
+
+from shared.database.models import Line_Info, Member, UserMatchScore
 
 
 class UserProfileAdapter:
@@ -48,6 +53,10 @@ class UserProfileAdapter:
     @property
     def diet(self):
         return self.raw.get("您的飲食習慣")
+
+    @property
+    def marital_status(self):
+        return self.raw.get("您目前的感情狀況")
 
     @property
     def job(self):
@@ -106,7 +115,7 @@ class UserProfileAdapter:
         return self._parse_int("您期待認識的對象最小年紀", 2030)
 
 
-def get_eligible_matching_pool(session):
+def get_eligible_matching_pool(session: Session):
     """
     Returns a Query object containing ONLY users who have the 'Right to Enter'.
     Criteria:
@@ -117,6 +126,7 @@ def get_eligible_matching_pool(session):
     return session.query(Member).filter(
         # Rule 1: Active
         Member.is_active == True,
+        Member.is_test == False,
 
         # Rule 2: Has Web URL (Not Null and Not Empty)
         Member.user_info['會員介紹頁網址'].astext != None,
@@ -124,7 +134,7 @@ def get_eligible_matching_pool(session):
 
         # Rule 3: Exists in Line Info (The Join Check)
         exists().where(Line_Info.phone_number == Member.phone_number)
-    )
+    ).all()
 
 
 def calculate_match_score(me_adapter, candidate_adapter):
@@ -132,7 +142,7 @@ def calculate_match_score(me_adapter, candidate_adapter):
     me_adapter: The UserProfileAdapter object for the person LOOKING
     candidate_adapter: The UserProfileAdapter object for the POTENTIAL MATCH
     """
-    score = 60.0
+    score = 80.0
     breakdown = {}
 
     # --- 1. RANKING (排約等級) ---
@@ -189,4 +199,98 @@ def calculate_match_score(me_adapter, candidate_adapter):
         score -= 20
         breakdown['datable_place'] = f"-20"
 
+    if candidate_adapter.height < me_adapter.pref_min_height:
+        score -= 20
+        breakdown['min_height'] = f"-20"
+
+    if candidate_adapter.birth_year < me_adapter.pref_oldest_birth_year:
+        score -= 20
+        breakdown['over_age'] = f"-20"
+
+    if candidate_adapter.birth_year > me_adapter.pref_youngest_birth_year:
+        score -= 20
+        breakdown['under_age'] = f"-20"
+
+    if "離婚" in me_adapter.dealbreakers and "離婚" in candidate_adapter.marital_status:
+        score -= 20
+        breakdown['married'] = f"-20"
+
     return score, breakdown
+
+
+def run_matching_score_optimized(active_users, session: Session):
+    # --- STAGE 0: PRE-PROCESSING (Memory) ---
+    # 1. Load everyone into a dictionary for O(1) access and create Adapters ONCE
+    # Assumption: active_users are already Member objects.
+    # If not, fetch them all in ONE query here.
+
+    users_by_gender = defaultdict(list)
+    adapters_map = {}
+
+    print(f"Pre-loading {len(active_users)} profiles...")
+
+    for user in active_users:
+        # Group by gender to avoid iterating unrelated candidates later
+        users_by_gender[user.gender].append(user)
+
+        # Initialize Adapter once per user
+        adapters_map[user.id] = UserProfileAdapter(user.user_info)
+
+    match_records = []
+
+    # --- STAGE 1: PAIRING & SCORING (Pure Python) ---
+    # We avoid DB hits entirely in this loop
+
+    for me in active_users:
+        my_adapter = adapters_map[me.id]
+
+        # Determine candidates: Opposite gender only
+        # (This replaces the SQL filter: Member.gender != me.gender)
+        candidates = users_by_gender['F'] if me.gender == 'M' else users_by_gender['M']
+
+        for candidate in candidates:
+            # Skip self-match (though gender logic usually handles this)
+            if me.id == candidate.id:
+                continue
+
+            cand_adapter = adapters_map[candidate.id]
+
+            # --- STAGE 2: SCORING ---
+            score, breakdown = calculate_match_score(my_adapter, cand_adapter)
+
+            # Prepare dict for bulk insert (faster than creating ORM objects)
+            match_records.append({
+                "source_user_id": me.id,
+                "target_user_id": candidate.id,
+                "score": score,
+                "breakdown": breakdown,
+            })
+
+    # --- STAGE 3: BATCH WRITING (Bulk Upsert) ---
+    # If we have records, write them all in a single (or few) transactions
+
+    if match_records:
+        print(f"Bulk upserting {len(match_records)} records...")
+
+        # Chunking is recommended if records > 10,000 to avoid packet size limits
+        chunk_size = 5000
+        for i in range(0, len(match_records), chunk_size):
+            chunk = match_records[i: i + chunk_size]
+
+            stmt = pg_insert(UserMatchScore).values(chunk)
+
+            # Upsert Logic: "ON CONFLICT DO UPDATE"
+            # If the pair (source, target) already exists, update score and breakdown
+            upsert_stmt = stmt.on_conflict_do_update(
+                # Ensure you have a UniqueConstraint on these 2 cols
+                index_elements=['source_user_id', 'target_user_id'],
+                set_={
+                    "score": stmt.excluded.score,
+                    "breakdown": stmt.excluded.breakdown
+                }
+            )
+
+            session.execute(upsert_stmt)
+
+    session.commit()
+    print("Weekly matching complete.")
