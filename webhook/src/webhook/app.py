@@ -1,13 +1,10 @@
 import os
 import re
 
-from flask import Flask, abort, g, request, session
-from linebot import (
-    WebhookParser
-)
-from linebot import LineBotApi, WebhookHandler
+from flask import Flask, abort, g, request
+from linebot.v3 import WebhookHandler
 from linebot.v3.exceptions import InvalidSignatureError
-from linebot.v3.webhooks import MessageEvent, TextMessageContent, UserSource
+from linebot.v3.webhooks import MessageEvent, TextMessageContent
 from linebot.v3.messaging import (
     Configuration,
     ApiClient,
@@ -40,8 +37,6 @@ DB = os.getenv('DB')
 
 handler = WebhookHandler(CHANNEL_SECRET)
 
-
-parser = WebhookParser(CHANNEL_SECRET)
 
 configuration = Configuration(
     access_token=CHANNEL_ACCESS_TOKEN
