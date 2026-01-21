@@ -5,19 +5,26 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "beautifulsoup4>=4.13.5",
-    "fastapi>=0.115.13",
-    "line-bot-sdk>=3.17.1",
-    "psycopg[binary]>=3.2.9",
-    "pytest>=8.4.1",
-    "python-dotenv>=1.1.0",
-    "requests>=2.32.4",
-    "uvicorn[standard]>=0.34.3",
+    "form-app",
+    "gspread>=6.2.1",
+    "networkx>=3.6.1",
+    "python-dotenv>=1.2.1",
+    "shared",
+    "webhook",
 ]
+
+
 
 [tool.uv.workspace]
 members = [
     "form_app",
-    "flow_charts",
-    "database",
+    "shared",
+    "senders",
+    "webhook",
+    "alembic"
 ]
+
+[tool.uv.sources]
+shared = { workspace = true }
+form-app = { workspace = true }
+webhook = { workspace = true }

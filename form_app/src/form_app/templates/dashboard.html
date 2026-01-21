@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-center dashboard-header pb-3">
+
+        <div class="mb-3 mb-md-0 text-center text-md-start">
+            <h2 class="fw-bold text-dark mb-1">{{ current_user.proper_name }}的配對</h2>
+            <p class="text-muted small mb-0">你有 <strong>{{ current_user.all_matches|length }}</strong> 個進行中的配對！</p>
+        </div>
+
+        <div class="d-flex flex-wrap justify-content-center gap-2" id="match-filters">
+            <button class="btn btn-sm btn-outline-dark rounded-pill px-3 active" data-filter="all">全部</button>
+            <button class="btn btn-sm btn-outline-dark rounded-pill px-3" data-filter="ACTIVE">配對中</button>
+            <button class="btn btn-sm btn-outline-dark rounded-pill px-3" data-filter="COMPLETED">已完成</button>
+            <button class="btn btn-sm btn-outline-dark rounded-pill px-3" data-filter="CANCELLED">已取消</button>
+        </div>
+    </div>
+
+    {% if missing_items %}
+    <div class="card border-warning mb-3">
+        <div class="card-header bg-warning text-dark">
+            <strong>⚠️ 配對功能暫停中</strong>
+        </div>
+        <div class="card-body">
+            <p>請完成以下步驟以恢復每週配對資格：</p>
+            <ul>
+                {% if 'line_info' in missing_items %}
+                <li>
+                    綁定 LINE 帳號
+                </li>
+                {% endif %}
+                {% if 'introduction_link' in missing_items %}
+                <li>
+                    設置介紹卡連結
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row g-4" id="matches-container">
+        {% for matching in current_user.all_matches %}
+        <div class="col-md-6 col-lg-4 match-item" data-status="{{ matching.status.value }}">
+
+            <a href="{{ url_for('dashboard_bp.matching_detail', matching_id=matching.id) }}"
+                class="match-card text-decoration-none text-dark">
+                <div class="modern-card p-4 h-100 shadow-sm position-relative">
+
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+
+                        {% if matching.is_pending %}
+                        <span class="badge rounded-pill bg-primary bg-opacity-10 text-primary">
+                            <i class="bi bi-stars me-1"></i> 新配對
+                        </span>
+                        {% elif matching.is_active %}
+                        <span class="badge rounded-pill bg-success bg-opacity-10 text-success">
+                            <i class="bi bi-activity me-1"></i> 配對中
+                        </span>
+                        {% elif matching.is_completed %}
+                        <span class="badge rounded-pill bg-secondary bg-opacity-10 text-secondary">
+                            <i class="bi bi-check-circle me-1"></i> 已完成
+                        </span>
+                        {% elif matching.is_cancelled %}
+                        <span class="badge rounded-pill bg-danger bg-opacity-10 text-danger">
+                            <i class="bi bi-x-circle me-1"></i> 已取消
+                        </span>
+                        {% else %}
+                        <span class="badge rounded-pill bg-light text-dark border">
+                            {{ matching.status.value }}
+                        </span>
+                        {% endif %}
+
+                        <small class="text-muted fw-bold">
+                            <i class="bi bi-heart-fill text-danger"></i>
+                            {{ matching.get_grading(current_user.id) }}%
+                        </small>
+                    </div>
+
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="avatar-large me-3 shadow-sm bg-white d-flex align-items-center justify-content-center"
+                            style="width:50px; height:50px; border-radius:50%; font-size:1.2rem; border:1px solid #eee;">
+                            {{ matching.get_partner(current_user.id).name[0] }}
+                        </div>
+
+                        <div style="line-height: 1.2;">
+                            <h5 class="card-title fw-bold mb-1">
+                                {{ matching.get_partner(current_user.id).proper_name }}
+                            </h5>
+                            <div class="location-tag small text-muted mb-2">
+                                <i class="bi bi-hash text-warning opacity-75 fw-bold"></i>
+                                {{ matching.cool_name }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="my-3 opacity-25">
+
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted text-truncate" style="max-width: 80%;">
+                            {% if matching.last_message %}
+                            <i class="bi bi-chat-left-text me-1"></i> {{ matching.last_message.content[:20] }}
+                            {% else %}
+                            <span class="text-primary fst-italic">
+                                <i class="bi bi-chat-dots"></i> 開始對話...
+                            </span>
+                            {% endif %}
+                        </small>
+
+                        <div class="btn btn-sm btn-light rounded-circle shadow-sm">
+                            <i class="bi bi-chevron-right"></i>
+                        </div>
+                    </div>
+
+                </div>
+            </a>
+        </div>
+        {% endfor %}
+
+        {% if current_user.all_matches|length == 0 %}
+        <div class="col-12 text-center py-5">
+            <div class="text-muted opacity-50 mb-3">
+                <i class="bi bi-people display-1"></i>
+            </div>
+            <h3>尚未有配對！</h3>
+            <p>我們將盡快為您安排配對！</p>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<script>
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const filterButtons = document.querySelectorAll('#match-filters button');
+        const matchItems = document.querySelectorAll('.match-item');
+
+        filterButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                // 1. Remove 'active' class from all buttons
+                filterButtons.forEach(btn => btn.classList.remove('active'));
+                // 2. Add 'active' class to clicked button
+                button.classList.add('active');
+
+                const filterValue = button.getAttribute('data-filter');
+
+                matchItems.forEach(item => {
+                    const itemStatus = item.getAttribute('data-status');
+
+                    // Logic: 
+                    // If filter is 'all', show everything.
+                    // Otherwise, check if item's status matches the filter.
+                    // Note: You might need to adjust logic if one button maps to multiple DB statuses
+                    if (filterValue === 'all' || itemStatus === filterValue) {
+                        item.style.display = 'block'; // Or 'flex' depending on your layout, but block works for Bootstrap cols
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            });
+        });
+    });
+</script>
+{% endblock %}

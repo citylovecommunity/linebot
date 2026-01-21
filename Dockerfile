@@ -1,19 +1,37 @@
-FROM python:3.12-slim
+FROM python:3.12-slim-trixie
 
-# Set working directory
+# 1. Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+# 2. Set working directory
 WORKDIR /app
 
-# Copy requirements first to leverage Docker cache
-COPY requirements.txt .
+# 3. Environment variables
+# Ensure the virtual environment is used by default
+ENV VIRTUAL_ENV=/app/.venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+# Bytecode compilation for faster startup
+ENV UV_COMPILE_BYTECODE=1 
 
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application
-COPY main.py .
 
-# Expose the port uvicorn will run on
-EXPOSE 8000
+COPY ./pyproject.toml /app
+COPY ./uv.lock /app
 
-# Command to run the app
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+COPY ./shared /app/shared
+COPY ./form_app /app/form_app
+COPY ./senders /app/senders
+COPY ./webhook /app/webhook
+COPY ./scripts /app/scripts
+
+# 6. Install the project itself (if your app is configured as a package)
+# If your app is just scripts, this might be redundant, but it's safe for uv workspaces.
+RUN uv sync --frozen
+
+# 7. Expose ports
+EXPOSE 5678
+
+# 8. Default Command (Can be overridden)
+# Since we added .venv to PATH, we don't strictly need 'uv run' prefix, 
+# but keeping it is harmless and explicit.
+CMD ["uv", "run", "gunicorn", "-w", "4", "-b", "0.0.0.0:5678", "form_app.app:app"]

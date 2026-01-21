@@ -6,12 +6,20 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "flask>=3.1.1",
+    "flask-login>=0.6.3",
+    "flask-wtf>=1.2.2",
     "gunicorn>=23.0.0",
-    "psycopg[binary]>=3.2.9",
+    "psycopg2-binary>=2.9.11",
     "python-dotenv>=1.1.0",
+    "shared",
+    "sqlalchemy>=2.0.43",
 ]
 
-[dependency-groups]
-dev = [
-    "debugpy>=1.8.19",
-]
+
+[build-system]
+requires = ["uv_build>=0.9.26,<0.10.0"]
+build-backend = "uv_build"
+
+
+[tool.uv.sources]
+shared = { workspace = true }
