@@ -7,22 +7,19 @@ requires-python = ">=3.12"
 dependencies = [
     "form-app",
     "gspread>=6.2.1",
-    "line-bot-sdk>=3.17.1",
     "networkx>=3.6.1",
-    "pytest>=8.4.1",
     "python-dotenv>=1.2.1",
-    "requests>=2.32.4",
     "shared",
 ]
+
+
 
 [tool.uv.workspace]
 members = [
     "form_app",
-    "flow_charts",
-    "shared/database",
+    "shared",
     "senders",
     "webhook",
-    "shared",
     "alembic"
 ]
 
