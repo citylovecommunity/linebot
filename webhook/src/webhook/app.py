@@ -15,6 +15,7 @@ from linebot.v3.messaging import (
     ReplyMessageRequest,
     TextMessage,
 )
+import logging
 
 
 from shared.database.models import Line_Info
@@ -25,6 +26,10 @@ from shared.database.session_maker import get_session_factory
 # For this example, I will assume a variable 'session' exists
 
 app = Flask(__name__)
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+app.logger.setLevel(logging.INFO)
+
 
 # 2. Configuration (Best stored in environment variables)
 CHANNEL_ACCESS_TOKEN = os.getenv(
@@ -33,7 +38,6 @@ CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET', 'YOUR_CHANNEL_SECRET')
 DB = os.getenv('DB')
 
 
-line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(CHANNEL_SECRET)
 
 
@@ -86,12 +90,24 @@ def callback():
 
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
-    text = event.message.text
-    with ApiClient(configuration) as api_client:
-        line_bot_api = MessagingApi(api_client)
-        if check_bind_match(text):
-            reply_msg = run_binding(text, event.source.user_id)
+    # 1. Strip whitespace to prevent regex failure on hidden spaces
+    text = event.message.text.strip()
 
+    app.logger.info(
+        f"Received text: '{text}' from user: {event.source.user_id}")
+
+    # 2. Capture the match object variable
+    match = check_bind_match(text)
+
+    # 3. Check if match exists (is not None)
+    if match:
+        app.logger.info("Regex Matched! Processing binding...")
+
+        # 4. Pass the MATCH object, not the text string
+        reply_msg = run_binding(match, event.source.user_id)
+
+        with ApiClient(configuration) as api_client:
+            line_bot_api = MessagingApi(api_client)
             line_bot_api.reply_message(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
@@ -100,6 +116,8 @@ def handle_message(event):
                     ]
                 )
             )
+    else:
+        app.logger.info("Regex did NOT match.")
 
 
 def check_bind_match(msg):
