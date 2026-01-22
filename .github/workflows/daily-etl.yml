@@ -1,0 +1,24 @@
+name: Daily ETL Pipeline
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # Runs every day at 02:00 UTC
+  workflow_dispatch:
+
+jobs:
+  run-etl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: devops-actions/json-to-file@v1.0.4
+        with:
+            json: ${{ secrets.GSPREAD_CREDENTIAL }}
+            filename: service_account.json    
+      - name: Run ETL
+
+        run: uv run scripts/etl_load_data.py
+        env: 
+            DB: ${{ secrets.DB }}

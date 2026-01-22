@@ -1,0 +1,20 @@
+name: Weekly Report
+
+on:
+  schedule:
+    - cron: '0 8 * * 1' # Runs every Monday at 08:00 UTC
+  workflow_dispatch:
+
+jobs:
+  run-report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      
+      - name: Run Weekly Script
+        run: uv run scripts/run_matching.py
+        env: 
+            DB: ${{ secrets.DB }}
