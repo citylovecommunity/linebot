@@ -50,37 +50,64 @@ def generate_weekly_matches(users, session: Session):
     G = nx.Graph()
     CARDINALITY_BIAS = 10000
 
+    # --- 1. BUILD THE GRAPH ---
     for i, u in enumerate(users):
-        # Optimization: j starts at i+1 to avoid checking (A,B) and then (B,A) again
         for j in range(i + 1, len(users)):
             v = users[j]
 
-            # 1. Check if they are already matched (O(1) lookup)
+            # Skip if already matched historically
             if (u.id, v.id) in matched_pairs:
                 continue
 
-            # 2. Get scores from dictionary (O(1) lookup)
-            # Default to 0 or a low number if they haven't rated each other
+            # Get scores
             s_u_v = score_map.get((u.id, v.id), 0)
             s_v_u = score_map.get((v.id, u.id), 0)
 
-            # 3. Dealbreaker check (optional but recommended)
-            # If they barely know each other (score 0), don't force a match
+            # Dealbreaker check
             if s_u_v <= 0 or s_v_u <= 0:
                 continue
 
-            # 4. Calculate Weight
+            # Calculate Weight
             geo_mean = math.sqrt(s_u_v * s_v_u)
             final_weight = geo_mean + CARDINALITY_BIAS
 
             G.add_edge(u.id, v.id, weight=final_weight)
 
-    # --- ALGORITHM EXECUTION ---
+    # --- 2. RUN MAX WEIGHT MATCHING (Strict 1-to-1) ---
+    # Returns a set of tuples: {(id1, id2), (id3, id4)}
+    matching_set = nx.max_weight_matching(G, maxcardinality=True)
 
-    # Returns set of edges: {(id1, id2), (id3, id4)}
-    matching_ids = nx.max_weight_matching(G, maxcardinality=True)
+    # Convert to a list so we can append leftovers later
+    final_edges = list(matching_set)
 
-    return matching_ids
+    # --- 3. IDENTIFY LEFTOVERS ---
+    # Create a set of all nodes currently in a match
+    matched_nodes = set()
+    for u_id, v_id in matching_set:
+        matched_nodes.add(u_id)
+        matched_nodes.add(v_id)
+
+    # Find nodes in the graph that were NOT matched
+    # Note: We use G.nodes() because if a user had 0 valid edges, they aren't in G at all
+    all_graph_nodes = set(G.nodes())
+    leftover_nodes = all_graph_nodes - matched_nodes
+
+    # --- 4. GREEDY FILL (The "Throuple" Fix) ---
+    for node in leftover_nodes:
+        # Find the neighbor with the absolute highest weight
+        # G[node].items() gives us (neighbor_id, attributes_dict)
+        if not G[node]:
+            continue  # Should be impossible if node is in G, but good safety
+
+        best_neighbor = max(G[node].items(), key=lambda x: x[1]['weight'])
+
+        target_id = best_neighbor[0]
+        # weight = best_neighbor[1]['weight'] # Unused, but available if needed
+
+        # Add this edge to our final results
+        final_edges.append((node, target_id))
+
+    return final_edges
 
 
 def match(subject_id, object_id, session: Session):
