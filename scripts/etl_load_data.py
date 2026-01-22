@@ -137,7 +137,7 @@ def load_data_bulk(clean_data):
             col.name: col
             for col in stmt.excluded
             # Protect ID
-            if col.name not in ['id']
+            if col.name not in ['id', 'password_hash']
         }
 
         # 3. Execute
