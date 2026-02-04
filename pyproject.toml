@@ -10,7 +10,6 @@ dependencies = [
     "networkx>=3.6.1",
     "python-dotenv>=1.2.1",
     "shared",
-    "webhook",
 ]
 
 
@@ -27,4 +26,3 @@ members = [
 [tool.uv.sources]
 shared = { workspace = true }
 form-app = { workspace = true }
-webhook = { workspace = true }

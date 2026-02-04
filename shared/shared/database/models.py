@@ -9,6 +9,8 @@ from sqlalchemy import ForeignKey, func
 from sqlalchemy.dialects.postgresql.json import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.orm import column_property
+from sqlalchemy import select, func, and_, or_
 
 
 class ProposalStatus(enum.Enum):
@@ -96,6 +98,10 @@ class Member(Base):
         back_populates="member",
         primaryjoin="Member.phone_number == Line_Info.phone_number",
         foreign_keys="Line_Info.phone_number"
+    )
+
+    last_notification_sent_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
     )
 
     @property
@@ -326,6 +332,10 @@ class Message(Base):
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc)
     )
+
+    read_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True))
+
     user_id: Mapped[int] = mapped_column(ForeignKey("member.id"))
     matching_id: Mapped[int] = mapped_column(ForeignKey("matching.id"))
     is_system_notification: Mapped[bool] = mapped_column(default=False)
@@ -336,6 +346,12 @@ class Message(Base):
         back_populates="messages",
         foreign_keys=[matching_id]
     )
+
+    is_notified: Mapped[Optional[bool]]
+
+    @property
+    def receiver_id(self):
+        return self.matching.get_partner(self.user_id)
 
 
 class DateProposal(Base):
@@ -371,6 +387,9 @@ class DateProposal(Base):
         "Member",
         foreign_keys=[proposer_id]
     )
+
+    is_pending_notified: Mapped[Optional[bool]]
+    is_confirmed_notified: Mapped[Optional[bool]]
 
     @property
     def is_pending(self):
@@ -418,3 +437,25 @@ class UserMatchScore(Base):
     # Optional: Store WHY they got this score?
     # useful for debugging: {"hobbies": +10, "height": -5}
     breakdown: Mapped[Dict[str, Any]] = mapped_column(JSONB, nullable=True)
+
+
+Member.unread_count = column_property(
+    select(func.count(Message.id))
+    .join(Matching, Message.matching_id == Matching.id)
+    .where(
+        and_(
+            # Logic: Message is unread
+            Message.read_at == None,
+
+            # Logic: User is NOT the sender
+            Message.user_id != Member.id,  # Refers to User.id
+
+            # Logic: User is part of the match
+            or_(Matching.subject_id == Member.id,
+                Matching.object_id == Member.id)
+        )
+    )
+    # Tells SQL to link 'id' to the outer User table
+    .correlate_except(Matching)
+    .scalar_subquery()
+)

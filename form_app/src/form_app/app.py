@@ -5,16 +5,25 @@ from flask import Flask, session, redirect, url_for
 
 from form_app.config import BaseConfig
 from form_app.database import init_db
-from form_app.routes import dashboard, admin, auth
+from form_app.routes import dashboard, admin, auth, tasks, webhook
 from flask_login import LoginManager, current_user
 from form_app.database import get_db
 from shared.database.models import Member
+from flask import Flask
+
+
+import logging
+
 
 app = Flask(__name__)
 app.config.from_object(BaseConfig)
 
 # Set the "Remember Me" cookie to last 1 year (or 10 years, effectively "forever")
 app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=365)
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+app.logger.setLevel(logging.INFO)
+
 
 init_db(app)
 
@@ -30,8 +39,10 @@ def load_user(user_id):
 
 
 app.register_blueprint(dashboard.bp)
-app.register_blueprint(admin.admin_bp)
-app.register_blueprint(auth.auth_bp)
+app.register_blueprint(admin.bp)
+app.register_blueprint(auth.bp)
+app.register_blueprint(webhook.bp)
+app.register_blueprint(tasks.bp)
 
 
 @app.route('/')

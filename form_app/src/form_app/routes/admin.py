@@ -6,10 +6,10 @@ from form_app.decorators import admin_required
 from form_app.database import get_db
 
 
-admin_bp = Blueprint('admin_bp', __name__, url_prefix='/admin')
+bp = Blueprint('admin_bp', __name__, url_prefix='/admin')
 
 
-@admin_bp.route('/dashboard')
+@bp.route('/dashboard')
 @login_required
 @admin_required  # This applies the protection
 def admin_dashboard():
@@ -18,7 +18,7 @@ def admin_dashboard():
     return render_template('admin_dashboard.html', users=all_users)
 
 
-@admin_bp.route('/delete_user/<int:user_id>')
+@bp.route('/delete_user/<int:user_id>')
 @login_required
 @admin_required
 def delete_user(user_id):
