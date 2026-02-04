@@ -13,16 +13,7 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 # Bytecode compilation for faster startup
 ENV UV_COMPILE_BYTECODE=1 
 
-
-
-COPY ./pyproject.toml /app
-COPY ./uv.lock /app
-
-COPY ./shared /app/shared
-COPY ./form_app /app/form_app
-COPY ./senders /app/senders
-COPY ./webhook /app/webhook
-COPY ./scripts /app/scripts
+COPY . /app
 
 # 6. Install the project itself (if your app is configured as a package)
 # If your app is just scripts, this might be redundant, but it's safe for uv workspaces.

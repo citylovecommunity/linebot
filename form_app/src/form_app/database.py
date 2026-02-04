@@ -1,6 +1,5 @@
 
 from flask import g
-
 from sqlalchemy.orm import Session
 
 from shared.database.session_maker import get_session_factory

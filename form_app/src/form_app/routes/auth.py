@@ -7,10 +7,10 @@ from form_app.database import get_db
 from shared.database.models import Member
 from shared.security import verify_password
 
-auth_bp = Blueprint('auth_bp', __name__)
+bp = Blueprint('auth_bp', __name__)
 
 
-@auth_bp.route('/auto-login/<int:user_id>')
+@bp.route('/auto-login/<int:user_id>')
 def auto_login(user_id):
     # SAFETY NET: Strictly forbid this in production
     if not current_app.debug:
@@ -29,7 +29,7 @@ def auto_login(user_id):
     return "Dev user not found", 404
 
 
-@auth_bp.route('/login', methods=['GET', 'POST'])
+@bp.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
         # Check logic here too in case they are already logged in
@@ -65,7 +65,7 @@ def login():
     return render_template('login.html')
 
 
-@auth_bp.route('/logout')
+@bp.route('/logout')
 @login_required
 def logout():
     logout_user()

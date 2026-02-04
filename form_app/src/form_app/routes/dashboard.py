@@ -1,5 +1,6 @@
 
 from typing import Optional
+
 from flask import (Blueprint, abort, flash, redirect, render_template, request,
                    url_for)
 from flask_login import current_user, login_required
@@ -58,6 +59,17 @@ def dashboard():
 @login_required
 def matching_detail(matching_id):
     matching = get_matching_or_abort(matching_id)
+
+    # 新增訊息已讀
+    from datetime import datetime
+    now = datetime.now()
+    for msg in matching.messages:
+        # Condition: Message is unread AND I am the receiver
+        if msg.read_at is None and msg.receiver_id == current_user.id:
+            msg.read_at = now
+
+    db = get_db()
+    db.commit()
 
     partner = matching.get_partner(current_user.id)
     proposal = matching.ui_proposal
