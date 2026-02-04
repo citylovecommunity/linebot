@@ -33,7 +33,7 @@ def handle_message(event):
     # 1. Strip whitespace to prevent regex failure on hidden spaces
     text = event.message.text.strip()
 
-    bp.logger.info(
+    current_app.logger.info(
         f"Received text: '{text}' from user: {event.source.user_id}")
 
     # 2. Capture the match object variable
@@ -41,7 +41,7 @@ def handle_message(event):
 
     # 3. Check if match exists (is not None)
     if match:
-        bp.logger.info("Regex Matched! Processing binding...")
+        current_app.logger.info("Regex Matched! Processing binding...")
 
         # 4. Pass the MATCH object, not the text string
         reply_msg = run_binding(match, event.source.user_id)
@@ -57,7 +57,7 @@ def handle_message(event):
                 )
             )
     else:
-        bp.logger.info("Regex did NOT match.")
+        current_app.logger.info("Regex did NOT match.")
 
 
 def check_bind_match(msg):
