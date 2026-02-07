@@ -23,8 +23,7 @@ def get_matching_or_abort(matching_id) -> Matching:
 
     # 1. Check Existence
     if not matching:
-        flash("matching錯誤", "danger")
-        return redirect(url_for('dashboard_bp.dashboard'))
+        return None
 
     is_participant = (
         current_user.id == matching.subject_id or
@@ -32,8 +31,8 @@ def get_matching_or_abort(matching_id) -> Matching:
     )
 
     if not is_participant:
-        flash("matching錯誤", "danger")
-        return redirect(url_for('dashboard_bp.dashboard'))
+
+        return None
 
     return matching
 
@@ -65,6 +64,9 @@ def dashboard():
 @login_required
 def matching_detail(matching_id):
     matching = get_matching_or_abort(matching_id)
+    if matching is None:
+        flash("matching錯誤", "danger")
+        return redirect(url_for('dashboard_bp.dashboard'))
 
     # 新增訊息已讀
     from datetime import datetime
