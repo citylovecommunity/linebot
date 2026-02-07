@@ -7,6 +7,7 @@ from flask_login import current_user, login_required
 
 from form_app.database import get_db
 from shared.database.models import DateProposal, Matching, Message
+from form_app.config import settings
 
 bp = Blueprint('dashboard_bp', __name__, url_prefix="/dashboard")
 
@@ -37,6 +38,9 @@ def get_matching_or_abort(matching_id) -> Matching:
 
 @bp.route('/debug-user')
 def debug_user():
+    if settings.APP_ENV == 'development':
+        abort(404)
+
     return {
         "is_authenticated": current_user.is_authenticated,
         "is_anonymous": current_user.is_anonymous,

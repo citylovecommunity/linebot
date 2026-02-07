@@ -14,7 +14,7 @@ bp = Blueprint('auth_bp', __name__)
 @bp.route('/auto-login/<int:user_id>')
 def auto_login(user_id):
     # SAFETY NET: Strictly forbid this in production
-    if not settings.DEBUG:
+    if not settings.APP_ENV == 'development':
         abort(404)
 
     # 1. Grab a hardcoded "dev" user or the first user in the DB
