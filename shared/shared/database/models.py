@@ -261,7 +261,8 @@ class Matching(Base):
     messages: Mapped[list["Message"]] = relationship(
         "Message",
         back_populates="matching",
-        foreign_keys="Message.matching_id"
+        foreign_keys="Message.matching_id",
+        order_by="Message.timestamp"
     )
 
     proposals: Mapped[List["DateProposal"]] = relationship(
