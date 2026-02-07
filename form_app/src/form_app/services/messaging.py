@@ -68,7 +68,7 @@ def collect_date_proposal_texts(session):
         updates[matching.get_partner(proposal.proposer_id).id].append(text)
 
         # Mark as processed in this specific scope so we don't fetch it next time
-        proposal.is_notified = True
+        proposal.is_pending_notified = True
         session.commit()
 
     return updates
