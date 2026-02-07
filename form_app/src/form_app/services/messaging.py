@@ -1,12 +1,16 @@
 from collections import defaultdict
 from datetime import datetime, timezone
 
+from flask import current_app
 from linebot import LineBotApi
 from linebot.models import TextMessage
 from sqlalchemy import or_
 
 from form_app.extensions import line_bot_helper
 from shared.database.models import DateProposal, Member, Message
+from form_app.config import settings
+
+APP_URL = settings.APP_URL
 
 
 def collect_unread_message_texts(session):
@@ -28,7 +32,11 @@ def collect_unread_message_texts(session):
 
     for message in un_notified_messages:
         matching = message.matching
-        text = f"{matching.cool_name}-{message.user.proper_name}:{message.content}"
+        text = f"""
+        📩 {matching.cool_name} {message.user.proper_name}: {message.content}
+
+        🔗 馬上回覆: {APP_URL}/dashboard/{matching.id}
+        """
         updates[message.receiver_id.id].append(text)
         message.is_notified = True
 
@@ -56,7 +64,13 @@ def collect_date_proposal_texts(session):
         # Formatting the date nicely
         date_str = proposal.proposed_datetime.strftime('%m/%d %H:%M')
         matching = proposal.matching
-        text = f"{matching.cool_name}的夥伴邀請您在（{date_str}）前往「{proposal.restaurant_name}」出任務！快點擊確認吧！"
+        text = f"""
+        📅 {matching.cool_name}
+
+        您的夥伴邀請您在 {date_str} 前往「{proposal.restaurant_name}」出任務！
+
+        👇 快點擊確認吧！ {APP_URL}/dashboard/{matching.id}
+        """
 
         updates[proposal.proposer_id].append(text)
         updates[matching.get_partner(proposal.proposer_id).id].append(text)
@@ -87,7 +101,13 @@ def collect_confirmed_date_proposal_texts(session):
         # Formatting the date nicely
         date_str = proposal.proposed_datetime.strftime('%m/%d %H:%M')
         matching = proposal.matching
-        text = f"與{matching.cool_name}的夥伴在（{date_str}）{proposal.restaurant_name}的任務已被確認！"
+        text = f"""
+        ✅ 任務確認！
+
+        與 {matching.cool_name} 的夥伴在 （{date_str}） {proposal.restaurant_name} 的任務已被確認！
+
+        🔗 查看行程詳情： {APP_URL}/dashboard/{matching.id}
+        """
 
         updates[proposal.proposer_id].append(text)
         updates[matching.get_partner(proposal.proposer_id).id].append(text)

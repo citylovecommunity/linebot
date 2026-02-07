@@ -1,14 +1,14 @@
 from linebot.v3 import WebhookHandler
-from linebot.v3.messaging import Configuration, MessagingApi
+from linebot.v3.messaging import Configuration
 
-from form_app.config import BaseConfig
+from form_app.config import settings
 
 
 class LineBotHelper:
     def __init__(self):
-        self.handler = WebhookHandler(BaseConfig.LINE_CHANNEL_SECRET)
+        self.handler = WebhookHandler(settings.LINE_CHANNEL_SECRET)
         self.configuration = Configuration(
-            access_token=BaseConfig.LINE_CHANNEL_ACCESS_TOKEN)
+            access_token=settings.LINE_CHANNEL_ACCESS_TOKEN)
 
 
 # Create the empty instance globally

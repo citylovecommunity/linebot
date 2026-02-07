@@ -6,6 +6,7 @@ from flask_login import (current_user, login_required,
 from form_app.database import get_db
 from shared.database.models import Member
 from shared.security import verify_password
+from form_app.config import settings
 
 bp = Blueprint('auth_bp', __name__)
 
@@ -13,7 +14,7 @@ bp = Blueprint('auth_bp', __name__)
 @bp.route('/auto-login/<int:user_id>')
 def auto_login(user_id):
     # SAFETY NET: Strictly forbid this in production
-    if not current_app.debug:
+    if not settings.DEBUG:
         abort(404)
 
     # 1. Grab a hardcoded "dev" user or the first user in the DB
