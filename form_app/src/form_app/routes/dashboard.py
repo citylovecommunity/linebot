@@ -24,7 +24,7 @@ def get_matching_or_abort(matching_id) -> Matching:
     # 1. Check Existence
     if not matching:
         flash("matching錯誤", "danger")
-        redirect(url_for('dashboard_bp.dashboard'))
+        return redirect(url_for('dashboard_bp.dashboard'))
 
     is_participant = (
         current_user.id == matching.subject_id or
@@ -33,7 +33,7 @@ def get_matching_or_abort(matching_id) -> Matching:
 
     if not is_participant:
         flash("matching錯誤", "danger")
-        redirect(url_for('dashboard_bp.dashboard'))
+        return redirect(url_for('dashboard_bp.dashboard'))
 
     return matching
 
