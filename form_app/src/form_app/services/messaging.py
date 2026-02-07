@@ -139,7 +139,6 @@ def process_all_notifications(session, dev=True, test_user_id=None):
     for uid, texts in date_confirmed_updates.items():
         all_notifications[uid].extend(texts)
 
-    breakpoint()
     # If nothing to do, exit
     if not all_notifications:
         return

@@ -1,8 +1,8 @@
 from flask import Blueprint, current_app, request
 
+from form_app.config import settings
 from form_app.database import get_db
 from form_app.services.messaging import process_all_notifications
-from form_app.config import settings
 
 bp = Blueprint('tasks_bp', __name__)
 
