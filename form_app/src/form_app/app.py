@@ -32,7 +32,7 @@ app.register_blueprint(tasks.bp)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = url_for('auth_bp.login')
+login_manager.login_view = 'auth_bp.login'
 
 
 @login_manager.user_loader
