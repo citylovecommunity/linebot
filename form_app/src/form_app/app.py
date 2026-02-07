@@ -23,21 +23,22 @@ app.logger.setLevel(logging.INFO)
 init_db(app)
 
 
+app.register_blueprint(dashboard.bp)
+app.register_blueprint(admin.bp)
+app.register_blueprint(auth.bp)
+app.register_blueprint(webhook.bp)
+app.register_blueprint(tasks.bp)
+
+
 login_manager = LoginManager()
 login_manager.init_app(app)
+login_manager.login_view = url_for('auth_bp.login')
 
 
 @login_manager.user_loader
 def load_user(user_id):
     db = get_db()
     return db.get(Member, int(user_id))
-
-
-app.register_blueprint(dashboard.bp)
-app.register_blueprint(admin.bp)
-app.register_blueprint(auth.bp)
-app.register_blueprint(webhook.bp)
-app.register_blueprint(tasks.bp)
 
 
 @app.route('/')

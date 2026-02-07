@@ -32,10 +32,7 @@ def collect_unread_message_texts(session):
 
     for message in un_notified_messages:
         matching = message.matching
-        text = f"""
-        📩 {matching.cool_name} {message.user.proper_name}: {message.content}
-
-        🔗 馬上回覆: {APP_URL}/dashboard/{matching.id}
+        text = f"""📩 {matching.cool_name} {message.user.proper_name}: {message.content}\n🔗 馬上回覆: {APP_URL}/dashboard/{matching.id}
         """
         updates[message.receiver_id].append(text)
         message.is_notified = True
@@ -64,12 +61,7 @@ def collect_date_proposal_texts(session):
         # Formatting the date nicely
         date_str = proposal.proposed_datetime.strftime('%m/%d %H:%M')
         matching = proposal.matching
-        text = f"""
-        📅 {matching.cool_name}
-
-        您的夥伴邀請您在 {date_str} 前往「{proposal.restaurant_name}」出任務！
-
-        👇 快點擊確認吧！ {APP_URL}/dashboard/{matching.id}
+        text = f"""📅 {matching.cool_name}\n\n您的夥伴邀請您在 {date_str} 前往「{proposal.restaurant_name}」出任務！\n\n👇 快點擊確認吧！ {APP_URL}/dashboard/{matching.id}
         """
 
         updates[proposal.proposer_id].append(text)
@@ -101,12 +93,7 @@ def collect_confirmed_date_proposal_texts(session):
         # Formatting the date nicely
         date_str = proposal.proposed_datetime.strftime('%m/%d %H:%M')
         matching = proposal.matching
-        text = f"""
-        ✅ 任務確認！
-
-        與 {matching.cool_name} 的夥伴在 （{date_str}） {proposal.restaurant_name} 的任務已被確認！
-
-        🔗 查看行程詳情： {APP_URL}/dashboard/{matching.id}
+        text = f"""✅ 任務確認！\n\n與 {matching.cool_name} 的夥伴在 （{date_str}） {proposal.restaurant_name} 的任務已被確認！\n\n🔗 查看行程詳情： {APP_URL}/dashboard/{matching.id}
         """
 
         updates[proposal.proposer_id].append(text)
