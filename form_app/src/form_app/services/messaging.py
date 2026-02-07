@@ -37,7 +37,7 @@ def collect_unread_message_texts(session):
 
         🔗 馬上回覆: {APP_URL}/dashboard/{matching.id}
         """
-        updates[message.receiver_id.id].append(text)
+        updates[message.receiver_id].append(text)
         message.is_notified = True
 
     return updates

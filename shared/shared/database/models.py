@@ -351,7 +351,7 @@ class Message(Base):
 
     @property
     def receiver_id(self):
-        return self.matching.get_partner(self.user_id)
+        return self.matching.get_partner(self.user_id).id
 
 
 class DateProposal(Base):
