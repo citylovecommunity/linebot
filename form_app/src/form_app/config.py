@@ -15,5 +15,9 @@ class Settings(BaseSettings):
     LINE_TEST_USER_ID: str
     APP_URL: str
 
+    @property
+    def is_dev(self):
+        return self.APP_ENV == 'development'
+
 
 settings = Settings()

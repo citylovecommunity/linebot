@@ -13,7 +13,7 @@ def task_send_notifications():
         return "Unauthorized", 401
 
     # Pass the session to the new processor
-    process_all_notifications(get_db(), dev=settings.APP_ENV == 'development',
+    process_all_notifications(get_db(), dev=settings.is_dev,
                               test_user_id=settings.LINE_TEST_USER_ID)
 
     current_app.logger.info("已傳送line通知！！")

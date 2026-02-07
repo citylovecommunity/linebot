@@ -38,7 +38,7 @@ def get_matching_or_abort(matching_id) -> Matching:
 
 @bp.route('/debug-user')
 def debug_user():
-    if settings.APP_ENV == 'development':
+    if not settings.is_dev:
         abort(404)
 
     return {
