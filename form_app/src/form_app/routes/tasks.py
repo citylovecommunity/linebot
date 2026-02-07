@@ -16,4 +16,6 @@ def task_send_notifications():
     process_all_notifications(get_db(), dev=settings.DEBUG,
                               test_user_id=settings.LINE_TEST_USER_ID)
 
+    current_app.logger.info("已傳送line通知！！")
+
     return "OK", 200
