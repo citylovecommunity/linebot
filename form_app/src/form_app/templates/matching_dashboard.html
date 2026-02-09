@@ -237,7 +237,7 @@
                         <div class="fw-bold small mb-1">{{ msg.user.proper_name }}</div>
                         {% endif %}
                         {{ msg.content }}
-                        <span class="msg-time">{{ msg.timestamp.strftime('%H:%M') }}</span>
+                        <span class="msg-time">{{ msg.timestamp.strftime('%Y-%m-%d %H:%M') }}</span>
                     </div>
                     {% endif %}
                     {% endfor %}

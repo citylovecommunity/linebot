@@ -7,6 +7,7 @@ from flask_login import current_user, login_required
 
 from form_app.database import get_db
 from shared.database.models import DateProposal, Matching, Message
+from form_app.config import settings
 
 bp = Blueprint('dashboard_bp', __name__, url_prefix="/dashboard")
 
@@ -22,7 +23,7 @@ def get_matching_or_abort(matching_id) -> Matching:
 
     # 1. Check Existence
     if not matching:
-        abort(404)
+        return None
 
     is_participant = (
         current_user.id == matching.subject_id or
@@ -30,13 +31,17 @@ def get_matching_or_abort(matching_id) -> Matching:
     )
 
     if not is_participant:
-        abort(403)
+
+        return None
 
     return matching
 
 
 @bp.route('/debug-user')
 def debug_user():
+    if not settings.is_dev:
+        abort(404)
+
     return {
         "is_authenticated": current_user.is_authenticated,
         "is_anonymous": current_user.is_anonymous,
@@ -59,6 +64,9 @@ def dashboard():
 @login_required
 def matching_detail(matching_id):
     matching = get_matching_or_abort(matching_id)
+    if matching is None:
+        flash("matching錯誤", "danger")
+        return redirect(url_for('dashboard_bp.dashboard'))
 
     # 新增訊息已讀
     from datetime import datetime

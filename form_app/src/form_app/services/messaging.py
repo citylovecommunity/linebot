@@ -1,12 +1,17 @@
+from ast import Try
 from collections import defaultdict
 from datetime import datetime, timezone
 
+from flask import current_app
 from linebot import LineBotApi
 from linebot.models import TextMessage
 from sqlalchemy import or_
 
 from form_app.extensions import line_bot_helper
 from shared.database.models import DateProposal, Member, Message
+from form_app.config import settings
+
+APP_URL = settings.APP_URL
 
 
 def collect_unread_message_texts(session):
@@ -18,18 +23,15 @@ def collect_unread_message_texts(session):
     un_notified_messages = (
         session.query(Message)
         .where(
-            # Condition 1: is_notified is False OR it is NULL
-            or_(Message.is_notified == False, Message.is_notified.is_(None)),
-            # Condition 2: read_at is NOT NULL
-            Message.read_at.is_not(None)
+            or_(Message.read_at.is_(None), Message.is_notified.is_not(True)),
         )
         .all()
     )
-
     for message in un_notified_messages:
         matching = message.matching
-        text = f"{matching.cool_name}-{message.user.proper_name}:{message.content}"
-        updates[message.receiver_id.id].append(text)
+        text = f"""📩 {matching.cool_name} {message.user.proper_name}: {message.content}\n🔗 馬上回覆: {APP_URL}/dashboard/{matching.id}
+        """
+        updates[message.receiver_id].append(text)
         message.is_notified = True
 
     return updates
@@ -56,13 +58,14 @@ def collect_date_proposal_texts(session):
         # Formatting the date nicely
         date_str = proposal.proposed_datetime.strftime('%m/%d %H:%M')
         matching = proposal.matching
-        text = f"{matching.cool_name}的夥伴邀請您在（{date_str}）前往「{proposal.restaurant_name}」出任務！快點擊確認吧！"
+        text = f"""📅 {matching.cool_name}\n\n您的夥伴邀請您在 {date_str} 前往「{proposal.restaurant_name}」出任務！\n\n👇 快點擊確認吧！ {APP_URL}/dashboard/{matching.id}
+        """
 
         updates[proposal.proposer_id].append(text)
         updates[matching.get_partner(proposal.proposer_id).id].append(text)
 
         # Mark as processed in this specific scope so we don't fetch it next time
-        proposal.is_notified = True
+        proposal.is_pending_notified = True
         session.commit()
 
     return updates
@@ -87,7 +90,8 @@ def collect_confirmed_date_proposal_texts(session):
         # Formatting the date nicely
         date_str = proposal.proposed_datetime.strftime('%m/%d %H:%M')
         matching = proposal.matching
-        text = f"與{matching.cool_name}的夥伴在（{date_str}）{proposal.restaurant_name}的任務已被確認！"
+        text = f"""✅ 任務確認！\n\n與 {matching.cool_name} 的夥伴在 （{date_str}） {proposal.restaurant_name} 的任務已被確認！\n\n🔗 查看行程詳情： {APP_URL}/dashboard/{matching.id}
+        """
 
         updates[proposal.proposer_id].append(text)
         updates[matching.get_partner(proposal.proposer_id).id].append(text)
@@ -119,7 +123,6 @@ def process_all_notifications(session, dev=True, test_user_id=None):
     for uid, texts in date_confirmed_updates.items():
         all_notifications[uid].extend(texts)
 
-    breakpoint()
     # If nothing to do, exit
     if not all_notifications:
         return

@@ -19,7 +19,6 @@ members = [
     "form_app",
     "shared",
     "senders",
-    "webhook",
     "alembic"
 ]
 
