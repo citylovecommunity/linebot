@@ -1,3 +1,4 @@
+from ast import Try
 from collections import defaultdict
 from datetime import datetime, timezone
 
@@ -22,14 +23,10 @@ def collect_unread_message_texts(session):
     un_notified_messages = (
         session.query(Message)
         .where(
-            # Condition 1: is_notified is False OR it is NULL
-            or_(Message.is_notified == False, Message.is_notified.is_(None)),
-            # Condition 2: read_at is NOT NULL
-            Message.read_at.is_not(None)
+            or_(Message.read_at.is_(None), Message.is_notified.is_not(True)),
         )
         .all()
     )
-
     for message in un_notified_messages:
         matching = message.matching
         text = f"""📩 {matching.cool_name} {message.user.proper_name}: {message.content}\n🔗 馬上回覆: {APP_URL}/dashboard/{matching.id}

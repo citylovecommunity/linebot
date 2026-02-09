@@ -2,7 +2,7 @@ import requests
 
 from form_app.config import settings
 
-url = f"{settings.APP_URL}/tasks/send-notifications"
+url = "http://127.0.0.1:5000/tasks/send-notifications"
 headers = {
     "X-Task-Secret": settings.TASK_SECRET,
     "Content-Type": "application/json"
