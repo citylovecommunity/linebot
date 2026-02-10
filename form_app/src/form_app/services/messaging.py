@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from flask import current_app
 from linebot import LineBotApi
 from linebot.models import TextMessage
-from sqlalchemy import or_
+from sqlalchemy import and_, false
 
 from form_app.extensions import line_bot_helper
 from shared.database.models import DateProposal, Member, Message
@@ -22,8 +22,9 @@ def collect_unread_message_texts(session):
 
     un_notified_messages = (
         session.query(Message)
-        .where(
-            or_(Message.read_at.is_(None), Message.is_notified.is_not(True)),
+        .filter(
+            and_(Message.read_at.is_(None),
+                 Message.is_notified.is_not(True)),
         )
         .all()
     )
