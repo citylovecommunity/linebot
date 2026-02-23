@@ -1,13 +1,12 @@
 import os
+import random
 
 from dotenv import load_dotenv
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 
-
-from shared.database.session_maker import get_session_factory
-from shared.database.models import Member, Matching
-from shared.cool_name import generate_funny_name
-import random
+from form_app.database import get_session_factory
+from form_app.models import Matching, Member
+from form_app.services.cool_name import generate_funny_name
 
 load_dotenv()
 

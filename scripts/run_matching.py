@@ -1,13 +1,13 @@
 from config import SessionFactory
-
-from shared.matching.matching import generate_weekly_matches, match
-from shared.matching.scoring import (get_eligible_matching_pool,
-                                     run_matching_score_optimized)
-from shared.database.models import UserMatchScore, Matching
-from shared.cool_name import generate_funny_name
 from sqlalchemy import tuple_
 # Assuming Postgres, see note below for MySQL/SQLite
 from sqlalchemy.dialects.postgresql import insert
+
+from form_app.models import Matching, UserMatchScore
+from form_app.services.cool_name import generate_funny_name
+from form_app.services.matching import generate_weekly_matches, match
+from form_app.services.scoring import (get_eligible_matching_pool,
+                                       run_matching_score_optimized)
 
 
 def process_matches_bulk(eligible_members, session):
