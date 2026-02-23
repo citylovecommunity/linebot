@@ -1,27 +1,25 @@
 [project]
-name = "line-bot"
-version = "0.1.0"
-description = "Add your description here"
+name = "form-app"
+version = "2.0"
+description = "City love form_app"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "form-app",
+    "alembic>=1.18.4",
+    "flask>=3.1.1",
+    "flask-login>=0.6.3",
+    "flask-wtf>=1.2.2",
     "gspread>=6.2.1",
+    "gunicorn>=23.0.0",
+    "line-bot-sdk>=3.22.0",
     "networkx>=3.6.1",
-    "python-dotenv>=1.2.1",
-    "shared",
+    "psycopg2-binary>=2.9.11",
+    "pydantic-settings>=2.12.0",
+    "python-dotenv>=1.1.0",
+    "sqlalchemy>=2.0.43",
 ]
 
 
-
-[tool.uv.workspace]
-members = [
-    "form_app",
-    "shared",
-    "senders",
-    "alembic"
-]
-
-[tool.uv.sources]
-shared = { workspace = true }
-form-app = { workspace = true }
+[build-system]
+requires = ["uv_build>=0.9.26,<0.10.0"]
+build-backend = "uv_build"

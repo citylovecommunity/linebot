@@ -1,10 +1,8 @@
-# etl_pipeline.py
 
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import gspread
-from config import SessionFactory
 from sqlalchemy.dialects.postgresql import insert
 
 from form_app.models import Member
@@ -114,7 +112,7 @@ def transform_data(raw_records):
     return clean_data_list
 
 
-def load_data_bulk(clean_data):
+def load_data_bulk(clean_data, session):
     """
     Performs a Bulk Upsert using Postgres ON CONFLICT logic.
     """
@@ -122,40 +120,29 @@ def load_data_bulk(clean_data):
         print("No data to load.")
         return
 
-    session = SessionFactory()
-    try:
-        # 有傻逼電話號碼重複
-        unique_data_map = {row['phone_number']: row for row in clean_data}
-        deduplicated_data = list(unique_data_map.values())
+    # 有傻逼電話號碼重複
+    unique_data_map = {row['phone_number']: row for row in clean_data}
+    deduplicated_data = list(unique_data_map.values())
 
-        # 1. Prepare the Insert Statement
-        stmt = insert(Member).values(deduplicated_data)
+    # 1. Prepare the Insert Statement
+    stmt = insert(Member).values(deduplicated_data)
 
-        # 2. Define the Upsert Logic (ON CONFLICT DO UPDATE)
-        # We want to update everything EXCEPT 'id' and maybe 'created_at'
-        update_dict = {
-            col.name: col
-            for col in stmt.excluded
-            # Protect ID
-            if col.name not in ['id', 'password_hash']
-        }
+    # 2. Define the Upsert Logic (ON CONFLICT DO UPDATE)
+    # We want to update everything EXCEPT 'id' and maybe 'created_at'
+    update_dict = {
+        col.name: col
+        for col in stmt.excluded
+        # Protect ID
+        if col.name not in ['id', 'password_hash']
+    }
 
-        # 3. Execute
-        final_stmt = stmt.on_conflict_do_update(
-            index_elements=['phone_number'],  # The unique constraint key
-            set_=update_dict
-        )
+    # 3. Execute
+    final_stmt = stmt.on_conflict_do_update(
+        index_elements=['phone_number'],  # The unique constraint key
+        set_=update_dict
+    )
 
-        result = session.execute(final_stmt)
-        session.commit()
-        print(f"Success: Processed {len(clean_data)} rows.")
-
-    except Exception as e:
-        session.rollback()
-        print(f"Error during bulk load: {e}")
-        raise
-    finally:
-        session.close()
+    session.execute(final_stmt)
 
 
 if __name__ == '__main__':
