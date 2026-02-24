@@ -10,7 +10,7 @@ from form_app.services.security import hash_password
 load_dotenv()
 
 
-SessionFactory = get_session_factory(os.getenv("DB"))
+SessionFactory = get_session_factory(os.getenv("PROD_DB_URL"))
 
 with SessionFactory() as session:
     stmt = select(Member)

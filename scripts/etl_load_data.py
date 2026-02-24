@@ -4,12 +4,13 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import gspread
-from config import SessionFactory
+from form_app.database import get_session_factory
 from sqlalchemy.dialects.postgresql import insert
 
 from form_app.models import Member
 from form_app.services.scoring import UserProfileAdapter
 from form_app.services.security import hash_password
+from form_app.config import settings
 
 # --- Config ---
 TZ = ZoneInfo('Asia/Taipei')
@@ -122,7 +123,7 @@ def load_data_bulk(clean_data):
         print("No data to load.")
         return
 
-    session = SessionFactory()
+    session = get_session_factory(settings.DB)()
     try:
         # 有傻逼電話號碼重複
         unique_data_map = {row['phone_number']: row for row in clean_data}
