@@ -150,11 +150,11 @@ def calculate_match_score(me_adapter, candidate_adapter):
     rank = candidate_adapter.raw.get("排約等級一", "B").strip().upper()
 
     if rank == "A":
-        score += 40
-        breakdown['rank_bonus'] = "+40 (Grade A)"
+        score += 20
+        breakdown['rank_bonus'] = "+20 (Grade A)"
     elif rank == "C":
-        score -= 30
-        breakdown['rank_penalty'] = "-30 (Grade C)"
+        score -= 20
+        breakdown['rank_penalty'] = "-20 (Grade C)"
     # Grade B is neutral (no change)
 
     # --- 2. ATTRIBUTES (Skin, Appearance, etc.) ---
@@ -204,16 +204,16 @@ def calculate_match_score(me_adapter, candidate_adapter):
         breakdown['min_height'] = f"-20"
 
     if candidate_adapter.birth_year < me_adapter.pref_oldest_birth_year:
-        score -= 20
-        breakdown['over_age'] = f"-20"
+        score -= 40
+        breakdown['over_age'] = f"-40"
 
     if candidate_adapter.birth_year > me_adapter.pref_youngest_birth_year:
-        score -= 20
-        breakdown['under_age'] = f"-20"
+        score -= 40
+        breakdown['under_age'] = f"-40"
 
     if "離婚" in me_adapter.dealbreakers and "離婚" in candidate_adapter.marital_status:
-        score -= 20
-        breakdown['married'] = f"-20"
+        score -= 35
+        breakdown['married'] = f"-35"
 
     return score, breakdown
 
