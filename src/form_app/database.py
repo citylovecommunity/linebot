@@ -11,7 +11,11 @@ _session_factory = None
 
 
 def get_session_factory(database_url: str) -> Session:
-    engine = create_engine(database_url)
+    engine = create_engine(
+        database_url,
+        pool_pre_ping=True,  # Tests the connection before each query
+        pool_recycle=1800    # Recreates connections older than 30 mins
+    )
     return sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
