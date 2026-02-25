@@ -24,7 +24,8 @@ def auto_login(user_id):
     # 2. Log them in programmatically
     if dev_user:
         login_user(dev_user)
-        # Redirect to where you want to work
+        if dev_user.is_admin:
+            return redirect(url_for('admin_bp.admin_dashboard'))
         return redirect(url_for('dashboard_bp.dashboard'))
 
     return "Dev user not found", 404

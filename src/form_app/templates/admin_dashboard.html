@@ -1,54 +1,268 @@
 {% extends "base.html" %}
 
-{% block title %}Admin Control Panel{% endblock %}
+{% block title %}Admin Panel{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>Admin Dashboard</h1>
-        <span class="badge bg-danger">Admin Mode</span>
+<div class="container-fluid mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">Admin Panel <span class="badge bg-danger ms-2">Admin</span></h2>
+  </div>
+
+  <ul class="nav nav-tabs" id="adminTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="members-tab" data-bs-toggle="tab" data-bs-target="#members"
+        type="button" role="tab">
+        Members <span class="badge bg-secondary ms-1">{{ members|length }}</span>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="matchings-tab" data-bs-toggle="tab" data-bs-target="#matchings"
+        type="button" role="tab">
+        Matchings <span class="badge bg-secondary ms-1">{{ matchings|length }}</span>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="non-eligible-tab" data-bs-toggle="tab" data-bs-target="#non-eligible"
+        type="button" role="tab">
+        Non-Eligible
+        {% if non_eligible %}
+        <span class="badge bg-danger ms-1">{{ non_eligible|length }}</span>
+        {% endif %}
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="actions-tab" data-bs-toggle="tab" data-bs-target="#actions"
+        type="button" role="tab">
+        Actions
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content border border-top-0 rounded-bottom p-3 bg-white shadow-sm">
+
+    <!-- Tab 1: Members -->
+    <div class="tab-pane fade show active" id="members" role="tabpanel">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">Members</h5>
+        <a href="{{ url_for('admin_bp.new_user') }}" class="btn btn-sm btn-success">
+          <i class="bi bi-person-plus"></i> New User
+        </a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover table-sm align-middle">
+          <thead class="table-dark">
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Gender</th>
+              <th>Phone</th>
+              <th>Rank</th>
+              <th>Status</th>
+              <th>Matches</th>
+              <th>Eligible</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for member in members %}
+            <tr>
+              <td class="text-muted small">{{ member.id }}</td>
+              <td>{{ member.name }}</td>
+              <td>{{ member.gender }}</td>
+              <td>{{ member.phone_number }}</td>
+              <td>{{ member.rank or '-' }}</td>
+              <td>
+                {% if member.is_active %}
+                <span class="badge bg-success">Active</span>
+                {% else %}
+                <span class="badge bg-secondary">Inactive</span>
+                {% endif %}
+                {% if member.is_test %}
+                <span class="badge bg-warning text-dark">Test</span>
+                {% endif %}
+              </td>
+              <td>{{ member.all_matches|length }}</td>
+              <td>
+                {% if member.is_match_ready and member.is_active and not member.is_test %}
+                <span class="badge bg-success">Ready</span>
+                {% else %}
+                <span class="badge bg-danger">Not Ready</span>
+                {% endif %}
+              </td>
+              <td>
+                <a href="{{ url_for('admin_bp.edit_user', user_id=member.id) }}"
+                  class="btn btn-sm btn-outline-primary">Edit</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
 
-    <div class="card shadow">
-        <div class="card-header bg-dark text-white">
-            User Management
-        </div>
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Email</th>
-                            <th>Role</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for user in users %}
-                        <tr>
-                            <td>{{ user.id }}</td>
-                            <td>{{ user.email }}</td>
-                            <td>
-                                {% if user.is_admin %}
-                                <span class="badge bg-success">Admin</span>
-                                {% else %}
-                                <span class="badge bg-secondary">User</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <a href="#" class="btn btn-sm btn-primary">Edit</a>
-                                {% if not user.is_admin %}
-                                <a href="{{ url_for('admin_bp.delete_user', user_id=user.id) }}"
-                                    class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?');">Delete</a>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+    <!-- Tab 2: Matchings -->
+    <div class="tab-pane fade" id="matchings" role="tabpanel">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">Matchings</h5>
+        <a href="{{ url_for('admin_bp.new_matching') }}" class="btn btn-sm btn-success">
+          <i class="bi bi-people"></i> Manual Pair
+        </a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover table-sm align-middle">
+          <thead class="table-dark">
+            <tr>
+              <th>ID</th>
+              <th>Cool Name</th>
+              <th>Subject</th>
+              <th>Object</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Scores (sub/obj)</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for matching in matchings %}
+            <tr>
+              <td class="text-muted small">{{ matching.id }}</td>
+              <td>{{ matching.cool_name }}</td>
+              <td>{{ matching.subject.name }}</td>
+              <td>{{ matching.object.name }}</td>
+              <td>
+                {% if matching.status.value == 'ACTIVE' %}
+                <span class="badge bg-success">ACTIVE</span>
+                {% elif matching.status.value == 'CANCELLED' %}
+                <span class="badge bg-secondary">CANCELLED</span>
+                {% elif matching.status.value == 'COMPLETED' %}
+                <span class="badge bg-info text-dark">COMPLETED</span>
+                {% else %}
+                <span class="badge bg-light text-dark">{{ matching.status.value }}</span>
+                {% endif %}
+              </td>
+              <td class="small">{{ matching.created_at.strftime('%Y-%m-%d') }}</td>
+              <td class="small">{{ matching.grading_metric }} / {{ matching.obj_grading_metric }}</td>
+              <td>
+                {% if matching.status.value == 'ACTIVE' %}
+                <form method="POST"
+                  action="{{ url_for('admin_bp.cancel_matching', matching_id=matching.id) }}"
+                  class="d-inline"
+                  onsubmit="return confirm('Cancel this matching?')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">Cancel</button>
+                </form>
+                {% elif matching.status.value == 'CANCELLED' %}
+                <form method="POST"
+                  action="{{ url_for('admin_bp.reactivate_matching', matching_id=matching.id) }}"
+                  class="d-inline">
+                  <button type="submit" class="btn btn-sm btn-outline-success">Reactivate</button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
+
+    <!-- Tab 3: Non-Eligible -->
+    <div class="tab-pane fade" id="non-eligible" role="tabpanel">
+      <h5 class="mb-3">Non-Eligible Members</h5>
+      {% if non_eligible %}
+      <div class="table-responsive">
+        <table class="table table-hover table-sm align-middle">
+          <thead class="table-dark">
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Phone</th>
+              <th>Issues</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for member, reasons in non_eligible %}
+            <tr>
+              <td class="text-muted small">{{ member.id }}</td>
+              <td>{{ member.name }}</td>
+              <td>{{ member.phone_number }}</td>
+              <td>
+                {% for r in reasons %}
+                <span class="badge bg-warning text-dark me-1">{{ r }}</span>
+                {% endfor %}
+              </td>
+              <td>
+                <a href="{{ url_for('admin_bp.edit_user', user_id=member.id) }}"
+                  class="btn btn-sm btn-outline-primary">Edit</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-success"><i class="bi bi-check-circle"></i> All members are eligible.</p>
+      {% endif %}
+    </div>
+
+    <!-- Tab 4: Actions -->
+    <div class="tab-pane fade" id="actions" role="tabpanel">
+      <h5 class="mb-3">Stats &amp; Actions</h5>
+      <div class="row g-3 mb-4">
+        <div class="col-md-4">
+          <div class="card text-center border-primary h-100">
+            <div class="card-body">
+              <h2 class="card-title text-primary">{{ total_users }}</h2>
+              <p class="card-text text-muted mb-0">Total Members</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card text-center border-success h-100">
+            <div class="card-body">
+              <h2 class="card-title text-success">{{ eligible_count }}</h2>
+              <p class="card-text text-muted mb-0">Eligible Members</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card text-center border-info h-100">
+            <div class="card-body">
+              <h2 class="card-title text-info">{{ active_matchings }}</h2>
+              <p class="card-text text-muted mb-0">Active Matchings</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body">
+          <h6 class="card-title">Send LINE Notifications</h6>
+          <p class="text-muted small">Push LINE notifications for unread messages and pending date proposals.</p>
+          <form method="POST" action="{{ url_for('admin_bp.send_notifications') }}"
+            onsubmit="return confirm('Send notifications to all users now?')">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-bell"></i> Send Notifications
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+  </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Activate the tab specified in the ?tab= query parameter
+  const params = new URLSearchParams(window.location.search);
+  const tabName = params.get('tab');
+  if (tabName) {
+    const tabEl = document.getElementById(tabName + '-tab');
+    if (tabEl) {
+      new bootstrap.Tab(tabEl).show();
+    }
+  }
+</script>
 {% endblock %}

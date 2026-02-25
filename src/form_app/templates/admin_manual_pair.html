@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Manual Pair — Admin{% endblock %}
+
+{% block content %}
+<div class="container mt-4" style="max-width: 480px;">
+  <div class="d-flex align-items-center mb-4 gap-3">
+    <a href="{{ url_for('admin_bp.admin_dashboard', tab='matchings') }}"
+      class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+    <h3 class="mb-0">Manual Pair</h3>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <form method="POST">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Subject (主動方)</label>
+          <select class="form-select" name="subject_id" required>
+            <option value="" disabled selected>— Select member —</option>
+            {% for member in members %}
+            <option value="{{ member.id }}">{{ member.name }} ({{ member.phone_number }})</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label fw-semibold">Object (被動方)</label>
+          <select class="form-select" name="object_id" required>
+            <option value="" disabled selected>— Select member —</option>
+            {% for member in members %}
+            <option value="{{ member.id }}">{{ member.name }} ({{ member.phone_number }})</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-success">
+            <i class="bi bi-people"></i> Create Pair
+          </button>
+          <a href="{{ url_for('admin_bp.admin_dashboard', tab='matchings') }}"
+            class="btn btn-outline-secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

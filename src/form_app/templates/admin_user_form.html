@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}{{ '編輯會員' if user else '新增會員' }} — Admin{% endblock %}
+
+{% block content %}
+<div class="container mt-4" style="max-width: 720px;">
+  <div class="d-flex align-items-center mb-4 gap-3">
+    <a href="{{ url_for('admin_bp.admin_dashboard') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+    <h3 class="mb-0">{{ '編輯會員' if user else '新增會員' }}</h3>
+  </div>
+
+  <form method="POST">
+    <!-- Identity -->
+    <div class="card mb-3">
+      <div class="card-header fw-semibold">Identity</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-sm-6">
+            <label class="form-label">姓名 <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" name="name" required
+              value="{{ user.name if user else '' }}">
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">性別 <span class="text-danger">*</span></label>
+            <select class="form-select" name="gender" required>
+              <option value="M" {% if user and user.gender == 'M' %}selected{% endif %}>男 (M)</option>
+              <option value="F" {% if user and user.gender == 'F' %}selected{% endif %}>女 (F)</option>
+            </select>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">手機號碼 <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" name="phone_number" required
+              value="{{ user.phone_number if user else '' }}">
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">Email</label>
+            <input type="email" class="form-control" name="email"
+              value="{{ user.email if user and user.email else '' }}">
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">生日</label>
+            <input type="date" class="form-control" name="birthday"
+              value="{{ user.birthday.strftime('%Y-%m-%d') if user and user.birthday else '' }}">
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">身高 (cm)</label>
+            <input type="number" class="form-control" name="height" min="100" max="250"
+              value="{{ user.height if user and user.height else '' }}">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div class="card mb-3">
+      <div class="card-header fw-semibold">Status</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-sm-6">
+            <label class="form-label">Rank</label>
+            <input type="text" class="form-control" name="rank"
+              value="{{ user.rank if user and user.rank else '' }}">
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">婚姻狀況</label>
+            <input type="text" class="form-control" name="marital_status"
+              value="{{ user.marital_status if user and user.marital_status else '' }}">
+          </div>
+          <div class="col-sm-6">
+            <div class="form-check mt-2">
+              <input class="form-check-input" type="checkbox" name="is_active" id="is_active"
+                {% if user is none or user.is_active %}checked{% endif %}>
+              <label class="form-check-label" for="is_active">Is Active</label>
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <div class="form-check mt-2">
+              <input class="form-check-input" type="checkbox" name="is_test" id="is_test"
+                {% if user and user.is_test %}checked{% endif %}>
+              <label class="form-check-label" for="is_test">Is Test Account</label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Preferences -->
+    <div class="card mb-3">
+      <div class="card-header fw-semibold">Preferences</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-sm-6">
+            <label class="form-label">偏好最低身高</label>
+            <input type="number" class="form-control" name="pref_min_height" min="100" max="250"
+              value="{{ user.pref_min_height if user and user.pref_min_height else '' }}">
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">偏好最高身高</label>
+            <input type="number" class="form-control" name="pref_max_height" min="100" max="250"
+              value="{{ user.pref_max_height if user and user.pref_max_height else '' }}">
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">偏好最大出生年 (oldest)</label>
+            <input type="number" class="form-control" name="pref_oldest_birth_year" min="1940" max="2010"
+              value="{{ user.pref_oldest_birth_year if user and user.pref_oldest_birth_year else '' }}">
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">偏好最小出生年 (youngest)</label>
+            <input type="number" class="form-control" name="pref_youngest_birth_year" min="1940" max="2010"
+              value="{{ user.pref_youngest_birth_year if user and user.pref_youngest_birth_year else '' }}">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile Links -->
+    <div class="card mb-3">
+      <div class="card-header fw-semibold">Profile Links</div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label">會員介紹頁網址 (introduction_link)</label>
+          <input type="url" class="form-control" name="introduction_link"
+            value="{{ user.introduction_link if user and user.introduction_link else '' }}">
+        </div>
+        <div class="mb-0">
+          <label class="form-label">盲約介紹卡一 (blind_introduction_link)</label>
+          <input type="url" class="form-control" name="blind_introduction_link"
+            value="{{ user.blind_introduction_link if user and user.blind_introduction_link else '' }}">
+        </div>
+      </div>
+    </div>
+
+    {% if not user %}
+    <!-- Password (new user only) -->
+    <div class="card mb-3">
+      <div class="card-header fw-semibold">Password</div>
+      <div class="card-body">
+        <div class="mb-0">
+          <label class="form-label">密碼</label>
+          <input type="password" class="form-control" name="password" autocomplete="new-password">
+          <div class="form-text">留空則不設定密碼。</div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-save"></i> {{ '儲存變更' if user else '新增會員' }}
+      </button>
+      <a href="{{ url_for('admin_bp.admin_dashboard') }}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -29,9 +29,17 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     {% if current_user.is_authenticated %}
+                    {% if current_user.is_admin %}
+                    <li class="nav-item">
+                        <a class="nav-link text-warning fw-semibold" href="{{ url_for('admin_bp.admin_dashboard') }}">
+                            <i class="bi bi-shield-lock"></i> Admin Panel
+                        </a>
+                    </li>
+                    {% else %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('dashboard_bp.dashboard') }}">Dashboard</a>
                     </li>
+                    {% endif %}
                     <li class="nav-item">
                         <a class="nav-link text-danger" href="{{ url_for('auth_bp.logout') }}">Logout</a>
                     </li>
