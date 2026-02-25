@@ -6,7 +6,8 @@ from flask import (Blueprint, abort, flash, redirect, render_template, request,
 from flask_login import current_user, login_required
 
 from form_app.database import get_db
-from form_app.models import DateProposal, Matching, Message
+from form_app.models import DateProposal, Matching, Member, Message
+from form_app.services.security import verify_password, hash_password
 from form_app.config import settings
 
 bp = Blueprint('dashboard_bp', __name__, url_prefix="/dashboard")
@@ -156,6 +157,7 @@ def submit_proposal(matching_id):
 
 
 @bp.route('/update_match_status/<int:matching_id>', methods=['POST'])
+@login_required
 def update_match_status(matching_id):
     db = get_db()
     matching = get_matching_or_abort(matching_id)
@@ -215,3 +217,36 @@ def handle_proposal(matching_id, proposal_id):
     db.commit()
 
     return redirect(url_for('.matching_detail', matching_id=matching_id))
+
+
+@bp.route('/profile')
+@login_required
+def profile():
+    return render_template('profile.html')
+
+
+@bp.route('/profile/change-password', methods=['POST'])
+@login_required
+def change_password():
+    db = get_db()
+    current_pw = request.form.get('current_password', '').strip()
+    new_pw = request.form.get('new_password', '').strip()
+    confirm_pw = request.form.get('confirm_password', '').strip()
+
+    if not current_user.password_hash or not verify_password(current_user.password_hash, current_pw):
+        flash('目前密碼不正確', 'danger')
+        return redirect(url_for('dashboard_bp.profile'))
+
+    if len(new_pw) < 6:
+        flash('新密碼至少需要 6 個字元', 'danger')
+        return redirect(url_for('dashboard_bp.profile'))
+
+    if new_pw != confirm_pw:
+        flash('兩次輸入的密碼不一致', 'danger')
+        return redirect(url_for('dashboard_bp.profile'))
+
+    user = db.get(Member, current_user.id)
+    user.password_hash = hash_password(new_pw)
+    db.commit()
+    flash('密碼已成功更新', 'success')
+    return redirect(url_for('dashboard_bp.profile'))
