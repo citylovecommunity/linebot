@@ -31,6 +31,29 @@ def auto_login(user_id):
     return "Dev user not found", 404
 
 
+@bp.route('/auto-login-admin')
+def auto_login_admin():
+    token = request.args.get('token', '')
+    if not settings.is_dev and token != settings.TASK_SECRET:
+        abort(404)
+
+    db = get_db()
+    admin_user = db.query(Member).filter(Member.is_admin == True).first()
+
+    if not admin_user:
+        total = db.query(Member).count()
+        current_app.logger.warning(
+            f"auto-login-admin: no admin user found. Total members in DB: {total}"
+        )
+        return f"No admin user found (total members: {total})", 404
+
+    current_app.logger.info(
+        f"auto-login-admin: logging in admin id={admin_user.id} name={admin_user.name}"
+    )
+    login_user(admin_user)
+    return redirect(url_for('admin_bp.admin_dashboard'))
+
+
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:

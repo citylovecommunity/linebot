@@ -132,6 +132,33 @@ class Member(Base):
     def blind_introduction_link(self):
         return self.user_info.get('盲約介紹卡一')
 
+    expiration_date: Mapped[Optional[date]]
+
+    @property
+    def membership_months(self) -> Optional[int]:
+        if not self.user_info:
+            return None
+        raw = self.user_info.get('購買的方案期數 /月（ 填寫純數字 ）', '')
+        try:
+            return int(str(raw).strip())
+        except (ValueError, TypeError):
+            return None
+
+    @property
+    def is_expiring_soon(self) -> bool:
+        from datetime import date as _date
+        from dateutil.relativedelta import relativedelta
+        if not self.expiration_date:
+            return False
+        return self.expiration_date <= _date.today() + relativedelta(days=30)
+
+    @property
+    def is_expired(self) -> bool:
+        from datetime import date as _date
+        if not self.expiration_date:
+            return False
+        return self.expiration_date < _date.today()
+
 
 class Line_Info(Base):
     __tablename__ = "line_info"

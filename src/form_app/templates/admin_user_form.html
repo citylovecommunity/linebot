@@ -69,6 +69,11 @@
               value="{{ user.marital_status if user and user.marital_status else '' }}">
           </div>
           <div class="col-sm-6">
+            <label class="form-label">到期日</label>
+            <input type="date" class="form-control" name="expiration_date"
+              value="{{ user.expiration_date.strftime('%Y-%m-%d') if user and user.expiration_date else '' }}">
+          </div>
+          <div class="col-sm-6">
             <div class="form-check mt-2">
               <input class="form-check-input" type="checkbox" name="is_active" id="is_active"
                 {% if user is none or user.is_active %}checked{% endif %}>

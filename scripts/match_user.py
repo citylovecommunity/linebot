@@ -10,8 +10,8 @@ with session_factory() as session:
     eligible_members = get_eligible_matching_pool(session)
     run_matching_score_optimized(eligible_members, session)
 
-    match(12016, 3436, session)
-    match(12016, 6331, session)
-    match(12016, 54, session)
+    match(18347, 49, session)
+    match(18347, 2730, session)
+    match(18347, 56, session)
 
     session.commit()

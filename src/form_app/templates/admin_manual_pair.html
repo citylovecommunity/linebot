@@ -2,48 +2,253 @@
 
 {% block title %}Manual Pair — Admin{% endblock %}
 
+{% block extra_css %}
+<style>
+  .member-card {
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    user-select: none;
+  }
+  .member-card:hover {
+    border-color: #adb5bd;
+    box-shadow: 0 2px 8px rgba(0,0,0,.12);
+  }
+  .member-card.selected-male {
+    border-color: #0d6efd;
+    background-color: #f0f5ff;
+  }
+  .member-card.selected-female {
+    border-color: #d63384;
+    background-color: #fff0f7;
+  }
+  .panel-col {
+    height: calc(100vh - 270px);
+    overflow-y: auto;
+  }
+  .confirm-bar {
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+    border-top: 1px solid #dee2e6;
+    z-index: 10;
+    padding: 12px 16px;
+  }
+  .badge-line { font-size: .7rem; }
+  .tag { font-size: .75rem; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container mt-4" style="max-width: 480px;">
-  <div class="d-flex align-items-center mb-4 gap-3">
+<div class="container-fluid px-4 mt-4">
+
+  <div class="d-flex align-items-center mb-3 gap-3">
     <a href="{{ url_for('admin_bp.admin_dashboard', tab='matchings') }}"
-      class="btn btn-sm btn-outline-secondary">
+       class="btn btn-sm btn-outline-secondary">
       <i class="bi bi-arrow-left"></i> Back
     </a>
-    <h3 class="mb-0">Manual Pair</h3>
+    <h4 class="mb-0">Manual Pair</h4>
+    <span class="text-muted small">Click one male and one female to pair them.</span>
   </div>
 
-  <div class="card shadow-sm">
-    <div class="card-body">
-      <form method="POST">
-        <div class="mb-3">
-          <label class="form-label fw-semibold">Subject (主動方)</label>
-          <select class="form-select" name="subject_id" required>
-            <option value="" disabled selected>— Select member —</option>
-            {% for member in members %}
-            <option value="{{ member.id }}">{{ member.name }} ({{ member.phone_number }})</option>
-            {% endfor %}
-          </select>
-        </div>
+  <form method="POST" id="pair-form">
+    <input type="hidden" name="subject_id" id="subject_id">
+    <input type="hidden" name="object_id" id="object_id">
 
-        <div class="mb-4">
-          <label class="form-label fw-semibold">Object (被動方)</label>
-          <select class="form-select" name="object_id" required>
-            <option value="" disabled selected>— Select member —</option>
-            {% for member in members %}
-            <option value="{{ member.id }}">{{ member.name }} ({{ member.phone_number }})</option>
-            {% endfor %}
-          </select>
-        </div>
+    <div class="row g-3">
 
-        <div class="d-flex gap-2">
-          <button type="submit" class="btn btn-success">
-            <i class="bi bi-people"></i> Create Pair
-          </button>
-          <a href="{{ url_for('admin_bp.admin_dashboard', tab='matchings') }}"
-            class="btn btn-outline-secondary">Cancel</a>
+      <!-- ── MALE PANEL ── -->
+      <div class="col-md-6">
+        <div class="d-flex align-items-center mb-2 gap-2">
+          <i class="bi bi-gender-male text-primary fs-5"></i>
+          <span class="fw-semibold">Males ({{ males|length }})</span>
         </div>
-      </form>
+        <input type="text" class="form-control form-control-sm mb-2"
+               placeholder="Search males…" oninput="filterPanel(this, 'panel-male')">
+        <div class="panel-col pe-1" id="panel-male">
+          {% for m in males %}
+          <div class="member-card card mb-2 p-2"
+               data-id="{{ m.id }}"
+               data-gender="male"
+               data-name="{{ m.name }}"
+               onclick="selectMember(this)">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <span class="fw-semibold">{{ m.name }}</span>
+                {% if m.rank %}
+                <span class="badge bg-secondary ms-1 badge-line">{{ m.rank }}</span>
+                {% endif %}
+                {% if m.line_info %}
+                <span class="badge bg-success ms-1 badge-line"><i class="bi bi-check2"></i> LINE</span>
+                {% else %}
+                <span class="badge bg-warning text-dark ms-1 badge-line">No LINE</span>
+                {% endif %}
+              </div>
+              <span class="text-muted small">ID {{ m.id }}</span>
+            </div>
+            <div class="mt-1 text-muted small d-flex flex-wrap gap-2">
+              {% if m.birthday %}
+              <span><i class="bi bi-calendar3"></i> {{ 2026 - m.birthday.year }}歲</span>
+              {% endif %}
+              {% if m.height %}
+              <span><i class="bi bi-rulers"></i> {{ m.height }}cm</span>
+              {% endif %}
+              {% if m.marital_status %}
+              <span><i class="bi bi-heart"></i> {{ m.marital_status }}</span>
+              {% endif %}
+            </div>
+            {% set hobbies = m.user_info.get('您的休閒興趣 (可複選)', '') if m.user_info else '' %}
+            {% if hobbies and hobbies != '無' %}
+            <div class="mt-1 d-flex flex-wrap gap-1">
+              {% for h in hobbies.replace('、', ',').split(',')[:4] %}
+              <span class="badge bg-light text-dark border tag">{{ h.strip() }}</span>
+              {% endfor %}
+            </div>
+            {% endif %}
+            {% if m.introduction_link %}
+            <div class="mt-1">
+              <a href="{{ m.introduction_link }}" target="_blank" class="small text-primary"
+                 onclick="event.stopPropagation()">
+                <i class="bi bi-box-arrow-up-right"></i> 介紹頁
+              </a>
+            </div>
+            {% endif %}
+          </div>
+          {% else %}
+          <p class="text-muted">No active male members.</p>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- ── FEMALE PANEL ── -->
+      <div class="col-md-6">
+        <div class="d-flex align-items-center mb-2 gap-2">
+          <i class="bi bi-gender-female text-danger fs-5"></i>
+          <span class="fw-semibold">Females ({{ females|length }})</span>
+        </div>
+        <input type="text" class="form-control form-control-sm mb-2"
+               placeholder="Search females…" oninput="filterPanel(this, 'panel-female')">
+        <div class="panel-col pe-1" id="panel-female">
+          {% for m in females %}
+          <div class="member-card card mb-2 p-2"
+               data-id="{{ m.id }}"
+               data-gender="female"
+               data-name="{{ m.name }}"
+               onclick="selectMember(this)">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <span class="fw-semibold">{{ m.name }}</span>
+                {% if m.rank %}
+                <span class="badge bg-secondary ms-1 badge-line">{{ m.rank }}</span>
+                {% endif %}
+                {% if m.line_info %}
+                <span class="badge bg-success ms-1 badge-line"><i class="bi bi-check2"></i> LINE</span>
+                {% else %}
+                <span class="badge bg-warning text-dark ms-1 badge-line">No LINE</span>
+                {% endif %}
+              </div>
+              <span class="text-muted small">ID {{ m.id }}</span>
+            </div>
+            <div class="mt-1 text-muted small d-flex flex-wrap gap-2">
+              {% if m.birthday %}
+              <span><i class="bi bi-calendar3"></i> {{ 2026 - m.birthday.year }}歲</span>
+              {% endif %}
+              {% if m.height %}
+              <span><i class="bi bi-rulers"></i> {{ m.height }}cm</span>
+              {% endif %}
+              {% if m.marital_status %}
+              <span><i class="bi bi-heart"></i> {{ m.marital_status }}</span>
+              {% endif %}
+            </div>
+            {% set hobbies = m.user_info.get('您的休閒興趣 (可複選)', '') if m.user_info else '' %}
+            {% if hobbies and hobbies != '無' %}
+            <div class="mt-1 d-flex flex-wrap gap-1">
+              {% for h in hobbies.replace('、', ',').split(',')[:4] %}
+              <span class="badge bg-light text-dark border tag">{{ h.strip() }}</span>
+              {% endfor %}
+            </div>
+            {% endif %}
+            {% if m.introduction_link %}
+            <div class="mt-1">
+              <a href="{{ m.introduction_link }}" target="_blank" class="small text-primary"
+                 onclick="event.stopPropagation()">
+                <i class="bi bi-box-arrow-up-right"></i> 介紹頁
+              </a>
+            </div>
+            {% endif %}
+          </div>
+          {% else %}
+          <p class="text-muted">No active female members.</p>
+          {% endfor %}
+        </div>
+      </div>
+
+    </div><!-- /row -->
+
+    <!-- ── CONFIRM BAR ── -->
+    <div class="confirm-bar mt-3 rounded shadow-sm">
+      <div class="d-flex align-items-center gap-3 flex-wrap">
+        <div class="d-flex align-items-center gap-2 flex-grow-1">
+          <i class="bi bi-gender-male text-primary"></i>
+          <span id="label-male" class="text-muted">— select male —</span>
+          <i class="bi bi-arrow-right text-muted"></i>
+          <i class="bi bi-gender-female text-danger"></i>
+          <span id="label-female" class="text-muted">— select female —</span>
+        </div>
+        <button type="submit" id="submit-btn" class="btn btn-success" disabled
+                onclick="return confirmPair()">
+          <i class="bi bi-people-fill"></i> Create Pair
+        </button>
+        <a href="{{ url_for('admin_bp.admin_dashboard', tab='matchings') }}"
+           class="btn btn-outline-secondary">Cancel</a>
+      </div>
     </div>
-  </div>
+
+  </form>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  let selectedMale = null;
+  let selectedFemale = null;
+
+  function filterPanel(input, panelId) {
+    const query = input.value.toLowerCase();
+    document.querySelectorAll('#' + panelId + ' .member-card').forEach(card => {
+      const name = card.dataset.name.toLowerCase();
+      card.style.display = name.includes(query) ? '' : 'none';
+    });
+  }
+
+  function selectMember(card) {
+    const id = card.dataset.id;
+    const gender = card.dataset.gender;
+    const name = card.querySelector('.fw-semibold').textContent.trim();
+
+    if (gender === 'male') {
+      if (selectedMale) selectedMale.classList.remove('selected-male');
+      selectedMale = card;
+      card.classList.add('selected-male');
+      document.getElementById('subject_id').value = id;
+      document.getElementById('label-male').textContent = name + ' (#' + id + ')';
+      document.getElementById('label-male').className = 'fw-semibold text-primary';
+    } else {
+      if (selectedFemale) selectedFemale.classList.remove('selected-female');
+      selectedFemale = card;
+      card.classList.add('selected-female');
+      document.getElementById('object_id').value = id;
+      document.getElementById('label-female').textContent = name + ' (#' + id + ')';
+      document.getElementById('label-female').className = 'fw-semibold text-danger';
+    }
+
+    document.getElementById('submit-btn').disabled = !(selectedMale && selectedFemale);
+  }
+
+  function confirmPair() {
+    const male = document.getElementById('label-male').textContent;
+    const female = document.getElementById('label-female').textContent;
+    return confirm(`Pair ${male} ♂ with ${female} ♀?`);
+  }
+</script>
 {% endblock %}

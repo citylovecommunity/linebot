@@ -119,21 +119,25 @@ def get_eligible_matching_pool(session: Session):
     """
     Returns a Query object containing ONLY users who have the 'Right to Enter'.
     Criteria:
-    1. Member is active
+    1. Member is active and not a test account
     2. Web URL is provided
     3. Phone Number exists in LineInfo table
+    4. Membership is not expired (expiration_date is null OR >= today)
     """
+    from datetime import date
+    today = date.today()
+
     return session.query(Member).filter(
-        # Rule 1: Active
         Member.is_active == True,
         Member.is_test == False,
 
-        # Rule 2: Has Web URL (Not Null and Not Empty)
         Member.user_info['會員介紹頁網址'].astext != None,
         Member.user_info['會員介紹頁網址'].astext != '',
 
-        # Rule 3: Exists in Line Info (The Join Check)
-        exists().where(Line_Info.phone_number == Member.phone_number)
+        exists().where(Line_Info.phone_number == Member.phone_number),
+
+        # Rule 4: Not expired
+        (Member.expiration_date == None) | (Member.expiration_date >= today),
     ).all()
 
 
@@ -195,7 +199,7 @@ def calculate_match_score(me_adapter, candidate_adapter):
         breakdown['religion'] = f"-20"
 
     if len(candidate_adapter.datable_place) > 0 and len(candidate_adapter.datable_place) > 0\
-            and len(candidate_adapter.datable_place.intersection(candidate_adapter.datable_place)) == 0:
+            and len(candidate_adapter.datable_place.intersection(me_adapter.datable_place)) == 0:
         score -= 20
         breakdown['datable_place'] = f"-20"
 

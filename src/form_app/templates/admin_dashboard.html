@@ -1,97 +1,168 @@
 {% extends "base.html" %}
 
-{% block title %}Admin Panel{% endblock %}
+{% block title %}管理後台{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
+{% endblock %}
 
 {% block content %}
 <div class="container-fluid mt-4">
   <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2 class="mb-0">Admin Panel <span class="badge bg-danger ms-2">Admin</span></h2>
+    <h2 class="mb-0">管理後台 <span class="badge bg-danger ms-2">Admin</span></h2>
   </div>
 
   <ul class="nav nav-tabs" id="adminTabs" role="tablist">
     <li class="nav-item" role="presentation">
       <button class="nav-link active" id="members-tab" data-bs-toggle="tab" data-bs-target="#members"
         type="button" role="tab">
-        Members <span class="badge bg-secondary ms-1">{{ members|length }}</span>
+        會員 <span class="badge bg-secondary ms-1">{{ members|length }}</span>
       </button>
     </li>
     <li class="nav-item" role="presentation">
       <button class="nav-link" id="matchings-tab" data-bs-toggle="tab" data-bs-target="#matchings"
         type="button" role="tab">
-        Matchings <span class="badge bg-secondary ms-1">{{ matchings|length }}</span>
+        配對 <span class="badge bg-secondary ms-1">{{ matchings|length }}</span>
       </button>
     </li>
     <li class="nav-item" role="presentation">
-      <button class="nav-link" id="non-eligible-tab" data-bs-toggle="tab" data-bs-target="#non-eligible"
+      <button class="nav-link" id="dates-tab" data-bs-toggle="tab" data-bs-target="#dates"
         type="button" role="tab">
-        Non-Eligible
-        {% if non_eligible %}
-        <span class="badge bg-danger ms-1">{{ non_eligible|length }}</span>
-        {% endif %}
+        約會
+        {% if confirmed_dates %}<span class="badge bg-success ms-1">{{ confirmed_dates }}</span>{% endif %}
+        {% if pending_dates %}<span class="badge bg-warning text-dark ms-1">{{ pending_dates }}</span>{% endif %}
       </button>
     </li>
     <li class="nav-item" role="presentation">
       <button class="nav-link" id="actions-tab" data-bs-toggle="tab" data-bs-target="#actions"
         type="button" role="tab">
-        Actions
+        操作
       </button>
     </li>
   </ul>
 
   <div class="tab-content border border-top-0 rounded-bottom p-3 bg-white shadow-sm">
 
-    <!-- Tab 1: Members -->
+    <!-- 會員頁籤 -->
     <div class="tab-pane fade show active" id="members" role="tabpanel">
       <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="mb-0">Members</h5>
+        <h5 class="mb-0">會員列表</h5>
         <a href="{{ url_for('admin_bp.new_user') }}" class="btn btn-sm btn-success">
-          <i class="bi bi-person-plus"></i> New User
+          <i class="bi bi-person-plus"></i> 新增會員
         </a>
       </div>
+
+      <!-- 篩選器 -->
+      <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+        <span class="text-muted small me-1">篩選：</span>
+
+        <div class="btn-group btn-group-sm" role="group">
+          <button class="btn btn-outline-secondary active" onclick="setFilter('gender','all',this)">全部</button>
+          <button class="btn btn-outline-primary" onclick="setFilter('gender','M',this)">♂ 男生</button>
+          <button class="btn btn-outline-danger" onclick="setFilter('gender','F',this)">♀ 女生</button>
+        </div>
+
+        <div class="btn-group btn-group-sm" role="group">
+          <button class="btn btn-outline-secondary active" onclick="setFilter('status','all',this)">全部</button>
+          <button class="btn btn-outline-success" onclick="setFilter('status','active',this)">啟用中</button>
+          <button class="btn btn-outline-secondary" onclick="setFilter('status','inactive',this)">已停用</button>
+        </div>
+
+        <div class="btn-group btn-group-sm" role="group">
+          <button class="btn btn-outline-secondary active" onclick="setFilter('eligible','all',this)">全部</button>
+          <button class="btn btn-outline-success" onclick="setFilter('eligible','ready',this)">合格</button>
+          <button class="btn btn-outline-danger" onclick="setFilter('eligible','not-ready',this)">不合格</button>
+        </div>
+
+        <div class="btn-group btn-group-sm" role="group">
+          <button class="btn btn-outline-secondary active" onclick="setFilter('expiry','all',this)">全部</button>
+          <button class="btn btn-outline-danger" onclick="setFilter('expiry','expired',this)">已到期</button>
+          <button class="btn btn-outline-warning" onclick="setFilter('expiry','soon',this)">即將到期</button>
+        </div>
+
+        <span id="member-count" class="text-muted small ms-auto"></span>
+      </div>
+
       <div class="table-responsive">
-        <table class="table table-hover table-sm align-middle">
+        <table class="table table-hover table-sm align-middle" id="members-table">
           <thead class="table-dark">
             <tr>
-              <th>ID</th>
-              <th>Name</th>
-              <th>Gender</th>
-              <th>Phone</th>
-              <th>Rank</th>
-              <th>Status</th>
-              <th>Matches</th>
-              <th>Eligible</th>
-              <th>Actions</th>
+              <th class="sortable" data-col="0" style="cursor:pointer;">編號 <i class="bi bi-arrow-down-up small"></i></th>
+              <th class="sortable" data-col="1" style="cursor:pointer;">姓名 <i class="bi bi-arrow-down-up small"></i></th>
+              <th>性別</th>
+              <th>電話</th>
+              <th>等級</th>
+              <th>狀態</th>
+              <th class="sortable" data-col="6" style="cursor:pointer;">配對數 <i class="bi bi-arrow-down-up small"></i></th>
+              <th class="sortable" data-col="7" style="cursor:pointer;">約會數 <i class="bi bi-arrow-down-up small"></i></th>
+              <th>資格</th>
+              <th class="sortable" data-col="9" style="cursor:pointer;">到期日 <i class="bi bi-arrow-down-up small"></i></th>
+              <th>操作</th>
             </tr>
           </thead>
           <tbody>
             {% for member in members %}
-            <tr>
-              <td class="text-muted small">{{ member.id }}</td>
-              <td>{{ member.name }}</td>
-              <td>{{ member.gender }}</td>
+            {% set exp = member.expiration_date %}
+            {% if exp %}
+              {% if exp < today %}{% set expiry_state = 'expired' %}
+              {% elif (exp - today).days <= 30 %}{% set expiry_state = 'soon' %}
+              {% else %}{% set expiry_state = 'ok' %}{% endif %}
+            {% else %}{% set expiry_state = 'none' %}{% endif %}
+            <tr
+              data-gender="{{ member.gender }}"
+              data-status="{{ 'active' if member.is_active else 'inactive' }}"
+              data-eligible="{{ 'ready' if (member.is_match_ready and member.is_active and not member.is_test) else 'not-ready' }}"
+              data-expiry="{{ expiry_state }}">
+              <td class="text-muted small" data-val="{{ member.id }}">{{ member.id }}</td>
+              <td data-val="{{ member.name }}">{{ member.name }}</td>
+              <td>{{ '男' if member.gender == 'M' else '女' }}</td>
               <td>{{ member.phone_number }}</td>
-              <td>{{ member.rank or '-' }}</td>
+              <td>{{ member.rank or '—' }}</td>
               <td>
                 {% if member.is_active %}
-                <span class="badge bg-success">Active</span>
+                <span class="badge bg-success">啟用</span>
                 {% else %}
-                <span class="badge bg-secondary">Inactive</span>
+                <span class="badge bg-secondary">停用</span>
                 {% endif %}
                 {% if member.is_test %}
-                <span class="badge bg-warning text-dark">Test</span>
+                <span class="badge bg-warning text-dark">測試</span>
                 {% endif %}
               </td>
-              <td>{{ member.all_matches|length }}</td>
-              <td>
-                {% if member.is_match_ready and member.is_active and not member.is_test %}
-                <span class="badge bg-success">Ready</span>
+              <td data-val="{{ member.all_matches|length }}">{{ member.all_matches|length }}</td>
+              <td data-val="{{ member_date_counts.get(member.id, 0) }}">
+                {% set dc = member_date_counts.get(member.id, 0) %}
+                {% if dc > 0 %}
+                <span class="badge bg-success">{{ dc }}</span>
                 {% else %}
-                <span class="badge bg-danger">Not Ready</span>
+                <span class="text-muted">0</span>
+                {% endif %}
+              </td>
+              <td>
+                {% set reasons = non_eligible_map.get(member.id, []) %}
+                {% if reasons %}
+                  {% for r in reasons %}
+                  <span class="badge bg-warning text-dark me-1">{{ r }}</span>
+                  {% endfor %}
+                {% else %}
+                <span class="badge bg-success">✓</span>
+                {% endif %}
+              </td>
+              <td class="small" data-val="{{ exp.strftime('%Y-%m-%d') if exp else '9999' }}">
+                {% if exp %}
+                  {% if exp < today %}
+                  <span class="text-danger fw-semibold" title="已到期">{{ exp.strftime('%Y-%m-%d') }}</span>
+                  {% elif (exp - today).days <= 30 %}
+                  <span class="text-warning fw-semibold" title="即將到期">{{ exp.strftime('%Y-%m-%d') }}</span>
+                  {% else %}
+                  {{ exp.strftime('%Y-%m-%d') }}
+                  {% endif %}
+                {% else %}
+                <span class="text-muted">—</span>
                 {% endif %}
               </td>
               <td>
                 <a href="{{ url_for('admin_bp.edit_user', user_id=member.id) }}"
-                  class="btn btn-sm btn-outline-primary">Edit</a>
+                  class="btn btn-sm btn-outline-primary">編輯</a>
               </td>
             </tr>
             {% endfor %}
@@ -100,26 +171,26 @@
       </div>
     </div>
 
-    <!-- Tab 2: Matchings -->
+    <!-- 配對頁籤 -->
     <div class="tab-pane fade" id="matchings" role="tabpanel">
       <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="mb-0">Matchings</h5>
+        <h5 class="mb-0">配對列表</h5>
         <a href="{{ url_for('admin_bp.new_matching') }}" class="btn btn-sm btn-success">
-          <i class="bi bi-people"></i> Manual Pair
+          <i class="bi bi-people"></i> 手動配對
         </a>
       </div>
       <div class="table-responsive">
         <table class="table table-hover table-sm align-middle">
           <thead class="table-dark">
             <tr>
-              <th>ID</th>
-              <th>Cool Name</th>
-              <th>Subject</th>
-              <th>Object</th>
-              <th>Status</th>
-              <th>Created</th>
-              <th>Scores (sub/obj)</th>
-              <th>Actions</th>
+              <th>編號</th>
+              <th>代號</th>
+              <th>主動方</th>
+              <th>被動方</th>
+              <th>狀態</th>
+              <th>建立日期</th>
+              <th>分數（主／被）</th>
+              <th>操作</th>
             </tr>
           </thead>
           <tbody>
@@ -131,11 +202,11 @@
               <td>{{ matching.object.name }}</td>
               <td>
                 {% if matching.status.value == 'ACTIVE' %}
-                <span class="badge bg-success">ACTIVE</span>
+                <span class="badge bg-success">進行中</span>
                 {% elif matching.status.value == 'CANCELLED' %}
-                <span class="badge bg-secondary">CANCELLED</span>
+                <span class="badge bg-secondary">已取消</span>
                 {% elif matching.status.value == 'COMPLETED' %}
-                <span class="badge bg-info text-dark">COMPLETED</span>
+                <span class="badge bg-info text-dark">已完成</span>
                 {% else %}
                 <span class="badge bg-light text-dark">{{ matching.status.value }}</span>
                 {% endif %}
@@ -147,14 +218,14 @@
                 <form method="POST"
                   action="{{ url_for('admin_bp.cancel_matching', matching_id=matching.id) }}"
                   class="d-inline"
-                  onsubmit="return confirm('Cancel this matching?')">
-                  <button type="submit" class="btn btn-sm btn-outline-danger">Cancel</button>
+                  onsubmit="return confirm('確定要取消此配對嗎？')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">取消配對</button>
                 </form>
                 {% elif matching.status.value == 'CANCELLED' %}
                 <form method="POST"
                   action="{{ url_for('admin_bp.reactivate_matching', matching_id=matching.id) }}"
                   class="d-inline">
-                  <button type="submit" class="btn btn-sm btn-outline-success">Reactivate</button>
+                  <button type="submit" class="btn btn-sm btn-outline-success">重新啟用</button>
                 </form>
                 {% endif %}
               </td>
@@ -165,55 +236,86 @@
       </div>
     </div>
 
-    <!-- Tab 3: Non-Eligible -->
-    <div class="tab-pane fade" id="non-eligible" role="tabpanel">
-      <h5 class="mb-3">Non-Eligible Members</h5>
-      {% if non_eligible %}
+    <!-- 約會頁籤 -->
+    <div class="tab-pane fade" id="dates" role="tabpanel">
+      <h5 class="mb-3">約會提案</h5>
+
+      <div class="row g-3 mb-4">
+        <div class="col-md-4">
+          <div class="card text-center border-success h-100">
+            <div class="card-body py-2">
+              <h3 class="text-success mb-0">{{ confirmed_dates }}</h3>
+              <div class="text-muted small">已確認約會</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card text-center border-warning h-100">
+            <div class="card-body py-2">
+              <h3 class="text-warning mb-0">{{ pending_dates }}</h3>
+              <div class="text-muted small">待確認提案</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card text-center border-secondary h-100">
+            <div class="card-body py-2">
+              <h3 class="text-secondary mb-0">{{ proposals|length }}</h3>
+              <div class="text-muted small">總提案數（不含已刪除）</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="dates-calendar" class="mb-4"></div>
+
+      <h6 class="mb-2">所有提案</h6>
       <div class="table-responsive">
         <table class="table table-hover table-sm align-middle">
           <thead class="table-dark">
             <tr>
-              <th>ID</th>
-              <th>Name</th>
-              <th>Phone</th>
-              <th>Issues</th>
-              <th>Actions</th>
+              <th>配對</th>
+              <th>餐廳</th>
+              <th>日期時間</th>
+              <th>提案人</th>
+              <th>狀態</th>
             </tr>
           </thead>
           <tbody>
-            {% for member, reasons in non_eligible %}
+            {% for p in proposals | sort(attribute='proposed_datetime', reverse=True) %}
             <tr>
-              <td class="text-muted small">{{ member.id }}</td>
-              <td>{{ member.name }}</td>
-              <td>{{ member.phone_number }}</td>
               <td>
-                {% for r in reasons %}
-                <span class="badge bg-warning text-dark me-1">{{ r }}</span>
-                {% endfor %}
+                <span class="fw-semibold">{{ p.matching.cool_name }}</span>
+                <div class="text-muted small">{{ p.matching.subject.name }} × {{ p.matching.object.name }}</div>
               </td>
+              <td>{{ p.restaurant_name }}</td>
+              <td class="small">{{ p.proposed_datetime.strftime('%Y-%m-%d %H:%M') }}</td>
+              <td class="small">{{ p.proposer.name }}</td>
               <td>
-                <a href="{{ url_for('admin_bp.edit_user', user_id=member.id) }}"
-                  class="btn btn-sm btn-outline-primary">Edit</a>
+                {% if p.status.value == 'CONFIRMED' %}
+                <span class="badge bg-success">已確認</span>
+                {% elif p.status.value == 'PENDING' %}
+                <span class="badge bg-warning text-dark">待確認</span>
+                {% endif %}
               </td>
             </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-muted text-center">尚無約會提案。</td></tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
-      {% else %}
-      <p class="text-success"><i class="bi bi-check-circle"></i> All members are eligible.</p>
-      {% endif %}
     </div>
 
-    <!-- Tab 4: Actions -->
+    <!-- 操作頁籤 -->
     <div class="tab-pane fade" id="actions" role="tabpanel">
-      <h5 class="mb-3">Stats &amp; Actions</h5>
+      <h5 class="mb-3">統計與操作</h5>
       <div class="row g-3 mb-4">
         <div class="col-md-4">
           <div class="card text-center border-primary h-100">
             <div class="card-body">
               <h2 class="card-title text-primary">{{ total_users }}</h2>
-              <p class="card-text text-muted mb-0">Total Members</p>
+              <p class="card-text text-muted mb-0">總會員數</p>
             </div>
           </div>
         </div>
@@ -221,7 +323,7 @@
           <div class="card text-center border-success h-100">
             <div class="card-body">
               <h2 class="card-title text-success">{{ eligible_count }}</h2>
-              <p class="card-text text-muted mb-0">Eligible Members</p>
+              <p class="card-text text-muted mb-0">合格會員數</p>
             </div>
           </div>
         </div>
@@ -229,20 +331,52 @@
           <div class="card text-center border-info h-100">
             <div class="card-body">
               <h2 class="card-title text-info">{{ active_matchings }}</h2>
-              <p class="card-text text-muted mb-0">Active Matchings</p>
+              <p class="card-text text-muted mb-0">進行中配對</p>
             </div>
           </div>
         </div>
       </div>
 
+      <div class="card mb-3">
+        <div class="card-body">
+          <h6 class="card-title">發送 LINE 通知</h6>
+          <p class="text-muted small">推送未讀訊息與待確認約會提案的 LINE 通知給所有相關會員。</p>
+          <form method="POST" action="{{ url_for('admin_bp.send_notifications') }}"
+            onsubmit="return confirm('確定要立即發送通知給所有會員嗎？')">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-bell"></i> 發送通知
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-body">
+          <h6 class="card-title">通知即將到期會員</h6>
+          <p class="text-muted small">推送續約提醒給會員資格即將到期的會員。</p>
+          <form method="POST" action="{{ url_for('admin_bp.notify_expiring') }}"
+            onsubmit="return confirm('確定要發送到期提醒嗎？')" class="d-flex align-items-center gap-2">
+            <select class="form-select form-select-sm" name="days" style="width:auto;">
+              <option value="7">7 天內到期</option>
+              <option value="14">14 天內到期</option>
+              <option value="30">30 天內到期</option>
+            </select>
+            <button type="submit" class="btn btn-warning">
+              <i class="bi bi-calendar-x"></i> 發送到期提醒
+            </button>
+          </form>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-body">
-          <h6 class="card-title">Send LINE Notifications</h6>
-          <p class="text-muted small">Push LINE notifications for unread messages and pending date proposals.</p>
-          <form method="POST" action="{{ url_for('admin_bp.send_notifications') }}"
-            onsubmit="return confirm('Send notifications to all users now?')">
-            <button type="submit" class="btn btn-primary">
-              <i class="bi bi-bell"></i> Send Notifications
+          <h6 class="card-title">執行自動配對</h6>
+          <p class="text-muted small">重新計算所有合格會員的配對分數並執行本週配對。</p>
+          <form method="POST" action="{{ url_for('tasks_bp.task_match_all_users') }}"
+            onsubmit="return confirm('確定要執行自動配對嗎？此操作將覆蓋現有分數。')"
+            id="match-form">
+            <button type="submit" class="btn btn-danger">
+              <i class="bi bi-shuffle"></i> 執行自動配對
             </button>
           </form>
         </div>
@@ -254,15 +388,113 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
 <script>
-  // Activate the tab specified in the ?tab= query parameter
+  // ── 會員篩選與排序 ──
+  const filters = { gender: 'all', status: 'all', eligible: 'all', expiry: 'all' };
+  let sortCol = null, sortAsc = true;
+
+  function setFilter(key, val, btn) {
+    filters[key] = val;
+    btn.closest('.btn-group').querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    applyFiltersAndSort();
+  }
+
+  function applyFiltersAndSort() {
+    const tbody = document.querySelector('#members-table tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+
+    let visible = 0;
+    rows.forEach(row => {
+      const show =
+        (filters.gender   === 'all' || row.dataset.gender   === filters.gender)   &&
+        (filters.status   === 'all' || row.dataset.status   === filters.status)   &&
+        (filters.eligible === 'all' || row.dataset.eligible === filters.eligible) &&
+        (filters.expiry   === 'all' || row.dataset.expiry   === filters.expiry);
+      row.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    document.getElementById('member-count').textContent = `顯示 ${visible} / ${rows.length} 位`;
+
+    if (sortCol === null) return;
+    const sorted = rows.filter(r => r.style.display !== 'none').sort((a, b) => {
+      const av = a.children[sortCol].dataset.val ?? a.children[sortCol].textContent.trim();
+      const bv = b.children[sortCol].dataset.val ?? b.children[sortCol].textContent.trim();
+      const an = parseFloat(av), bn = parseFloat(bv);
+      const cmp = isNaN(an) || isNaN(bn) ? av.localeCompare(bv, 'zh-TW') : an - bn;
+      return sortAsc ? cmp : -cmp;
+    });
+    sorted.forEach(r => tbody.appendChild(r));
+  }
+
+  document.querySelectorAll('#members-table th.sortable').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = parseInt(th.dataset.col);
+      if (sortCol === col) { sortAsc = !sortAsc; }
+      else { sortCol = col; sortAsc = true; }
+      document.querySelectorAll('#members-table th.sortable i').forEach(i => {
+        i.className = 'bi bi-arrow-down-up small';
+      });
+      th.querySelector('i').className = sortAsc ? 'bi bi-arrow-up small' : 'bi bi-arrow-down small';
+      applyFiltersAndSort();
+    });
+  });
+
+  applyFiltersAndSort();
+
+  // ── 頁籤切換（從 ?tab= 參數） ──
   const params = new URLSearchParams(window.location.search);
   const tabName = params.get('tab');
   if (tabName) {
     const tabEl = document.getElementById(tabName + '-tab');
-    if (tabEl) {
-      new bootstrap.Tab(tabEl).show();
-    }
+    if (tabEl) new bootstrap.Tab(tabEl).show();
   }
+
+  // ── 約會行事曆 ──
+  const calendarEvents = [
+    {% for p in proposals %}
+    {
+      title: "{{ p.matching.cool_name }} @ {{ p.restaurant_name }}",
+      start: "{{ p.proposed_datetime.strftime('%Y-%m-%dT%H:%M:%S') }}",
+      color: "{{ '#198754' if p.status.value == 'CONFIRMED' else '#ffc107' }}",
+      textColor: "{{ '#fff' if p.status.value == 'CONFIRMED' else '#000' }}",
+      extendedProps: {
+        pair: "{{ p.matching.subject.name }} × {{ p.matching.object.name }}",
+        status: "{{ '已確認' if p.status.value == 'CONFIRMED' else '待確認' }}",
+        proposer: "{{ p.proposer.name }}"
+      }
+    },
+    {% endfor %}
+  ];
+
+  let calendarInitialised = false;
+  document.getElementById('dates-tab').addEventListener('shown.bs.tab', function () {
+    if (calendarInitialised) return;
+    calendarInitialised = true;
+    const calendar = new FullCalendar.Calendar(document.getElementById('dates-calendar'), {
+      initialView: 'dayGridMonth',
+      locale: 'zh-tw',
+      headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,listMonth' },
+      events: calendarEvents,
+      eventClick: function(info) {
+        const p = info.event.extendedProps;
+        alert(info.event.title + '\n配對：' + p.pair + '\n提案人：' + p.proposer + '\n狀態：' + p.status);
+      }
+    });
+    calendar.render();
+  });
+
+  // 自動配對加 TASK_SECRET header（透過隱藏 form 提交）
+  document.getElementById('match-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    fetch('{{ url_for("tasks_bp.task_match_all_users") }}', {
+      method: 'POST',
+      headers: { 'X-Task-Secret': '{{ config.get("TASK_SECRET", "") }}' }
+    }).then(r => {
+      if (r.ok) { alert('自動配對完成！'); location.reload(); }
+      else { alert('執行失敗，請檢查 server log。'); }
+    });
+  });
 </script>
 {% endblock %}
