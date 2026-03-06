@@ -134,7 +134,7 @@ def new_user():
 
         password_plain = request.form.get('password', '').strip()
         if not password_plain and birthday:
-            password_plain = str(birthday)
+            password_plain = birthday.strftime('%Y%m%d')
 
         exp_str = request.form.get('expiration_date', '').strip()
         expiration_date = None
