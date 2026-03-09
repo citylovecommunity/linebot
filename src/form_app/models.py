@@ -71,7 +71,7 @@ class Member(Base):
 
     @property
     def is_anonymous(self):
-        return True
+        return False
 
     matches_as_subject: Mapped[list["Matching"]] = relationship(
         "Matching",
@@ -229,25 +229,6 @@ class Matching(Base):
     def cancel(self, cancel_id):
         self.status = MatchingStatus.CANCELLED
         self.cancel_by_id = cancel_id
-
-    def activate_by(self, user_id):
-        """Records acceptance and activates match if both agree."""
-        if user_id == self.user_a_id:
-            self.subject_accepted = True
-        elif user_id == self.user_b_id:
-            self.object_accepted = True
-
-        # Check if BOTH have accepted
-        if self.subject_accepted and self.object_accepted:
-            self.status = MatchingStatus.ACTIVE
-
-    def has_accepted(self, user_id):
-        """Helper to check if a specific user has already agreed."""
-        if user_id == self.subject_id:
-            return self.subject_accepted
-        elif user_id == self.object_id:
-            return self.object_accepted
-        return False
 
     created_at: Mapped[datetime] = mapped_column(default=datetime.now)
 
