@@ -215,7 +215,7 @@ def calculate_match_score(me_adapter, candidate_adapter):
         score -= 40
         breakdown['under_age'] = f"-40"
 
-    if "離婚" in me_adapter.dealbreakers and "離婚" in candidate_adapter.marital_status:
+    if "離婚" in me_adapter.dealbreakers and "離婚" in (candidate_adapter.marital_status or ""):
         score -= 35
         breakdown['married'] = f"-35"
 
