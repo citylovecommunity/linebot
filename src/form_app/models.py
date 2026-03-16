@@ -200,6 +200,8 @@ class Matching(Base):
 
     cool_name: Mapped[Optional[str]]
 
+    is_match_notified: Mapped[Optional[bool]] = mapped_column(default=False)
+
     cancel_by_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey('member.id'))
 

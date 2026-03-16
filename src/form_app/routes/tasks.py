@@ -29,12 +29,15 @@ def task_match_all_users():
         return "Unauthorized", 401
 
     from form_app.services.matching import process_matches_bulk
+    from form_app.services.messaging import process_all_notifications
     from form_app.services.scoring import get_eligible_matching_pool, run_matching_score_optimized
 
     session = get_db()
     eligible_members = get_eligible_matching_pool(session)
     run_matching_score_optimized(eligible_members, session)
     process_matches_bulk(eligible_members, session)
+    session.flush()  # ensure new matchings have IDs before notifying
+    process_all_notifications(session)
     session.commit()
     current_app.logger.info("已批量配對用戶")
 

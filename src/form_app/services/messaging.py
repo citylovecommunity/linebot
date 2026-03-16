@@ -7,7 +7,7 @@ from sqlalchemy import and_
 
 from form_app.config import settings
 from form_app.extensions import line_bot_helper
-from form_app.models import DateProposal, Member, Message
+from form_app.models import DateProposal, Matching, Member, Message
 
 APP_URL = settings.APP_URL
 
@@ -100,6 +100,34 @@ def collect_confirmed_date_proposal_texts(session):
     return updates
 
 
+def collect_new_match_texts(session):
+    """
+    Returns a dict: { user_id: ["Text 1"] }
+    Fires once per new matching for both members.
+    """
+    updates = defaultdict(list)
+
+    new_matchings = (
+        session.query(Matching)
+        .filter(Matching.is_match_notified.is_not(True))
+        .all()
+    )
+
+    for matching in new_matchings:
+        for member in (matching.subject, matching.object):
+            if not member:
+                continue
+            text = (
+                f"🎉 恭喜！你有一個新的配對！\n\n"
+                f"代號：{matching.cool_name}\n\n"
+                f"👇 立刻前往查看吧！\n{APP_URL}/dashboard/{matching.id}"
+            )
+            updates[member.id].append(text)
+        matching.is_match_notified = True
+
+    return updates
+
+
 def process_all_notifications(session):
     # 1. Initialize Aggregator
     # This will hold all messages for all users: { user_id: [msg1, msg2] }
@@ -108,6 +136,10 @@ def process_all_notifications(session):
     all_notifications = defaultdict(list)
 
     # 2. Run Collectors
+    match_updates = collect_new_match_texts(session)
+    for uid, texts in match_updates.items():
+        all_notifications[uid].extend(texts)
+
     # Merge results from messages
     msg_updates = collect_unread_message_texts(session)
     for uid, texts in msg_updates.items():

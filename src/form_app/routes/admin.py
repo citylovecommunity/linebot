@@ -345,6 +345,9 @@ def new_matching():
             obj_grading_metric=int(obj_score.score),
         )
         session.add(new_match)
+        session.flush()
+        from form_app.services.messaging import process_all_notifications
+        process_all_notifications(session)
         session.commit()
         flash(f'已手動建立配對「{new_match.cool_name}」', 'success')
         return redirect(url_for('admin_bp.admin_dashboard', tab='matchings'))
