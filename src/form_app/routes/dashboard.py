@@ -1,8 +1,8 @@
 
 from typing import Optional
 
-from flask import (Blueprint, abort, flash, redirect, render_template, request,
-                   url_for)
+from flask import (Blueprint, abort, flash, jsonify, redirect, render_template,
+                   request, url_for)
 from flask_login import current_user, login_required
 
 from form_app.database import get_db
@@ -108,8 +108,14 @@ def matching_detail(matching_id):
 def submit_message(matching_id):
     db = get_db()
     matching = get_matching_or_abort(matching_id)
+    content = request.form.get('message_content') or (request.json or {}).get('content', '')
+    if not content:
+        if request.is_json:
+            return jsonify({'error': 'empty message'}), 400
+        return redirect(request.referrer)
+
     new_msg = Message(
-        content=request.form['message_content'],
+        content=content,
         user_id=current_user.id,
         matching=matching
     )
@@ -118,7 +124,40 @@ def submit_message(matching_id):
 
     matching.last_message_id = new_msg.id
     db.commit()
+
+    if request.is_json:
+        return jsonify({
+            'id': new_msg.id,
+            'content': new_msg.content,
+            'is_me': True,
+            'sender_name': current_user.proper_name,
+            'timestamp': new_msg.timestamp.strftime('%Y-%m-%d %H:%M'),
+            'is_system_notification': False,
+        })
     return redirect(request.referrer)
+
+
+@bp.route('/messages/<int:matching_id>', methods=['GET'])
+@login_required
+def get_messages(matching_id):
+    """Return messages after a given message id for live chat polling."""
+    matching = get_matching_or_abort(matching_id)
+    after_id = request.args.get('after_id', 0, type=int)
+    db = get_db()
+    msgs = (
+        db.query(Message)
+        .filter(Message.matching_id == matching_id, Message.id > after_id)
+        .order_by(Message.id)
+        .all()
+    )
+    return jsonify([{
+        'id': m.id,
+        'content': m.content,
+        'is_me': m.user_id == current_user.id,
+        'sender_name': m.user.proper_name,
+        'timestamp': m.timestamp.strftime('%Y-%m-%d %H:%M'),
+        'is_system_notification': m.is_system_notification,
+    } for m in msgs])
 
 
 @bp.route('/submit_proposal/<int:matching_id>', methods=['POST'])

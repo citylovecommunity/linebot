@@ -250,14 +250,11 @@
                         配對已取消，對話功能暫時關閉。
                     </div>
                     {% else %}
-                    <form method="POST"
-                        action="{{ url_for('dashboard_bp.submit_message', matching_id = matching.id) }}">
-                        <div class=" input-group">
-                            <input type="text" name="message_content" class="form-control border-0 bg-light"
-                                placeholder="Type a message..." style="padding: 12px;" required>
-                            <button class="btn btn-primary px-4"><i class="bi bi-send-fill"></i></button>
-                        </div>
-                    </form>
+                    <div class="input-group" id="chatInputGroup">
+                        <input type="text" id="chatInput" class="form-control border-0 bg-light"
+                            placeholder="Type a message..." style="padding: 12px;">
+                        <button class="btn btn-primary px-4" id="chatSendBtn"><i class="bi bi-send-fill"></i></button>
+                    </div>
                     {% endif %}
                 </div>
             </div>
@@ -302,8 +299,99 @@
 </div>
 
 <script>
-    var messageBox = document.getElementById("messageBox");
-    messageBox.scrollTop = messageBox.scrollHeight;
+    const messageBox = document.getElementById("messageBox");
+    const chatInput = document.getElementById("chatInput");
+    const chatSendBtn = document.getElementById("chatSendBtn");
+    const matchingId = {{ matching.id }};
+    const submitUrl = "{{ url_for('dashboard_bp.submit_message', matching_id=matching.id) }}";
+    const pollUrl = "{{ url_for('dashboard_bp.get_messages', matching_id=matching.id) }}";
+
+    // Track the last message id to only fetch new ones
+    let lastMsgId = {{ messages[-1].id if messages else 0 }};
+
+    function scrollToBottom() {
+        messageBox.scrollTop = messageBox.scrollHeight;
+    }
+
+    function appendMessage(msg) {
+        let el;
+        if (msg.is_system_notification) {
+            el = document.createElement('div');
+            el.className = 'text-center my-3';
+            el.innerHTML = `<span class="badge bg-light text-muted fw-normal border px-3 py-2">${escapeHtml(msg.content)}</span>`;
+        } else {
+            el = document.createElement('div');
+            el.className = `chat-bubble ${msg.is_me ? 'msg-outgoing' : 'msg-incoming'}`;
+            let inner = '';
+            if (!msg.is_me) {
+                inner += `<div class="fw-bold small mb-1">${escapeHtml(msg.sender_name)}</div>`;
+            }
+            inner += escapeHtml(msg.content);
+            inner += `<span class="msg-time">${escapeHtml(msg.timestamp)}</span>`;
+            el.innerHTML = inner;
+        }
+        messageBox.appendChild(el);
+        if (msg.id > lastMsgId) lastMsgId = msg.id;
+    }
+
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    async function sendMessage() {
+        const content = chatInput.value.trim();
+        if (!content) return;
+        chatInput.value = '';
+        chatSendBtn.disabled = true;
+
+        try {
+            const res = await fetch(submitUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content })
+            });
+            if (res.ok) {
+                const msg = await res.json();
+                appendMessage(msg);
+                scrollToBottom();
+            }
+        } finally {
+            chatSendBtn.disabled = false;
+            chatInput.focus();
+        }
+    }
+
+    async function pollMessages() {
+        try {
+            const res = await fetch(`${pollUrl}?after_id=${lastMsgId}`);
+            if (res.ok) {
+                const msgs = await res.json();
+                if (msgs.length > 0) {
+                    // Only append messages not sent by current user (those are already shown)
+                    msgs.forEach(msg => {
+                        if (!msg.is_me) appendMessage(msg);
+                        else if (msg.id > lastMsgId) lastMsgId = msg.id;
+                    });
+                    scrollToBottom();
+                }
+            }
+        } catch (e) { /* ignore network errors */ }
+    }
+
+    if (chatSendBtn) {
+        chatSendBtn.addEventListener('click', sendMessage);
+        chatInput.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+        });
+        // Poll every 5 seconds for new messages
+        setInterval(pollMessages, 5000);
+    }
+
+    scrollToBottom();
 </script>
 
 {% endblock %}
