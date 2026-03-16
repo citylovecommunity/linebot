@@ -160,9 +160,15 @@
                 <span class="text-muted">—</span>
                 {% endif %}
               </td>
-              <td>
+              <td class="text-nowrap">
                 <a href="{{ url_for('admin_bp.edit_user', user_id=member.id) }}"
                   class="btn btn-sm btn-outline-primary">編輯</a>
+                <form method="POST"
+                  action="{{ url_for('admin_bp.delete_user', user_id=member.id) }}"
+                  class="d-inline"
+                  onsubmit="return confirm('確定要永久刪除「{{ member.name }}」嗎？此操作無法復原。')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">刪除</button>
+                </form>
               </td>
             </tr>
             {% endfor %}

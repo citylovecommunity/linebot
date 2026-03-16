@@ -5,7 +5,7 @@ from flask_login import login_required, current_user
 from sqlalchemy.orm import joinedload, subqueryload, defer
 from sqlalchemy.orm.attributes import flag_modified
 
-from form_app.models import Member, Matching, MatchingStatus, UserMatchScore, DateProposal, ProposalStatus
+from form_app.models import Member, Matching, MatchingStatus, UserMatchScore, DateProposal, ProposalStatus, Line_Info
 from form_app.decorators import admin_required
 from form_app.database import get_db
 from form_app.services.cool_name import generate_funny_name
@@ -229,6 +229,35 @@ def edit_user(user_id):
         return redirect(url_for('admin_bp.admin_dashboard'))
 
     return render_template('admin_user_form.html', user=user)
+
+
+@bp.route('/users/<int:user_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_user(user_id):
+    session = get_db()
+    user = session.get(Member, user_id)
+    if user is None:
+        flash('找不到該會員', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard'))
+
+    if user.all_matches:
+        flash(f'無法刪除「{user.name}」：該會員有配對記錄，請先取消所有配對。', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard'))
+
+    # Remove related scores and line_info before deleting member
+    session.query(UserMatchScore).filter(
+        (UserMatchScore.source_user_id == user_id) |
+        (UserMatchScore.target_user_id == user_id)
+    ).delete(synchronize_session=False)
+    if user.line_info:
+        session.delete(user.line_info)
+
+    name = user.name
+    session.delete(user)
+    session.commit()
+    flash(f'已刪除會員「{name}」', 'success')
+    return redirect(url_for('admin_bp.admin_dashboard'))
 
 
 @bp.route('/matchings/<int:matching_id>/cancel', methods=['POST'])
