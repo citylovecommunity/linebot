@@ -15,7 +15,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column('member', sa.Column('expiration_date', sa.Date(), nullable=True))
+    op.execute("ALTER TABLE member ADD COLUMN IF NOT EXISTS expiration_date DATE")
 
 
 def downgrade() -> None:
