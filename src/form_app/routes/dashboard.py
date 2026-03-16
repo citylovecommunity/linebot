@@ -70,12 +70,13 @@ def matching_detail(matching_id):
         return redirect(url_for('dashboard_bp.dashboard'))
 
     # 新增訊息已讀
-    from datetime import datetime
-    now = datetime.now()
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
     for msg in matching.messages:
-        # Condition: Message is unread AND I am the receiver
         if msg.read_at is None and msg.receiver_id == current_user.id:
             msg.read_at = now
+
+    current_user.last_seen_at = now
 
     db = get_db()
     db.commit()

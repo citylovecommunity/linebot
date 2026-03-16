@@ -221,7 +221,12 @@
             <div class="modern-card h-100">
                 <div class="card-header-clean d-flex justify-content-between align-items-center">
                     <span><i class="bi bi-chat-dots me-2 text-primary"></i> 對話</span>
-                    <span class="badge bg-light text-dark">{{ messages|length }} messages</span>
+                    <span class="d-flex align-items-center gap-2">
+                        <span id="pollIndicator" class="text-success small" style="display:none!important;">
+                            <i class="bi bi-circle-fill" style="font-size:.5rem;vertical-align:middle;"></i> 即時更新中
+                        </span>
+                        <span id="msgCountBadge" class="badge bg-light text-dark">{{ messages|length }} 則訊息</span>
+                    </span>
                 </div>
 
                 <div class="chat-container" id="messageBox">
@@ -252,8 +257,11 @@
                     {% else %}
                     <div class="input-group" id="chatInputGroup">
                         <input type="text" id="chatInput" class="form-control border-0 bg-light"
-                            placeholder="Type a message..." style="padding: 12px;">
+                            placeholder="輸入訊息..." style="padding: 12px;">
                         <button class="btn btn-primary px-4" id="chatSendBtn"><i class="bi bi-send-fill"></i></button>
+                    </div>
+                    <div id="chatError" class="text-danger small mt-1" style="display:none;">
+                        <i class="bi bi-exclamation-circle me-1"></i>傳送失敗，請稍後再試。
                     </div>
                     {% endif %}
                 </div>
@@ -302,6 +310,9 @@
     const messageBox = document.getElementById("messageBox");
     const chatInput = document.getElementById("chatInput");
     const chatSendBtn = document.getElementById("chatSendBtn");
+    const chatError = document.getElementById("chatError");
+    const msgCountBadge = document.getElementById("msgCountBadge");
+    const pollIndicator = document.getElementById("pollIndicator");
     const matchingId = {{ matching.id }};
     const submitUrl = "{{ url_for('dashboard_bp.submit_message', matching_id=matching.id) }}";
     const pollUrl = "{{ url_for('dashboard_bp.get_messages', matching_id=matching.id) }}";
@@ -332,6 +343,9 @@
         }
         messageBox.appendChild(el);
         if (msg.id > lastMsgId) lastMsgId = msg.id;
+        // Update badge count
+        const current = parseInt(msgCountBadge.textContent) || 0;
+        msgCountBadge.textContent = (current + 1) + ' 則訊息';
     }
 
     function escapeHtml(str) {
@@ -347,6 +361,7 @@
         if (!content) return;
         chatInput.value = '';
         chatSendBtn.disabled = true;
+        chatError.style.display = 'none';
 
         try {
             const res = await fetch(submitUrl, {
@@ -358,7 +373,13 @@
                 const msg = await res.json();
                 appendMessage(msg);
                 scrollToBottom();
+            } else {
+                chatInput.value = content;  // restore unsent message
+                chatError.style.display = 'block';
             }
+        } catch (e) {
+            chatInput.value = content;
+            chatError.style.display = 'block';
         } finally {
             chatSendBtn.disabled = false;
             chatInput.focus();
@@ -387,7 +408,10 @@
         chatInput.addEventListener('keydown', e => {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
         });
-        // Poll every 5 seconds for new messages
+        chatInput.addEventListener('input', () => { chatError.style.display = 'none'; });
+        // Show polling indicator and start polling every 5 seconds
+        pollIndicator.style.display = 'inline!important';
+        pollIndicator.style.setProperty('display', 'inline-flex', 'important');
         setInterval(pollMessages, 5000);
     }
 

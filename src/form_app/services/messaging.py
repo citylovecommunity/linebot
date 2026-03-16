@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from linebot import LineBotApi
 from linebot.models import TextMessage
@@ -12,9 +12,18 @@ from form_app.models import DateProposal, Matching, Member, Message
 APP_URL = settings.APP_URL
 
 
+_MAX_CONTENT_LEN = 50
+_SILENCE_WINDOW_SECONDS = 10 * 60  # 10 minutes
+
+
+def _trim(text: str) -> str:
+    return text if len(text) <= _MAX_CONTENT_LEN else text[:_MAX_CONTENT_LEN] + '...'
+
+
 def collect_unread_message_texts(session):
     """
-    Returns a dict: { user_id: ["Text 1"] }
+    Returns a dict: { user_id: [text, ...] }
+    Messages are bundled per conversation (one LINE message per matching).
     """
     updates = defaultdict(list)
 
@@ -26,12 +35,34 @@ def collect_unread_message_texts(session):
         )
         .all()
     )
-    for message in un_notified_messages:
-        matching = message.matching
-        text = f"""📩 {matching.cool_name} {message.user.proper_name}: {message.content}\n🔗 馬上回覆: {APP_URL}/dashboard/{matching.id}
-        """
-        updates[message.receiver_id].append(text)
-        message.is_notified = True
+
+    # Group by (receiver_id, matching_id)
+    by_convo = defaultdict(list)
+    for msg in un_notified_messages:
+        by_convo[(msg.receiver_id, msg.matching_id)].append(msg)
+
+    for (receiver_id, matching_id), msgs in by_convo.items():
+        matching = msgs[0].matching
+        count = len(msgs)
+
+        if count <= 3:
+            lines = "\n".join(
+                f"  {m.user.proper_name}: {_trim(m.content)}" for m in msgs
+            )
+            text = (
+                f"📩 {matching.cool_name} — {count} 則未讀\n"
+                f"{lines}\n\n"
+                f"🔗 馬上回覆: {APP_URL}/dashboard/{matching_id}"
+            )
+        else:
+            text = (
+                f"📩 {matching.cool_name} — 您有 {count} 則未讀訊息\n\n"
+                f"🔗 馬上回覆: {APP_URL}/dashboard/{matching_id}"
+            )
+
+        updates[receiver_id].append(text)
+        for msg in msgs:
+            msg.is_notified = True
 
     return updates
 
@@ -119,8 +150,9 @@ def collect_new_match_texts(session):
                 continue
             text = (
                 f"🎉 恭喜！你有一個新的配對！\n\n"
+                f"你的新夥伴正在等你 👀\n"
                 f"代號：{matching.cool_name}\n\n"
-                f"👇 立刻前往查看吧！\n{APP_URL}/dashboard/{matching.id}"
+                f"👇 登入查看：\n{APP_URL}/dashboard/{matching.id}"
             )
             updates[member.id].append(text)
         matching.is_match_notified = True
@@ -160,26 +192,33 @@ def process_all_notifications(session):
 
     line_bot_api = LineBotApi(line_bot_helper.configuration.access_token)
 
+    now = datetime.now(timezone.utc)
+
     # 4. Iterate over distinct Users
     for user_id_db, messages in all_notifications.items():
 
-        # Fetch User Object to check silence window & get Line ID
         user = session.get(Member, user_id_db)
+
+        # Silence window: skip if user was active on the dashboard recently
+        if user.last_seen_at and (now - user.last_seen_at).total_seconds() < _SILENCE_WINDOW_SECONDS:
+            continue
 
         if dev:
             target_line_id = settings.LINE_TEST_USER_ID
         else:
+            if not user.line_info:
+                continue
             target_line_id = user.line_info.user_id
 
-        line_messages = [TextMessage(text=m) for m in messages[:5]]
+        # LINE allows max 5 messages per push; bundle overflow into a summary
+        if len(messages) <= 5:
+            line_messages = [TextMessage(text=m) for m in messages]
+        else:
+            line_messages = [TextMessage(text=m) for m in messages[:4]]
+            line_messages.append(TextMessage(text=f"⋯ 還有 {len(messages) - 4} 則通知，請登入查看。"))
 
-        print(
-            f"Sending {len(messages)} msgs to Test User for ID {user.id}")
+        print(f"Sending {len(line_messages)} msgs to user {user.id}")
 
-        line_bot_api.push_message(
-            target_line_id,
-            messages=line_messages
-        )
+        line_bot_api.push_message(target_line_id, messages=line_messages)
 
-        # Update Timestamp
-        user.last_notification_sent_at = datetime.now(timezone.utc)
+        user.last_notification_sent_at = now

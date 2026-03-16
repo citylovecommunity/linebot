@@ -104,6 +104,10 @@ class Member(Base):
         DateTime(timezone=True),
     )
 
+    last_seen_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+    )
+
     @property
     def is_match_ready(self):
         """Returns True if the user has all requirements for matching."""
