@@ -28,6 +28,12 @@ def task_match_all_users():
     if request.headers.get('X-Task-Secret') != settings.TASK_SECRET:
         return "Unauthorized", 401
 
+    # ?skip_notify=true: insert matchings but skip LINE notifications.
+    # Use this when users have already been notified but the previous run's
+    # commit failed and the matchings were never persisted.
+    skip_notify = request.args.get('skip_notify', 'false').lower() == 'true'
+
+    from form_app.models import Matching
     from form_app.services.matching import process_matches_bulk
     from form_app.services.messaging import process_all_notifications
     from form_app.services.scoring import get_eligible_matching_pool, run_matching_score_optimized
@@ -36,10 +42,26 @@ def task_match_all_users():
     eligible_members = get_eligible_matching_pool(session)
     run_matching_score_optimized(eligible_members, session)
     process_matches_bulk(eligible_members, session)
-    session.flush()  # ensure new matchings have IDs before notifying
-    process_all_notifications(session)
-    session.commit()
-    current_app.logger.info("已批量配對用戶")
+
+    if skip_notify:
+        # Mark every unnotified matching (including the ones just created) as
+        # already notified so the next send-notifications run won't fire them.
+        new_matchings = session.query(Matching).filter(
+            Matching.is_match_notified.is_not(True)
+        ).all()
+        for m in new_matchings:
+            m.is_match_notified = True
+        session.commit()
+        current_app.logger.info(
+            f"已批量配對用戶（skip_notify=true，共標記 {len(new_matchings)} 筆為已通知）"
+        )
+    else:
+        # Commit matchings first so they exist even if the notification step fails.
+        # LINE push_message is irreversible — it must happen only after the DB is safe.
+        session.commit()
+        process_all_notifications(session)
+        session.commit()
+        current_app.logger.info("已批量配對用戶並發送通知")
 
     return "OK", 200
 
