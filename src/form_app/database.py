@@ -56,4 +56,7 @@ def close_db(e=None):
     """
     db = g.pop('db_session', None)
     if db is not None:
-        db.close()
+        try:
+            db.close()
+        except Exception:
+            db.invalidate()
