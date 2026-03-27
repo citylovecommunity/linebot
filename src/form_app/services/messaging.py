@@ -4,6 +4,7 @@ from datetime import datetime, timezone, timedelta
 from linebot import LineBotApi
 from linebot.models import TextMessage
 from sqlalchemy import and_
+from sqlalchemy.orm import joinedload
 
 from form_app.config import settings
 from form_app.extensions import line_bot_helper
@@ -190,14 +191,30 @@ def process_all_notifications(session):
     if not all_notifications:
         return
 
+    # Commit all is_*_notified flags before pushing so they are persisted
+    # even if a LINE API call fails later.
+    session.commit()
+
     line_bot_api = LineBotApi(line_bot_helper.configuration.access_token)
 
     now = datetime.now(timezone.utc)
 
-    # 4. Iterate over distinct Users
+    # 4. Eager-load all members with line_info in one query to avoid lazy-loads
+    # after the commit (which expires all ORM objects).
+    user_ids = list(all_notifications.keys())
+    members = (
+        session.query(Member)
+        .filter(Member.id.in_(user_ids))
+        .options(joinedload(Member.line_info))
+        .all()
+    )
+    members_by_id = {m.id: m for m in members}
+
     for user_id_db, messages in all_notifications.items():
 
-        user = session.get(Member, user_id_db)
+        user = members_by_id.get(user_id_db)
+        if not user:
+            continue
 
         # Silence window: skip if user was active on the dashboard recently
         if user.last_seen_at and (now - user.last_seen_at).total_seconds() < _SILENCE_WINDOW_SECONDS:
@@ -219,6 +236,8 @@ def process_all_notifications(session):
 
         print(f"Sending {len(line_messages)} msgs to user {user.id}")
 
-        line_bot_api.push_message(target_line_id, messages=line_messages)
-
-        user.last_notification_sent_at = now
+        try:
+            line_bot_api.push_message(target_line_id, messages=line_messages)
+            user.last_notification_sent_at = now
+        except Exception as e:
+            print(f"Failed to push LINE message to user {user.id}: {e}")
