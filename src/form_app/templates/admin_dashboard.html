@@ -111,7 +111,7 @@
             <tr
               data-gender="{{ member.gender }}"
               data-status="{{ 'active' if member.is_active else 'inactive' }}"
-              data-eligible="{{ 'ready' if (member.is_match_ready and member.is_active and not member.is_test) else 'not-ready' }}"
+              data-eligible="{{ 'ready' if (member.id in match_ready_ids and member.is_active and not member.is_test) else 'not-ready' }}"
               data-expiry="{{ expiry_state }}">
               <td class="text-muted small" data-val="{{ member.id }}">{{ member.id }}</td>
               <td data-val="{{ member.name }}">{{ member.name }}</td>
@@ -128,7 +128,7 @@
                 <span class="badge bg-warning text-dark">測試</span>
                 {% endif %}
               </td>
-              <td data-val="{{ member.all_matches|length }}">{{ member.all_matches|length }}</td>
+              <td data-val="{{ member_match_counts.get(member.id, 0) }}">{{ member_match_counts.get(member.id, 0) }}</td>
               <td data-val="{{ member_date_counts.get(member.id, 0) }}">
                 {% set dc = member_date_counts.get(member.id, 0) %}
                 {% if dc > 0 %}
@@ -201,11 +201,13 @@
           </thead>
           <tbody>
             {% for matching in matchings %}
+            {% set subj = members_by_id.get(matching.subject_id) %}
+            {% set obj  = members_by_id.get(matching.object_id) %}
             <tr>
               <td class="text-muted small">{{ matching.id }}</td>
               <td>{{ matching.cool_name }}</td>
-              <td>{{ matching.subject.name }}</td>
-              <td>{{ matching.object.name }}</td>
+              <td>{{ subj.name if subj else '—' }}</td>
+              <td>{{ obj.name if obj else '—' }}</td>
               <td>
                 {% if matching.status.value == 'ACTIVE' %}
                 <span class="badge bg-success">進行中</span>
@@ -289,14 +291,18 @@
           </thead>
           <tbody>
             {% for p in proposals | sort(attribute='proposed_datetime', reverse=True) %}
+            {% set pm    = matchings_by_id.get(p.matching_id) %}
+            {% set psubj = members_by_id.get(pm.subject_id) if pm else none %}
+            {% set pobj  = members_by_id.get(pm.object_id) if pm else none %}
+            {% set pprop = members_by_id.get(p.proposer_id) %}
             <tr>
               <td>
-                <span class="fw-semibold">{{ p.matching.cool_name }}</span>
-                <div class="text-muted small">{{ p.matching.subject.name }} × {{ p.matching.object.name }}</div>
+                <span class="fw-semibold">{{ pm.cool_name if pm else '—' }}</span>
+                <div class="text-muted small">{{ psubj.name if psubj else '—' }} × {{ pobj.name if pobj else '—' }}</div>
               </td>
               <td>{{ p.restaurant_name }}</td>
               <td class="small">{{ p.proposed_datetime.strftime('%Y-%m-%d %H:%M') }}</td>
-              <td class="small">{{ p.proposer.name }}</td>
+              <td class="small">{{ pprop.name if pprop else '—' }}</td>
               <td>
                 {% if p.status.value == 'CONFIRMED' %}
                 <span class="badge bg-success">已確認</span>
@@ -460,15 +466,19 @@
   // ── 約會行事曆 ──
   const calendarEvents = [
     {% for p in proposals %}
+    {% set cm    = matchings_by_id.get(p.matching_id) %}
+    {% set csubj = members_by_id.get(cm.subject_id) if cm else none %}
+    {% set cobj  = members_by_id.get(cm.object_id) if cm else none %}
+    {% set cprop = members_by_id.get(p.proposer_id) %}
     {
-      title: "{{ p.matching.cool_name }} @ {{ p.restaurant_name }}",
+      title: "{{ cm.cool_name if cm else '' }} @ {{ p.restaurant_name }}",
       start: "{{ p.proposed_datetime.strftime('%Y-%m-%dT%H:%M:%S') }}",
       color: "{{ '#198754' if p.status.value == 'CONFIRMED' else '#ffc107' }}",
       textColor: "{{ '#fff' if p.status.value == 'CONFIRMED' else '#000' }}",
       extendedProps: {
-        pair: "{{ p.matching.subject.name }} × {{ p.matching.object.name }}",
+        pair: "{{ csubj.name if csubj else '—' }} × {{ cobj.name if cobj else '—' }}",
         status: "{{ '已確認' if p.status.value == 'CONFIRMED' else '待確認' }}",
-        proposer: "{{ p.proposer.name }}"
+        proposer: "{{ cprop.name if cprop else '—' }}"
       }
     },
     {% endfor %}

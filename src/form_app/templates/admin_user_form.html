@@ -3,7 +3,7 @@
 {% block title %}{{ '編輯會員' if user else '新增會員' }} — Admin{% endblock %}
 
 {% block content %}
-<div class="container mt-4" style="max-width: 720px;">
+<div class="container mt-4" style="max-width: 800px;">
   <div class="d-flex align-items-center mb-4 gap-3">
     <a href="{{ url_for('admin_bp.admin_dashboard') }}" class="btn btn-sm btn-outline-secondary">
       <i class="bi bi-arrow-left"></i> Back
@@ -11,8 +11,11 @@
     <h3 class="mb-0">{{ '編輯會員' if user else '新增會員' }}</h3>
   </div>
 
+  {# Helper: read a user_info value safely #}
+  {% set ui = user.user_info if user and user.user_info else {} %}
+
   <form method="POST">
-    <!-- Identity -->
+    <!-- ── Identity ─────────────────────────────────────────────── -->
     <div class="card mb-3">
       <div class="card-header fw-semibold">Identity</div>
       <div class="card-body">
@@ -53,35 +56,34 @@
       </div>
     </div>
 
-    <!-- Status -->
+    <!-- ── Status ────────────────────────────────────────────────── -->
     <div class="card mb-3">
       <div class="card-header fw-semibold">Status</div>
       <div class="card-body">
         <div class="row g-3">
           <div class="col-sm-6">
             <label class="form-label">Rank</label>
-            <input type="text" class="form-control" name="rank"
-              value="{{ user.rank if user and user.rank else '' }}">
-          </div>
-          <div class="col-sm-6">
-            <label class="form-label">婚姻狀況</label>
-            <input type="text" class="form-control" name="marital_status"
-              value="{{ user.marital_status if user and user.marital_status else '' }}">
+            <select class="form-select" name="rank">
+              <option value="">— 未設定 —</option>
+              {% for r in ['A', 'B', 'C'] %}
+              <option value="{{ r }}" {% if user and user.rank == r %}selected{% endif %}>{{ r }}</option>
+              {% endfor %}
+            </select>
           </div>
           <div class="col-sm-6">
             <label class="form-label">到期日</label>
             <input type="date" class="form-control" name="expiration_date"
               value="{{ user.expiration_date.strftime('%Y-%m-%d') if user and user.expiration_date else '' }}">
           </div>
-          <div class="col-sm-6">
-            <div class="form-check mt-2">
+          <div class="col-sm-3 d-flex align-items-end">
+            <div class="form-check mb-2">
               <input class="form-check-input" type="checkbox" name="is_active" id="is_active"
                 {% if user is none or user.is_active %}checked{% endif %}>
               <label class="form-check-label" for="is_active">Is Active</label>
             </div>
           </div>
-          <div class="col-sm-6">
-            <div class="form-check mt-2">
+          <div class="col-sm-3 d-flex align-items-end">
+            <div class="form-check mb-2">
               <input class="form-check-input" type="checkbox" name="is_test" id="is_test"
                 {% if user and user.is_test %}checked{% endif %}>
               <label class="form-check-label" for="is_test">Is Test Account</label>
@@ -91,48 +93,180 @@
       </div>
     </div>
 
-    <!-- Preferences -->
+    <!-- ── Profile Links ─────────────────────────────────────────── -->
     <div class="card mb-3">
-      <div class="card-header fw-semibold">Preferences</div>
+      <div class="card-header fw-semibold">Profile Links</div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label">會員介紹頁網址</label>
+          <input type="url" class="form-control" name="introduction_link"
+            value="{{ user.introduction_link if user and user.introduction_link else '' }}">
+        </div>
+        <div class="mb-0">
+          <label class="form-label">盲約介紹卡一</label>
+          <input type="url" class="form-control" name="blind_introduction_link"
+            value="{{ user.blind_introduction_link if user and user.blind_introduction_link else '' }}">
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Matchmaking Profile ───────────────────────────────────── -->
+    <div class="card mb-3 border-primary">
+      <div class="card-header fw-semibold bg-primary text-white">
+        <i class="bi bi-heart-fill me-1"></i> 配對資料 (Matchmaking Profile)
+      </div>
       <div class="card-body">
         <div class="row g-3">
           <div class="col-sm-6">
-            <label class="form-label">偏好最低身高</label>
-            <input type="number" class="form-control" name="pref_min_height" min="100" max="250"
-              value="{{ user.pref_min_height if user and user.pref_min_height else '' }}">
+            <label class="form-label">感情狀況</label>
+            {% set cur_marital = ui.get('您目前的感情狀況') or (user.marital_status if user else '') %}
+            <select class="form-select" name="marital_status">
+              <option value="">— 未設定 —</option>
+              {% for s in ['單身', '離婚', '喪偶'] %}
+              <option value="{{ s }}" {% if cur_marital == s %}selected{% endif %}>{{ s }}</option>
+              {% endfor %}
+            </select>
           </div>
           <div class="col-sm-6">
-            <label class="form-label">偏好最高身高</label>
-            <input type="number" class="form-control" name="pref_max_height" min="100" max="250"
-              value="{{ user.pref_max_height if user and user.pref_max_height else '' }}">
+            <label class="form-label">有無小孩需要扶養</label>
+            {% set cur_children = ui.get('您有無小孩需要扶養', '') %}
+            <select class="form-select" name="has_children">
+              <option value="">— 未設定 —</option>
+              <option value="沒有" {% if cur_children == '沒有' %}selected{% endif %}>沒有</option>
+              <option value="有" {% if cur_children == '有' %}selected{% endif %}>有</option>
+            </select>
           </div>
           <div class="col-sm-6">
-            <label class="form-label">偏好最大出生年 (oldest)</label>
-            <input type="number" class="form-control" name="pref_oldest_birth_year" min="1940" max="2010"
-              value="{{ user.pref_oldest_birth_year if user and user.pref_oldest_birth_year else '' }}">
+            <label class="form-label">職業類別</label>
+            <input type="text" class="form-control" name="job_category"
+              placeholder="e.g. 服務業、科技業"
+              value="{{ ui.get('會員之職業類別', '') }}">
           </div>
           <div class="col-sm-6">
-            <label class="form-label">偏好最小出生年 (youngest)</label>
-            <input type="number" class="form-control" name="pref_youngest_birth_year" min="1940" max="2010"
-              value="{{ user.pref_youngest_birth_year if user and user.pref_youngest_birth_year else '' }}">
+            <label class="form-label">飲食習慣</label>
+            {% set cur_diet = ui.get('您的飲食習慣', '') %}
+            <select class="form-select" name="diet">
+              <option value="">— 未設定 —</option>
+              {% for d in ['葷', '素', '葷素皆可', '純素'] %}
+              <option value="{{ d }}" {% if cur_diet == d %}selected{% endif %}>{{ d }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">宗教信仰</label>
+            {% set cur_religion = ui.get('宗教信仰', '') %}
+            <select class="form-select" name="religion">
+              <option value="">— 未設定 —</option>
+              {% for rel in ['無特別宗教信仰（無限制）', '佛教', '基督教', '天主教', '伊斯蘭教', '道教'] %}
+              <option value="{{ rel }}" {% if cur_religion == rel %}selected{% endif %}>{{ rel }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- Datable Regions -->
+        <hr class="my-3">
+        <label class="form-label fw-semibold">可約會地區</label>
+        {% set cur_regions = ui.get('可約會地區 (可複選)', '') %}
+        <div class="row row-cols-2 row-cols-sm-3 g-2">
+          {% for region in ['大台北地區', '桃園', '新竹', '台中', '台南', '高雄', '基隆', '宜蘭', '花蓮', '台東'] %}
+          <div class="col">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="date_regions"
+                value="{{ region }}" id="region_{{ loop.index }}"
+                {% if region in cur_regions %}checked{% endif %}>
+              <label class="form-check-label" for="region_{{ loop.index }}">{{ region }}</label>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Dealbreakers ──────────────────────────────────────────── -->
+    <div class="card mb-3 border-danger">
+      <div class="card-header fw-semibold bg-danger text-white">
+        <i class="bi bi-x-circle-fill me-1"></i> 絕對不接受條件 (Dealbreakers)
+      </div>
+      <div class="card-body">
+        <p class="text-muted small mb-3">勾選後，系統將<strong>永不</strong>把符合此條件的對象配對給此會員。</p>
+
+        <!-- Hard dealbreakers checkboxes -->
+        <label class="form-label fw-semibold">完全無法接受的對象條件</label>
+        {% set cur_db = ui.get('您完全無法接受的對象條件 (可複選)', '') %}
+        <div class="row row-cols-2 row-cols-sm-3 g-2 mb-3">
+          {% for item in ['離婚', '有小孩', '抽菸', '喝酒', '紋身'] %}
+          <div class="col">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="dealbreakers"
+                value="{{ item }}" id="db_{{ loop.index }}"
+                {% if item in cur_db %}checked{% endif %}>
+              <label class="form-check-label" for="db_{{ loop.index }}">{{ item }}</label>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="row g-3">
+          <div class="col-sm-4">
+            <label class="form-label">不能接受的飲食習慣</label>
+            {% set cur_db_diet = ui.get('不能接受的飲食習慣', '') %}
+            <select class="form-select" name="dealbreaker_diet">
+              <option value="">不設限</option>
+              {% for d in ['葷', '素', '純素'] %}
+              <option value="{{ d }}" {% if cur_db_diet == d %}selected{% endif %}>{{ d }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label">無法接受之職業類別</label>
+            <input type="text" class="form-control" name="dealbreaker_job"
+              placeholder="e.g. 軍警消"
+              value="{{ ui.get('無法接受之職業類別', '') }}">
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label">無法接受的宗教信仰</label>
+            {% set cur_db_rel = ui.get('無法接受的宗教信仰', '') %}
+            <select class="form-select" name="dealbreaker_religion">
+              <option value="">不設限</option>
+              {% for rel in ['佛教', '基督教', '天主教', '伊斯蘭教', '道教'] %}
+              <option value="{{ rel }}" {% if cur_db_rel == rel %}selected{% endif %}>{{ rel }}</option>
+              {% endfor %}
+            </select>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Profile Links -->
+    <!-- ── Height & Age Preferences ─────────────────────────────── -->
     <div class="card mb-3">
-      <div class="card-header fw-semibold">Profile Links</div>
+      <div class="card-header fw-semibold">期待對象條件 (Preferences)</div>
       <div class="card-body">
-        <div class="mb-3">
-          <label class="form-label">會員介紹頁網址 (introduction_link)</label>
-          <input type="url" class="form-control" name="introduction_link"
-            value="{{ user.introduction_link if user and user.introduction_link else '' }}">
-        </div>
-        <div class="mb-0">
-          <label class="form-label">盲約介紹卡一 (blind_introduction_link)</label>
-          <input type="url" class="form-control" name="blind_introduction_link"
-            value="{{ user.blind_introduction_link if user and user.blind_introduction_link else '' }}">
+        <div class="row g-3">
+          <div class="col-sm-6">
+            <label class="form-label">偏好最低身高 (cm)</label>
+            <input type="number" class="form-control" name="pref_min_height" min="100" max="250"
+              value="{{ user.pref_min_height if user and user.pref_min_height else '' }}">
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">偏好最高身高 (cm)</label>
+            <input type="number" class="form-control" name="pref_max_height" min="100" max="250"
+              value="{{ user.pref_max_height if user and user.pref_max_height else '' }}">
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">對象最大出生年 (oldest acceptable)</label>
+            <input type="number" class="form-control" name="pref_oldest_birth_year" min="1940" max="2010"
+              placeholder="e.g. 1985"
+              value="{{ user.pref_oldest_birth_year if user and user.pref_oldest_birth_year else '' }}">
+            <div class="form-text">填 1985 = 對象須為 1985 年（含）後出生</div>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">對象最小出生年 (youngest acceptable)</label>
+            <input type="number" class="form-control" name="pref_youngest_birth_year" min="1940" max="2010"
+              placeholder="e.g. 2000"
+              value="{{ user.pref_youngest_birth_year if user and user.pref_youngest_birth_year else '' }}">
+            <div class="form-text">填 2000 = 對象須為 2000 年（含）前出生</div>
+          </div>
         </div>
       </div>
     </div>
@@ -145,7 +279,7 @@
         <div class="mb-0">
           <label class="form-label">密碼</label>
           <input type="password" class="form-control" name="password" autocomplete="new-password">
-          <div class="form-text">留空則不設定密碼。</div>
+          <div class="form-text">留空則以生日（YYYYMMDD）作為預設密碼。</div>
         </div>
       </div>
     </div>

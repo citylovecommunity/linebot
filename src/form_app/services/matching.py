@@ -92,19 +92,30 @@ def generate_weekly_matches(users, session: Session):
     all_graph_nodes = set(G.nodes())
     leftover_nodes = all_graph_nodes - matched_nodes
 
-    # --- 4. GREEDY FILL (The "Throuple" Fix) ---
+    # --- 4. GREEDY FILL ---
+    # For each leftover, find the best available neighbor.
+    # Track pairs we've already added to avoid duplicating the same couple when
+    # two leftovers are each other's best choice.
+    greedy_pairs: set[frozenset] = set()
     for node in leftover_nodes:
-        # Find the neighbor with the absolute highest weight
-        # G[node].items() gives us (neighbor_id, attributes_dict)
         if not G[node]:
-            continue  # Should be impossible if node is in G, but good safety
+            continue
 
-        best_neighbor = max(G[node].items(), key=lambda x: x[1]['weight'])
+        # Only consider neighbors that are not already matched this week
+        available = {n: attrs for n, attrs in G[node].items() if n not in matched_nodes}
+        if not available:
+            continue
 
+        best_neighbor = max(available.items(), key=lambda x: x[1]['weight'])
         target_id = best_neighbor[0]
-        # weight = best_neighbor[1]['weight'] # Unused, but available if needed
 
-        # Add this edge to our final results
+        pair = frozenset((node, target_id))
+        if pair in greedy_pairs:
+            continue  # Already added from the other side
+
+        greedy_pairs.add(pair)
+        matched_nodes.add(node)
+        matched_nodes.add(target_id)
         final_edges.append((node, target_id))
 
     return final_edges
@@ -182,12 +193,4 @@ def process_matches_bulk(eligible_members, session: Session):
 
     if matches_to_insert:
         stmt = insert(Matching).values(matches_to_insert)
-
-        # # This acts like your try/except IntegrityError block but for the whole batch
-        # # It skips rows that already exist.
-        # stmt = stmt.on_conflict_do_nothing(
-        #     # Replace with your actual UniqueConstraint columns
-        #     index_elements=['subject_id', 'object_id']
-        # )
-
         session.execute(stmt)

@@ -128,13 +128,11 @@ class Member(Base):
         surname = '先生' if self.gender == 'M' else '小姐'
         return self.name[0] + surname
 
-    @property
-    def introduction_link(self):
-        return self.user_info.get('會員介紹頁網址')
+    introduction_link: Mapped[Optional[str]]
 
     @property
     def blind_introduction_link(self):
-        return self.user_info.get('盲約介紹卡一')
+        return self.user_info.get('盲約介紹卡一') if self.user_info else None
 
     expiration_date: Mapped[Optional[date]]
 
@@ -454,23 +452,3 @@ class UserMatchScore(Base):
     breakdown: Mapped[Dict[str, Any]] = mapped_column(JSONB, nullable=True)
 
 
-Member.unread_count = column_property(
-    select(func.count(Message.id))
-    .join(Matching, Message.matching_id == Matching.id)
-    .where(
-        and_(
-            # Logic: Message is unread
-            Message.read_at == None,
-
-            # Logic: User is NOT the sender
-            Message.user_id != Member.id,  # Refers to User.id
-
-            # Logic: User is part of the match
-            or_(Matching.subject_id == Member.id,
-                Matching.object_id == Member.id)
-        )
-    )
-    # Tells SQL to link 'id' to the outer User table
-    .correlate_except(Matching)
-    .scalar_subquery()
-)

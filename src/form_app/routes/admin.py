@@ -1,9 +1,25 @@
+import threading
+import time as _time
 from datetime import datetime, date
 
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask import Blueprint, render_template, redirect, url_for, flash, request, session as flask_session
 from flask_login import login_required, current_user
-from sqlalchemy.orm import joinedload, subqueryload, defer
+from sqlalchemy.orm import joinedload, defer
 from sqlalchemy.orm.attributes import flag_modified
+
+# ── Admin dashboard cache ──────────────────────────────────────────────────────
+# The dashboard queries are expensive (remote Neon DB in Singapore).
+# Cache the rendered HTML for 60s. The cache is bypassed automatically when
+# Flask has pending flash messages, which means the admin just performed an
+# action and needs to see fresh data.
+_dashboard_cache: dict = {'html': None, 'expires': 0.0}
+_dashboard_cache_lock = threading.Lock()
+_DASHBOARD_CACHE_TTL = 60  # seconds
+
+
+def _invalidate_dashboard_cache():
+    with _dashboard_cache_lock:
+        _dashboard_cache['expires'] = 0.0
 
 from form_app.models import Member, Matching, MatchingStatus, UserMatchScore, DateProposal, ProposalStatus, Line_Info
 from form_app.decorators import admin_required
@@ -17,43 +33,90 @@ from form_app.services.security import hash_password
 bp = Blueprint('admin_bp', __name__, url_prefix='/admin')
 
 
+def _populate_matchmaking_info(user_info: dict, form):
+    """
+    Reads matchmaking-relevant fields from the submitted form and writes them
+    into user_info with the canonical Chinese keys the scoring engine expects.
+    Called for both new-user creation and edit.
+    """
+    # --- Personal profile ---
+    _set_if_present(user_info, '您目前的感情狀況', form.get('marital_status', '').strip())
+    _set_if_present(user_info, '您有無小孩需要扶養', form.get('has_children', '').strip())
+    _set_if_present(user_info, '會員之職業類別', form.get('job_category', '').strip())
+    _set_if_present(user_info, '您的飲食習慣', form.get('diet', '').strip())
+    _set_if_present(user_info, '宗教信仰', form.get('religion', '').strip())
+
+    # --- Datable regions (multi-select checkboxes) ---
+    regions = form.getlist('date_regions')
+    user_info['可約會地區 (可複選)'] = ','.join(regions) if regions else ''
+
+    # --- Hard dealbreakers (multi-select checkboxes) ---
+    dealbreakers = form.getlist('dealbreakers')
+    user_info['您完全無法接受的對象條件 (可複選)'] = ','.join(dealbreakers) if dealbreakers else '不設限'
+
+    # --- Specific cannot-accept fields ---
+    _set_if_present(user_info, '不能接受的飲食習慣', form.get('dealbreaker_diet', '').strip())
+    _set_if_present(user_info, '無法接受之職業類別', form.get('dealbreaker_job', '').strip())
+    _set_if_present(user_info, '無法接受的宗教信仰', form.get('dealbreaker_religion', '').strip())
+
+
+def _set_if_present(d: dict, key: str, value: str):
+    if value:
+        d[key] = value
+
+
 @bp.route('/dashboard')
 @login_required
 @admin_required
 def admin_dashboard():
+    # Serve cached HTML if available and no pending flash messages
+    has_flash = bool(flask_session.get('_flashes'))
+    now = _time.time()
+    if not has_flash:
+        with _dashboard_cache_lock:
+            if _dashboard_cache['html'] and now < _dashboard_cache['expires']:
+                return _dashboard_cache['html']
+
     session = get_db()
+
     all_members = (
         session.query(Member)
         .options(
-            defer(Member.unread_count),
+            defer(Member.user_info),
             joinedload(Member.line_info),
-            subqueryload(Member.matches_as_subject),
-            subqueryload(Member.matches_as_object),
         )
         .order_by(Member.id)
         .all()
     )
+
+    # Build in-memory lookup — avoids re-joining member table in subsequent queries
+    members_by_id = {m.id: m for m in all_members}
+
     all_matchings = (
         session.query(Matching)
-        .options(
-            joinedload(Matching.subject),
-            joinedload(Matching.object),
-        )
         .order_by(Matching.id.desc())
         .all()
     )
 
+    matchings_by_id = {m.id: m for m in all_matchings}
+
     all_proposals = (
         session.query(DateProposal)
         .filter(DateProposal.status != ProposalStatus.DELETED)
-        .options(
-            joinedload(DateProposal.matching).joinedload(Matching.subject),
-            joinedload(DateProposal.matching).joinedload(Matching.object),
-            joinedload(DateProposal.proposer),
-        )
         .order_by(DateProposal.proposed_datetime)
         .all()
     )
+
+    from collections import defaultdict
+    member_match_counts = defaultdict(int)
+    for m in all_matchings:
+        member_match_counts[m.subject_id] += 1
+        member_match_counts[m.object_id] += 1
+
+    match_ready_ids = {
+        m.id for m in all_members
+        if m.line_info and m.introduction_link
+    }
 
     non_eligible = []
     for member in all_members:
@@ -74,7 +137,7 @@ def admin_dashboard():
     total_users = len(all_members)
     eligible_count = sum(
         1 for m in all_members
-        if m.is_match_ready and m.is_active and not m.is_test
+        if m.id in match_ready_ids and m.is_active and not m.is_test
     )
     active_matchings = sum(
         1 for m in all_matchings if m.status == MatchingStatus.ACTIVE
@@ -83,18 +146,23 @@ def admin_dashboard():
     confirmed_dates = sum(1 for p in all_proposals if p.status == ProposalStatus.CONFIRMED)
     pending_dates = sum(1 for p in all_proposals if p.status == ProposalStatus.PENDING)
 
-    from collections import defaultdict
     member_date_counts = defaultdict(int)
     for p in all_proposals:
         if p.status == ProposalStatus.CONFIRMED:
-            member_date_counts[p.matching.subject_id] += 1
-            member_date_counts[p.matching.object_id] += 1
+            m = matchings_by_id.get(p.matching_id)
+            if m:
+                member_date_counts[m.subject_id] += 1
+                member_date_counts[m.object_id] += 1
 
     non_eligible_map = {m.id: reasons for m, reasons in non_eligible}
 
-    return render_template(
+    response = render_template(
         'admin_dashboard.html',
         today=date.today(),
+        match_ready_ids=match_ready_ids,
+        members_by_id=members_by_id,
+        matchings_by_id=matchings_by_id,
+        member_match_counts=member_match_counts,
         member_date_counts=member_date_counts,
         non_eligible_map=non_eligible_map,
         members=all_members,
@@ -107,6 +175,10 @@ def admin_dashboard():
         confirmed_dates=confirmed_dates,
         pending_dates=pending_dates,
     )
+    with _dashboard_cache_lock:
+        _dashboard_cache['html'] = response
+        _dashboard_cache['expires'] = _time.time() + _DASHBOARD_CACHE_TTL
+    return response
 
 
 @bp.route('/users/new', methods=['GET', 'POST'])
@@ -123,6 +195,10 @@ def new_user():
             user_info['會員介紹頁網址'] = intro_link
         if blind_intro_link:
             user_info['盲約介紹卡一'] = blind_intro_link
+
+        # Matchmaking profile fields → stored in user_info for scoring engine
+        _populate_matchmaking_info(user_info, request.form)
+
 
         birthday_str = request.form.get('birthday', '').strip()
         birthday = None
@@ -152,11 +228,12 @@ def new_user():
             birthday=birthday,
             height=int(request.form['height']) if request.form.get('height') else None,
             rank=request.form.get('rank') or None,
-            marital_status=request.form.get('marital_status') or None,
+            marital_status=request.form.get('marital_status') or None,  # also saved to user_info above
             is_active='is_active' in request.form,
             is_test='is_test' in request.form,
             fill_form_at=datetime.now(),
             user_info=user_info,
+            introduction_link=intro_link or None,
             expiration_date=expiration_date,
             pref_min_height=int(request.form['pref_min_height']) if request.form.get('pref_min_height') else None,
             pref_max_height=int(request.form['pref_max_height']) if request.form.get('pref_max_height') else None,
@@ -166,6 +243,7 @@ def new_user():
         )
         session.add(member)
         session.commit()
+        _invalidate_dashboard_cache()
         flash(f'已新增會員 {member.name}', 'success')
         return redirect(url_for('admin_bp.admin_dashboard'))
 
@@ -220,11 +298,14 @@ def edit_user(user_id):
             user.user_info = {}
         intro_link = request.form.get('introduction_link', '').strip()
         blind_intro_link = request.form.get('blind_introduction_link', '').strip()
+        user.introduction_link = intro_link or None
         user.user_info['會員介紹頁網址'] = intro_link or None
         user.user_info['盲約介紹卡一'] = blind_intro_link or None
+        _populate_matchmaking_info(user.user_info, request.form)
         flag_modified(user, 'user_info')
 
         session.commit()
+        _invalidate_dashboard_cache()
         flash(f'已更新會員 {user.name}', 'success')
         return redirect(url_for('admin_bp.admin_dashboard'))
 
@@ -256,6 +337,7 @@ def delete_user(user_id):
     name = user.name
     session.delete(user)
     session.commit()
+    _invalidate_dashboard_cache()
     flash(f'已刪除會員「{name}」', 'success')
     return redirect(url_for('admin_bp.admin_dashboard'))
 
@@ -271,6 +353,7 @@ def cancel_matching(matching_id):
         return redirect(url_for('admin_bp.admin_dashboard'))
     matching.cancel(current_user.id)
     session.commit()
+    _invalidate_dashboard_cache()
     flash(f'已取消配對「{matching.cool_name}」', 'success')
     return redirect(url_for('admin_bp.admin_dashboard', tab='matchings'))
 
@@ -286,6 +369,7 @@ def reactivate_matching(matching_id):
         return redirect(url_for('admin_bp.admin_dashboard'))
     matching.activate()
     session.commit()
+    _invalidate_dashboard_cache()
     flash(f'已重新啟用配對「{matching.cool_name}」', 'success')
     return redirect(url_for('admin_bp.admin_dashboard', tab='matchings'))
 
@@ -293,8 +377,8 @@ def reactivate_matching(matching_id):
 def _compute_and_save_score(session, source: Member, target: Member) -> UserMatchScore:
     """Compute a match score between two members and persist it."""
     score, breakdown = calculate_match_score(
-        UserProfileAdapter(source.user_info or {}),
-        UserProfileAdapter(target.user_info or {}),
+        UserProfileAdapter.from_member(source),
+        UserProfileAdapter.from_member(target),
     )
     record = UserMatchScore(
         source_user_id=source.id,
@@ -349,6 +433,7 @@ def new_matching():
         from form_app.services.messaging import process_all_notifications
         process_all_notifications(session)
         session.commit()
+        _invalidate_dashboard_cache()
         flash(f'已手動建立配對「{new_match.cool_name}」', 'success')
         return redirect(url_for('admin_bp.admin_dashboard', tab='matchings'))
 
@@ -371,6 +456,7 @@ def send_notifications():
     session = get_db()
     process_all_notifications(session)
     session.commit()
+    _invalidate_dashboard_cache()
     flash('已發送所有通知', 'success')
     return redirect(url_for('admin_bp.admin_dashboard', tab='actions'))
 

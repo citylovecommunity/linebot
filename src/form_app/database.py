@@ -13,8 +13,15 @@ _session_factory = None
 def get_session_factory(database_url: str) -> Session:
     engine = create_engine(
         database_url,
-        pool_pre_ping=True,  # Tests the connection before each query
-        pool_recycle=1800    # Recreates connections older than 30 mins
+        pool_pre_ping=True,   # Tests the connection before each query
+        pool_recycle=300,     # Recreate connections older than 5 mins (Neon drops idle connections)
+        connect_args={
+            "connect_timeout": 10,    # Fail fast if Neon is unreachable
+            "keepalives": 1,          # Enable TCP keepalives to detect dead connections
+            "keepalives_idle": 10,    # Start probing after 10s idle
+            "keepalives_interval": 2, # Probe every 2s
+            "keepalives_count": 3,    # Give up after 3 failed probes (~16s total, not 27s)
+        },
     )
     return sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
