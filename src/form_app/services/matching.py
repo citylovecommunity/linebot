@@ -5,7 +5,7 @@ from sqlalchemy import or_
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from form_app.models import Matching, UserMatchScore
+from form_app.models import Matching, MatchingStatus, UserMatchScore
 from form_app.services.cool_name import generate_funny_name
 
 
@@ -146,7 +146,7 @@ def match(subject_id, object_id, session: Session):
     return new_match
 
 
-def process_matches_bulk(eligible_members, session: Session):
+def process_matches_bulk(eligible_members, session: Session, is_draft: bool = False):
     matchings = generate_weekly_matches(eligible_members, session)
     if not matchings:
         return
@@ -183,13 +183,17 @@ def process_matches_bulk(eligible_members, session: Session):
             # Handle missing scores gracefully (log it, skip it, or default to 0)
             continue
 
-        matches_to_insert.append({
+        row = {
             "subject_id": subject_id,
             "object_id": object_id,
             "cool_name": generate_funny_name(),
             "grading_metric": sub_score,
             "obj_grading_metric": obj_score,
-        })
+        }
+        if is_draft:
+            row["status"] = MatchingStatus.DRAFT.value
+            row["is_match_notified"] = True  # suppress normal notify flow until approved
+        matches_to_insert.append(row)
 
     if matches_to_insert:
         stmt = insert(Matching).values(matches_to_insert)

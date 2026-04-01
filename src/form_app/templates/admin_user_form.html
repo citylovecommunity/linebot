@@ -75,6 +75,16 @@
             <input type="date" class="form-control" name="expiration_date"
               value="{{ user.expiration_date.strftime('%Y-%m-%d') if user and user.expiration_date else '' }}">
           </div>
+          <div class="col-sm-6">
+            <label class="form-label">配對開始日 <span class="text-muted small">（此日前不進入配對池）</span></label>
+            <input type="date" class="form-control" name="matching_start_date"
+              value="{{ user.matching_start_date.strftime('%Y-%m-%d') if user and user.matching_start_date else '' }}">
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">配對結束日 <span class="text-muted small">（此日後不進入配對池）</span></label>
+            <input type="date" class="form-control" name="matching_end_date"
+              value="{{ user.matching_end_date.strftime('%Y-%m-%d') if user and user.matching_end_date else '' }}">
+          </div>
           <div class="col-sm-3 d-flex align-items-end">
             <div class="form-check mb-2">
               <input class="form-check-input" type="checkbox" name="is_active" id="is_active"

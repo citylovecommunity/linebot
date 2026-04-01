@@ -28,20 +28,43 @@ def task_match_all_users():
     if request.headers.get('X-Task-Secret') != settings.TASK_SECRET:
         return "Unauthorized", 401
 
+    # ?save_as_draft=true: insert matchings as DRAFT status so admin can review
+    # before notifications are sent. Admin approves via the admin dashboard.
+    save_as_draft = request.args.get('save_as_draft', 'false').lower() == 'true'
+
     # ?skip_notify=true: insert matchings but skip LINE notifications.
     # Use this when users have already been notified but the previous run's
     # commit failed and the matchings were never persisted.
     skip_notify = request.args.get('skip_notify', 'false').lower() == 'true'
 
-    from form_app.models import Matching
+    from form_app.models import Matching, MatchingStatus
     from form_app.services.matching import process_matches_bulk
     from form_app.services.messaging import process_all_notifications
     from form_app.services.scoring import get_eligible_matching_pool, run_matching_score_optimized
 
     session = get_db()
+
+    if save_as_draft:
+        # Block if drafts already exist to prevent duplicates
+        existing_drafts = session.query(Matching).filter(
+            Matching.status == MatchingStatus.DRAFT.value
+        ).count()
+        if existing_drafts > 0:
+            return f"草稿配對已存在（{existing_drafts} 筆），請先在管理後台處理後再重新生成。", 409
+
     eligible_members = get_eligible_matching_pool(session)
     run_matching_score_optimized(eligible_members, session)
-    process_matches_bulk(eligible_members, session)
+    process_matches_bulk(eligible_members, session, is_draft=save_as_draft)
+    session.commit()
+
+    if save_as_draft:
+        draft_count = session.query(Matching).filter(
+            Matching.status == MatchingStatus.DRAFT.value
+        ).count()
+        from form_app.routes.admin import _invalidate_dashboard_cache
+        _invalidate_dashboard_cache()
+        current_app.logger.info(f"已生成 {draft_count} 筆草稿配對，等待管理員審核")
+        return f"已生成 {draft_count} 筆草稿配對", 200
 
     if skip_notify:
         # Mark every unnotified matching (including the ones just created) as
@@ -58,7 +81,6 @@ def task_match_all_users():
     else:
         # Commit matchings first so they exist even if the notification step fails.
         # LINE push_message is irreversible — it must happen only after the DB is safe.
-        session.commit()
         process_all_notifications(session)
         session.commit()
         current_app.logger.info("已批量配對用戶並發送通知")

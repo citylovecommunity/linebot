@@ -23,6 +23,7 @@ class MatchingStatus(enum.Enum):
     ACTIVE = "ACTIVE"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
+    DRAFT = "DRAFT"
 
 
 class Base(DeclarativeBase):
@@ -87,8 +88,11 @@ class Member(Base):
 
     @property
     def all_matches(self):
-        """Returns a combined list of matches where user is subject or object."""
-        return self.matches_as_subject + self.matches_as_object
+        """Returns a combined list of matches where user is subject or object (excludes drafts)."""
+        return [
+            m for m in self.matches_as_subject + self.matches_as_object
+            if m.status is not MatchingStatus.DRAFT
+        ]
 
     password_hash: Mapped[Optional[str]]
 
@@ -135,6 +139,9 @@ class Member(Base):
         return self.user_info.get('盲約介紹卡一') if self.user_info else None
 
     expiration_date: Mapped[Optional[date]]
+
+    matching_start_date: Mapped[Optional[date]]
+    matching_end_date: Mapped[Optional[date]]
 
     @property
     def membership_months(self) -> Optional[int]:
@@ -223,6 +230,10 @@ class Matching(Base):
     def is_cancelled(self):
         return self.status is MatchingStatus.CANCELLED
 
+    @property
+    def is_draft(self):
+        return self.status is MatchingStatus.DRAFT
+
     def activate(self):
         self.status = MatchingStatus.ACTIVE
         self.cancel_by_id = None
@@ -233,6 +244,11 @@ class Matching(Base):
     def cancel(self, cancel_id):
         self.status = MatchingStatus.CANCELLED
         self.cancel_by_id = cancel_id
+
+    def approve_draft(self):
+        """Promote a DRAFT matching to ACTIVE and reset notification flag."""
+        self.status = MatchingStatus.ACTIVE
+        self.is_match_notified = False
 
     created_at: Mapped[datetime] = mapped_column(default=datetime.now)
 

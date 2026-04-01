@@ -20,6 +20,15 @@
       </button>
     </li>
     <li class="nav-item" role="presentation">
+      <button class="nav-link" id="drafts-tab" data-bs-toggle="tab" data-bs-target="#drafts"
+        type="button" role="tab">
+        草稿配對
+        {% if draft_matchings %}
+        <span class="badge bg-warning text-dark ms-1">{{ draft_matchings|length }}</span>
+        {% endif %}
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
       <button class="nav-link" id="matchings-tab" data-bs-toggle="tab" data-bs-target="#matchings"
         type="button" role="tab">
         配對 <span class="badge bg-secondary ms-1">{{ matchings|length }}</span>
@@ -93,10 +102,8 @@
               <th>電話</th>
               <th>等級</th>
               <th>狀態</th>
-              <th class="sortable" data-col="6" style="cursor:pointer;">配對數 <i class="bi bi-arrow-down-up small"></i></th>
-              <th class="sortable" data-col="7" style="cursor:pointer;">約會數 <i class="bi bi-arrow-down-up small"></i></th>
               <th>資格</th>
-              <th class="sortable" data-col="9" style="cursor:pointer;">到期日 <i class="bi bi-arrow-down-up small"></i></th>
+              <th class="sortable" data-col="7" style="cursor:pointer;">到期日 <i class="bi bi-arrow-down-up small"></i></th>
               <th>操作</th>
             </tr>
           </thead>
@@ -128,15 +135,6 @@
                 <span class="badge bg-warning text-dark">測試</span>
                 {% endif %}
               </td>
-              <td data-val="{{ member_match_counts.get(member.id, 0) }}">{{ member_match_counts.get(member.id, 0) }}</td>
-              <td data-val="{{ member_date_counts.get(member.id, 0) }}">
-                {% set dc = member_date_counts.get(member.id, 0) %}
-                {% if dc > 0 %}
-                <span class="badge bg-success">{{ dc }}</span>
-                {% else %}
-                <span class="text-muted">0</span>
-                {% endif %}
-              </td>
               <td>
                 {% set reasons = non_eligible_map.get(member.id, []) %}
                 {% if reasons %}
@@ -163,6 +161,14 @@
               <td class="text-nowrap">
                 <a href="{{ url_for('admin_bp.edit_user', user_id=member.id) }}"
                   class="btn btn-sm btn-outline-primary">編輯</a>
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                  onclick="showMatchHistory({{ member.id }}, '{{ member.name }}')"
+                  title="配對記錄（共 {{ member_match_counts[member.id] }} 次）">
+                  <i class="bi bi-clock-history"></i>
+                  {% if member_match_counts[member.id] %}
+                  <span class="badge bg-secondary">{{ member_match_counts[member.id] }}</span>
+                  {% endif %}
+                </button>
                 <form method="POST"
                   action="{{ url_for('admin_bp.delete_user', user_id=member.id) }}"
                   class="d-inline"
@@ -175,6 +181,145 @@
           </tbody>
         </table>
       </div>
+    </div>
+
+    <!-- 草稿配對頁籤 -->
+    <div class="tab-pane fade" id="drafts" role="tabpanel">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h5 class="mb-0">草稿配對 <span class="badge bg-warning text-dark ms-1">{{ draft_matchings|length }}</span></h5>
+          <p class="text-muted small mb-0 mt-1">本週自動配對結果，請確認後再發送通知給會員。</p>
+        </div>
+        {% if draft_matchings %}
+        <div class="d-flex gap-2">
+          <form method="POST" action="{{ url_for('admin_bp.discard_all_drafts') }}"
+            onsubmit="return confirm('確定要刪除所有草稿配對嗎？')">
+            <button type="submit" class="btn btn-sm btn-outline-danger">
+              <i class="bi bi-trash"></i> 全部刪除
+            </button>
+          </form>
+          <form method="POST" action="{{ url_for('admin_bp.approve_all_drafts') }}"
+            onsubmit="return confirm('確認全部配對並立即發送 LINE 通知給所有會員？')">
+            <button type="submit" class="btn btn-sm btn-success">
+              <i class="bi bi-check-all"></i> 確認全部並發送通知
+            </button>
+          </form>
+        </div>
+        {% endif %}
+      </div>
+
+      {% if not draft_matchings %}
+      <div class="text-center py-5 text-muted">
+        <i class="bi bi-inbox fs-1"></i>
+        <p class="mt-2">目前沒有草稿配對。<br>在「操作」頁籤中點選「生成草稿配對」來預覽本週配對結果。</p>
+      </div>
+      {% else %}
+      <div class="table-responsive">
+        <table class="table table-hover table-sm align-middle">
+          <thead class="table-dark">
+            <tr>
+              <th>#</th>
+              <th>代號</th>
+              <th>男生</th>
+              <th>女生</th>
+              <th>分數（男→女 / 女→男）</th>
+              <th>過往配對</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for matching in draft_matchings %}
+            {% set subj = members_by_id.get(matching.subject_id) %}
+            {% set obj  = members_by_id.get(matching.object_id) %}
+            {% set male   = subj if (subj and subj.gender == 'M') else obj %}
+            {% set female = obj  if (obj  and obj.gender  == 'F') else subj %}
+            {% set male_id   = male.id   if male   else matching.subject_id %}
+            {% set female_id = female.id if female else matching.object_id %}
+            {% set subj_bd = breakdowns_by_pair.get(matching.subject_id|string + ':' + matching.object_id|string, {}) %}
+            {% set obj_bd  = breakdowns_by_pair.get(matching.object_id|string + ':' + matching.subject_id|string, {}) %}
+            {% set male_history   = member_match_history.get(male_id,   []) %}
+            {% set female_history = member_match_history.get(female_id, []) %}
+            <tr>
+              <td class="text-muted small">{{ loop.index }}</td>
+              <td><span class="fw-semibold">{{ matching.cool_name }}</span></td>
+              <td>
+                <span class="text-primary fw-semibold">{{ male.name if male else '—' }}</span>
+                <div class="text-muted small">
+                  {% if male and male.birthday %}{{ 2026 - male.birthday.year }}歲{% endif %}
+                  {% if male and male.height %} · {{ male.height }}cm{% endif %}
+                </div>
+                {% if male and male.introduction_link %}
+                <a href="{{ male.introduction_link }}" target="_blank" class="small">
+                  <i class="bi bi-box-arrow-up-right"></i>
+                </a>
+                {% endif %}
+              </td>
+              <td>
+                <span class="text-danger fw-semibold">{{ female.name if female else '—' }}</span>
+                <div class="text-muted small">
+                  {% if female and female.birthday %}{{ 2026 - female.birthday.year }}歲{% endif %}
+                  {% if female and female.height %} · {{ female.height }}cm{% endif %}
+                </div>
+                {% if female and female.introduction_link %}
+                <a href="{{ female.introduction_link }}" target="_blank" class="small">
+                  <i class="bi bi-box-arrow-up-right"></i>
+                </a>
+                {% endif %}
+              </td>
+              <td class="small">
+                <span title="男生對女生的評分">{{ matching.grading_metric }}</span>
+                /
+                <span title="女生對男生的評分">{{ matching.obj_grading_metric }}</span>
+                {% if subj_bd or obj_bd %}
+                <div class="text-muted mt-1" style="font-size:0.70em;line-height:1.4;">
+                  {% if subj_bd %}
+                  <div>→：{% for k, v in subj_bd.items() %}<span class="me-1">{{ k }}{% if v %}=<b>{{ v }}</b>{% endif %}</span>{% endfor %}</div>
+                  {% endif %}
+                  {% if obj_bd %}
+                  <div>←：{% for k, v in obj_bd.items() %}<span class="me-1">{{ k }}{% if v %}=<b>{{ v }}</b>{% endif %}</span>{% endfor %}</div>
+                  {% endif %}
+                </div>
+                {% endif %}
+              </td>
+              <td class="small">
+                {% if male_history %}
+                <div class="text-muted mb-1">{{ male.name if male else '' }}：{% for pid, cname, cat in male_history %}<span class="badge bg-light text-dark border me-1">{{ members_by_id.get(pid).name if members_by_id.get(pid) else pid }}</span>{% endfor %}</div>
+                {% endif %}
+                {% if female_history %}
+                <div class="text-muted">{{ female.name if female else '' }}：{% for pid, cname, cat in female_history %}<span class="badge bg-light text-dark border me-1">{{ members_by_id.get(pid).name if members_by_id.get(pid) else pid }}</span>{% endfor %}</div>
+                {% endif %}
+                {% if not male_history and not female_history %}
+                <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td class="text-nowrap">
+                <button type="button" class="btn btn-sm btn-outline-secondary" title="編輯"
+                  onclick="openDraftEdit({{ matching.id }}, {{ male_id }}, {{ female_id }}, '{{ matching.cool_name }}')">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <form method="POST"
+                  action="{{ url_for('admin_bp.approve_draft', matching_id=matching.id) }}"
+                  class="d-inline"
+                  onsubmit="return confirm('確認此配對並發送通知？')">
+                  <button type="submit" class="btn btn-sm btn-success" title="確認並通知">
+                    <i class="bi bi-check-lg"></i>
+                  </button>
+                </form>
+                <form method="POST"
+                  action="{{ url_for('admin_bp.delete_draft', matching_id=matching.id) }}"
+                  class="d-inline"
+                  onsubmit="return confirm('確定要刪除此草稿配對嗎？')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger" title="刪除草稿">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
     </div>
 
     <!-- 配對頁籤 -->
@@ -220,7 +365,21 @@
                 {% endif %}
               </td>
               <td class="small">{{ matching.created_at.strftime('%Y-%m-%d') }}</td>
-              <td class="small">{{ matching.grading_metric }} / {{ matching.obj_grading_metric }}</td>
+              {% set subj_bd = breakdowns_by_pair.get(matching.subject_id|string + ':' + matching.object_id|string, {}) %}
+              {% set obj_bd  = breakdowns_by_pair.get(matching.object_id|string + ':' + matching.subject_id|string, {}) %}
+              <td class="small">
+                {{ matching.grading_metric }} / {{ matching.obj_grading_metric }}
+                {% if subj_bd or obj_bd %}
+                <div class="text-muted mt-1" style="font-size:0.72em;line-height:1.4;">
+                  {% if subj_bd %}
+                  <div>主：{% for k, v in subj_bd.items() %}<span class="me-1">{{ k }}{% if v %}=<b>{{ v }}</b>{% endif %}</span>{% endfor %}</div>
+                  {% endif %}
+                  {% if obj_bd %}
+                  <div>被：{% for k, v in obj_bd.items() %}<span class="me-1">{{ k }}{% if v %}=<b>{{ v }}</b>{% endif %}</span>{% endfor %}</div>
+                  {% endif %}
+                </div>
+                {% endif %}
+              </td>
               <td>
                 {% if matching.status.value == 'ACTIVE' %}
                 <form method="POST"
@@ -380,15 +539,33 @@
         </div>
       </div>
 
+      <div class="card mb-3">
+        <div class="card-body">
+          <h6 class="card-title">生成草稿配對 <span class="badge bg-success ms-1">推薦</span></h6>
+          <p class="text-muted small">計算配對分數並生成草稿，供管理員審核後再發送通知給會員。</p>
+          {% if draft_matchings %}
+          <div class="alert alert-warning py-2 mb-2 small">
+            <i class="bi bi-exclamation-triangle"></i>
+            目前已有 {{ draft_matchings|length }} 筆草稿，請先在「草稿配對」頁籤中處理。
+          </div>
+          {% endif %}
+          <form method="POST" action="{{ url_for('tasks_bp.task_match_all_users') }}?save_as_draft=true"
+            id="draft-match-form">
+            <button type="submit" class="btn btn-primary" {{ 'disabled' if draft_matchings }}>
+              <i class="bi bi-eye"></i> 生成草稿配對
+            </button>
+          </form>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-body">
-          <h6 class="card-title">執行自動配對</h6>
-          <p class="text-muted small">重新計算所有合格會員的配對分數並執行本週配對。</p>
+          <h6 class="card-title">直接執行自動配對</h6>
+          <p class="text-muted small">計算配對分數、立即建立配對並發送 LINE 通知，不經審核步驟。</p>
           <form method="POST" action="{{ url_for('tasks_bp.task_match_all_users') }}"
-            onsubmit="return confirm('確定要執行自動配對嗎？此操作將覆蓋現有分數。')"
             id="match-form">
             <button type="submit" class="btn btn-danger">
-              <i class="bi bi-shuffle"></i> 執行自動配對
+              <i class="bi bi-shuffle"></i> 直接執行配對並通知
             </button>
           </form>
         </div>
@@ -501,16 +678,190 @@
     calendar.render();
   });
 
-  // 自動配對加 TASK_SECRET header（透過隱藏 form 提交）
+  // 自動配對加 TASK_SECRET header（直接執行）
   document.getElementById('match-form').addEventListener('submit', function(e) {
     e.preventDefault();
+    if (!confirm('確定要直接執行自動配對並立即通知所有會員嗎？')) return;
     fetch('{{ url_for("tasks_bp.task_match_all_users") }}', {
       method: 'POST',
       headers: { 'X-Task-Secret': '{{ config.get("TASK_SECRET", "") }}' }
     }).then(r => {
       if (r.ok) { alert('自動配對完成！'); location.reload(); }
-      else { alert('執行失敗，請檢查 server log。'); }
+      else { r.text().then(t => alert('執行失敗：' + t)); }
     });
   });
+
+  // 生成草稿配對加 TASK_SECRET header
+  const draftForm = document.getElementById('draft-match-form');
+  if (draftForm) {
+    draftForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      if (!confirm('生成草稿配對？系統將計算配對結果但暫不通知會員。')) return;
+      const btn = draftForm.querySelector('button[type=submit]');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 計算中…';
+      fetch('{{ url_for("tasks_bp.task_match_all_users") }}?save_as_draft=true', {
+        method: 'POST',
+        headers: { 'X-Task-Secret': '{{ config.get("TASK_SECRET", "") }}' }
+      }).then(r => r.text().then(t => {
+        if (r.ok) { alert('草稿已生成：' + t); window.location.href = window.location.pathname + '?tab=drafts'; }
+        else { alert('執行失敗：' + t); btn.disabled = false; btn.innerHTML = '<i class="bi bi-eye"></i> 生成草稿配對'; }
+      }));
+    });
+  }
+
+  // ── 草稿編輯 Modal ──
+  // Build member lookup from template data
+  const allMembers = [
+    {% for m in members %}
+    {% if m.is_active and not m.is_test %}
+    { id: {{ m.id }}, name: {{ m.name | tojson }}, gender: {{ m.gender | tojson }},
+      age: {% if m.birthday %}{{ 2026 - m.birthday.year }}{% else %}null{% endif %},
+      height: {{ m.height or 'null' }} },
+    {% endif %}
+    {% endfor %}
+  ];
+  const males   = allMembers.filter(m => m.gender === 'M');
+  const females = allMembers.filter(m => m.gender === 'F');
+
+  function buildMemberOptions(list, selectedId) {
+    return list.map(m => {
+      const info = [m.age ? m.age + '歲' : null, m.height ? m.height + 'cm' : null].filter(Boolean).join('·');
+      const label = m.name + (info ? ' (' + info + ')' : '');
+      return `<option value="${m.id}" ${m.id === selectedId ? 'selected' : ''}>${label}</option>`;
+    }).join('');
+  }
+
+  function filterSelect(inputEl, selectEl) {
+    const q = inputEl.value.toLowerCase();
+    Array.from(selectEl.options).forEach(opt => {
+      opt.hidden = q && !opt.textContent.toLowerCase().includes(q);
+    });
+  }
+
+  let editDraftAction = '';
+  function openDraftEdit(matchingId, maleId, femaleId, coolName) {
+    editDraftAction = `/admin/matchings/${matchingId}/edit-draft`;
+    document.getElementById('edit-draft-form').action = editDraftAction;
+    document.getElementById('edit-cool-name').value = coolName;
+
+    const maleSelect   = document.getElementById('edit-male-select');
+    const femaleSelect = document.getElementById('edit-female-select');
+    maleSelect.innerHTML   = buildMemberOptions(males,   maleId);
+    femaleSelect.innerHTML = buildMemberOptions(females, femaleId);
+
+    // Clear search boxes
+    document.getElementById('edit-male-search').value   = '';
+    document.getElementById('edit-female-search').value = '';
+
+    new bootstrap.Modal(document.getElementById('editDraftModal')).show();
+  }
+
+  // ── 配對記錄 Modal ──
+  function showMatchHistory(memberId, memberName) {
+    document.getElementById('history-modal-title').textContent = memberName + ' 的配對記錄';
+    document.getElementById('history-modal-body').innerHTML =
+      '<div class="text-center py-3"><span class="spinner-border"></span></div>';
+    new bootstrap.Modal(document.getElementById('matchHistoryModal')).show();
+    fetch('/admin/members/' + memberId + '/match-history')
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) {
+          document.getElementById('history-modal-body').innerHTML = '<p class="text-danger">' + data.error + '</p>';
+          return;
+        }
+        if (!data.history.length) {
+          document.getElementById('history-modal-body').innerHTML = '<p class="text-muted">尚無配對記錄。</p>';
+          return;
+        }
+        const rows = data.history.map(h => {
+          const badge = h.status === 'ACTIVE' ? 'bg-success' : h.status === 'CANCELLED' ? 'bg-secondary' : 'bg-info text-dark';
+          const label = h.status === 'ACTIVE' ? '進行中' : h.status === 'CANCELLED' ? '已取消' : '已完成';
+          return `<tr>
+            <td class="small text-muted">${h.created_at}</td>
+            <td>${h.partner_name}</td>
+            <td><span class="badge bg-light text-dark border">${h.cool_name}</span></td>
+            <td><span class="badge ${badge}">${label}</span></td>
+          </tr>`;
+        }).join('');
+        document.getElementById('history-modal-body').innerHTML = `
+          <table class="table table-sm table-hover">
+            <thead><tr><th>日期</th><th>配對對象</th><th>代號</th><th>狀態</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>`;
+      });
+  }
 </script>
+
+<!-- 草稿編輯 Modal -->
+<div class="modal fade" id="editDraftModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>編輯草稿配對</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" id="edit-draft-form">
+        <div class="modal-body">
+          <div class="row g-3">
+
+            <!-- Male -->
+            <div class="col-md-6">
+              <label class="form-label fw-semibold text-primary">
+                <i class="bi bi-gender-male"></i> 男生
+              </label>
+              <input type="text" class="form-control form-control-sm mb-1" id="edit-male-search"
+                placeholder="搜尋姓名…"
+                oninput="filterSelect(this, document.getElementById('edit-male-select'))">
+              <select name="male_id" id="edit-male-select" class="form-select" size="6"></select>
+            </div>
+
+            <!-- Female -->
+            <div class="col-md-6">
+              <label class="form-label fw-semibold text-danger">
+                <i class="bi bi-gender-female"></i> 女生
+              </label>
+              <input type="text" class="form-control form-control-sm mb-1" id="edit-female-search"
+                placeholder="搜尋姓名…"
+                oninput="filterSelect(this, document.getElementById('edit-female-select'))">
+              <select name="female_id" id="edit-female-select" class="form-select" size="6"></select>
+            </div>
+
+            <!-- Cool name -->
+            <div class="col-12">
+              <label class="form-label fw-semibold">配對代號</label>
+              <div class="input-group">
+                <input type="text" class="form-control" name="cool_name" id="edit-cool-name"
+                  placeholder="代號（留空不變）">
+                <button type="button" class="btn btn-outline-secondary"
+                  onclick="document.getElementById('edit-cool-name').value = ''">清除</button>
+              </div>
+              <div class="form-text">清除後儲存將保留原代號。</div>
+            </div>
+
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save"></i> 儲存變更
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- 配對記錄 Modal -->
+<div class="modal fade" id="matchHistoryModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="history-modal-title"></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="history-modal-body"></div>
+    </div>
+  </div>
+</div>
 {% endblock %}

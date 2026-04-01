@@ -36,6 +36,14 @@
   }
   .badge-line { font-size: .7rem; }
   .tag { font-size: .75rem; }
+  .member-card.prev-matched {
+    border-color: #ffc107;
+    background-color: #fffbf0;
+  }
+  .member-card.prev-matched .prev-match-warning {
+    display: block;
+  }
+  .prev-match-warning { display: none; }
 </style>
 {% endblock %}
 
@@ -67,10 +75,12 @@
                placeholder="Search males…" oninput="filterPanel(this, 'panel-male')">
         <div class="panel-col pe-1" id="panel-male">
           {% for m in males %}
+          {% set prev_partners = past_partners.get(m.id, []) %}
           <div class="member-card card mb-2 p-2"
                data-id="{{ m.id }}"
                data-gender="male"
                data-name="{{ m.name }}"
+               data-prev-partners="{{ prev_partners | join(',') }}"
                onclick="selectMember(this)">
             <div class="d-flex justify-content-between align-items-start">
               <div>
@@ -113,6 +123,9 @@
               </a>
             </div>
             {% endif %}
+            <div class="prev-match-warning mt-1">
+              <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> 曾配對過</span>
+            </div>
           </div>
           {% else %}
           <p class="text-muted">No active male members.</p>
@@ -130,10 +143,12 @@
                placeholder="Search females…" oninput="filterPanel(this, 'panel-female')">
         <div class="panel-col pe-1" id="panel-female">
           {% for m in females %}
+          {% set prev_partners = past_partners.get(m.id, []) %}
           <div class="member-card card mb-2 p-2"
                data-id="{{ m.id }}"
                data-gender="female"
                data-name="{{ m.name }}"
+               data-prev-partners="{{ prev_partners | join(',') }}"
                onclick="selectMember(this)">
             <div class="d-flex justify-content-between align-items-start">
               <div>
@@ -176,6 +191,9 @@
               </a>
             </div>
             {% endif %}
+            <div class="prev-match-warning mt-1">
+              <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> 曾配對過</span>
+            </div>
           </div>
           {% else %}
           <p class="text-muted">No active female members.</p>
@@ -221,6 +239,26 @@
     });
   }
 
+  function highlightPrevMatches(selectedId, panelId) {
+    const prevPartners = new Set(
+      (document.querySelector(`[data-id="${selectedId}"]`)?.dataset.prevPartners || '')
+        .split(',').filter(Boolean)
+    );
+    document.querySelectorAll('#' + panelId + ' .member-card').forEach(c => {
+      if (prevPartners.has(c.dataset.id)) {
+        c.classList.add('prev-matched');
+      } else {
+        c.classList.remove('prev-matched');
+      }
+    });
+  }
+
+  function clearPrevMatches(panelId) {
+    document.querySelectorAll('#' + panelId + ' .member-card').forEach(c => {
+      c.classList.remove('prev-matched');
+    });
+  }
+
   function selectMember(card) {
     const id = card.dataset.id;
     const gender = card.dataset.gender;
@@ -233,6 +271,8 @@
       document.getElementById('subject_id').value = id;
       document.getElementById('label-male').textContent = name + ' (#' + id + ')';
       document.getElementById('label-male').className = 'fw-semibold text-primary';
+      // Highlight previously matched females
+      highlightPrevMatches(id, 'panel-female');
     } else {
       if (selectedFemale) selectedFemale.classList.remove('selected-female');
       selectedFemale = card;
@@ -240,9 +280,30 @@
       document.getElementById('object_id').value = id;
       document.getElementById('label-female').textContent = name + ' (#' + id + ')';
       document.getElementById('label-female').className = 'fw-semibold text-danger';
+      // Highlight previously matched males
+      highlightPrevMatches(id, 'panel-male');
     }
 
     document.getElementById('submit-btn').disabled = !(selectedMale && selectedFemale);
+
+    // Warn if this pair has been matched before
+    if (selectedMale && selectedFemale) {
+      const malePrev = new Set(
+        (selectedMale.dataset.prevPartners || '').split(',').filter(Boolean)
+      );
+      if (malePrev.has(selectedFemale.dataset.id)) {
+        document.getElementById('label-female').className += ' text-warning';
+        if (!document.getElementById('prev-match-warn')) {
+          const warn = document.createElement('span');
+          warn.id = 'prev-match-warn';
+          warn.className = 'badge bg-warning text-dark ms-2';
+          warn.innerHTML = '<i class="bi bi-exclamation-triangle"></i> 此兩人曾配對過';
+          document.getElementById('label-female').after(warn);
+        }
+      } else {
+        document.getElementById('prev-match-warn')?.remove();
+      }
+    }
   }
 
   function confirmPair() {

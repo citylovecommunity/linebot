@@ -22,6 +22,7 @@ def _invalidate_dashboard_cache():
         _dashboard_cache['expires'] = 0.0
 
 from form_app.models import Member, Matching, MatchingStatus, UserMatchScore, DateProposal, ProposalStatus, Line_Info
+from collections import defaultdict
 from form_app.decorators import admin_required
 from form_app.database import get_db
 from form_app.services.cool_name import generate_funny_name
@@ -94,11 +95,33 @@ def admin_dashboard():
 
     all_matchings = (
         session.query(Matching)
+        .filter(Matching.status != MatchingStatus.DRAFT)
         .order_by(Matching.id.desc())
         .all()
     )
 
+    draft_matchings = (
+        session.query(Matching)
+        .filter(Matching.status == MatchingStatus.DRAFT)
+        .order_by(Matching.id.asc())
+        .all()
+    )
+
     matchings_by_id = {m.id: m for m in all_matchings}
+
+    # Build breakdown lookup for score column popovers
+    _pairs = set()
+    for m in all_matchings:
+        _pairs.add((m.subject_id, m.object_id))
+        _pairs.add((m.object_id, m.subject_id))
+    breakdowns_by_pair: dict = {}
+    if _pairs:
+        from sqlalchemy import tuple_
+        _score_rows = session.query(UserMatchScore).filter(
+            tuple_(UserMatchScore.source_user_id, UserMatchScore.target_user_id).in_(list(_pairs))
+        ).all()
+        for r in _score_rows:
+            breakdowns_by_pair[f"{r.source_user_id}:{r.target_user_id}"] = r.breakdown or {}
 
     all_proposals = (
         session.query(DateProposal)
@@ -107,7 +130,6 @@ def admin_dashboard():
         .all()
     )
 
-    from collections import defaultdict
     member_match_counts = defaultdict(int)
     for m in all_matchings:
         member_match_counts[m.subject_id] += 1
@@ -131,6 +153,10 @@ def admin_dashboard():
             reasons.append("未綁定 LINE")
         if member.is_expired:
             reasons.append("會員已到期")
+        if member.matching_start_date and member.matching_start_date > date.today():
+            reasons.append(f"配對開始日未到（{member.matching_start_date}）")
+        if member.matching_end_date and member.matching_end_date < date.today():
+            reasons.append(f"配對已結束（{member.matching_end_date}）")
         if reasons:
             non_eligible.append((member, reasons))
 
@@ -156,6 +182,31 @@ def admin_dashboard():
 
     non_eligible_map = {m.id: reasons for m, reasons in non_eligible}
 
+    # Build per-member match history: { member_id: [(partner_id, cool_name, created_at), ...] }
+    member_match_history = defaultdict(list)
+    for m in all_matchings:
+        member_match_history[m.subject_id].append((m.object_id, m.cool_name, m.created_at))
+        member_match_history[m.object_id].append((m.subject_id, m.cool_name, m.created_at))
+
+    # Build set of previously matched pairs for manual-pair highlight
+    matched_pairs_set = set()
+    for m in all_matchings:
+        matched_pairs_set.add((m.subject_id, m.object_id))
+        matched_pairs_set.add((m.object_id, m.subject_id))
+
+    # Build score breakdowns for draft matchings too
+    _draft_pairs = set()
+    for m in draft_matchings:
+        _draft_pairs.add((m.subject_id, m.object_id))
+        _draft_pairs.add((m.object_id, m.subject_id))
+    if _draft_pairs:
+        from sqlalchemy import tuple_
+        _draft_score_rows = session.query(UserMatchScore).filter(
+            tuple_(UserMatchScore.source_user_id, UserMatchScore.target_user_id).in_(list(_draft_pairs))
+        ).all()
+        for r in _draft_score_rows:
+            breakdowns_by_pair[f"{r.source_user_id}:{r.target_user_id}"] = r.breakdown or {}
+
     response = render_template(
         'admin_dashboard.html',
         today=date.today(),
@@ -167,6 +218,7 @@ def admin_dashboard():
         non_eligible_map=non_eligible_map,
         members=all_members,
         matchings=all_matchings,
+        draft_matchings=draft_matchings,
         non_eligible=non_eligible,
         total_users=total_users,
         eligible_count=eligible_count,
@@ -174,6 +226,9 @@ def admin_dashboard():
         proposals=all_proposals,
         confirmed_dates=confirmed_dates,
         pending_dates=pending_dates,
+        breakdowns_by_pair=breakdowns_by_pair,
+        member_match_history=member_match_history,
+        matched_pairs_set=matched_pairs_set,
     )
     with _dashboard_cache_lock:
         _dashboard_cache['html'] = response
@@ -220,6 +275,15 @@ def new_user():
             except ValueError:
                 pass
 
+        def _parse_date(key):
+            s = request.form.get(key, '').strip()
+            if s:
+                try:
+                    return datetime.strptime(s, '%Y-%m-%d').date()
+                except ValueError:
+                    pass
+            return None
+
         member = Member(
             name=request.form['name'],
             phone_number=request.form['phone_number'],
@@ -235,6 +299,8 @@ def new_user():
             user_info=user_info,
             introduction_link=intro_link or None,
             expiration_date=expiration_date,
+            matching_start_date=_parse_date('matching_start_date'),
+            matching_end_date=_parse_date('matching_end_date'),
             pref_min_height=int(request.form['pref_min_height']) if request.form.get('pref_min_height') else None,
             pref_max_height=int(request.form['pref_max_height']) if request.form.get('pref_max_height') else None,
             pref_oldest_birth_year=int(request.form['pref_oldest_birth_year']) if request.form.get('pref_oldest_birth_year') else None,
@@ -287,6 +353,18 @@ def edit_user(user_id):
                 pass
         else:
             user.expiration_date = None
+
+        def _parse_date(key):
+            s = request.form.get(key, '').strip()
+            if s:
+                try:
+                    return datetime.strptime(s, '%Y-%m-%d').date()
+                except ValueError:
+                    pass
+            return None
+
+        user.matching_start_date = _parse_date('matching_start_date')
+        user.matching_end_date = _parse_date('matching_end_date')
 
         user.height = int(request.form['height']) if request.form.get('height') else None
         user.pref_min_height = int(request.form['pref_min_height']) if request.form.get('pref_min_height') else None
@@ -446,7 +524,24 @@ def new_matching():
     )
     males = [m for m in all_members if m.gender == 'M']
     females = [m for m in all_members if m.gender == 'F']
-    return render_template('admin_manual_pair.html', males=males, females=females)
+
+    # Build past-match map: { member_id: [partner_id, ...] }
+    all_member_ids = [m.id for m in all_members]
+    from sqlalchemy import or_ as _or
+    past_matchings = session.query(Matching.subject_id, Matching.object_id).filter(
+        Matching.status != MatchingStatus.DRAFT,
+        _or(
+            Matching.subject_id.in_(all_member_ids),
+            Matching.object_id.in_(all_member_ids),
+        )
+    ).all()
+    past_partners: dict[int, list[int]] = defaultdict(list)
+    for sub, obj in past_matchings:
+        past_partners[sub].append(obj)
+        past_partners[obj].append(sub)
+
+    return render_template('admin_manual_pair.html', males=males, females=females,
+                           past_partners=past_partners)
 
 
 @bp.route('/send-notifications', methods=['POST'])
@@ -512,3 +607,157 @@ def notify_expiring():
 
     flash(f'已通知 {sent}/{len(expiring)} 位即將到期的會員。', 'success')
     return redirect(url_for('admin_bp.admin_dashboard', tab='actions'))
+
+
+# ── Draft matching management ────────────────────────────────────────────────
+
+@bp.route('/matchings/<int:matching_id>/edit-draft', methods=['POST'])
+@login_required
+@admin_required
+def edit_draft(matching_id):
+    session = get_db()
+    matching = session.get(Matching, matching_id)
+    if matching is None or not matching.is_draft:
+        flash('找不到草稿配對', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
+
+    new_male_id   = request.form.get('male_id',   type=int)
+    new_female_id = request.form.get('female_id', type=int)
+    new_cool_name = request.form.get('cool_name', '').strip()
+
+    # Determine current male/female sides
+    subj = session.get(Member, matching.subject_id)
+    if subj and subj.gender == 'M':
+        cur_male_id, cur_female_id = matching.subject_id, matching.object_id
+    else:
+        cur_male_id, cur_female_id = matching.object_id, matching.subject_id
+
+    final_male_id   = new_male_id   or cur_male_id
+    final_female_id = new_female_id or cur_female_id
+
+    if final_male_id == final_female_id:
+        flash('男生和女生不能是同一人', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
+
+    if final_male_id != cur_male_id or final_female_id != cur_female_id:
+        male_member   = session.get(Member, final_male_id)
+        female_member = session.get(Member, final_female_id)
+        if not male_member or not female_member:
+            flash('找不到指定會員', 'danger')
+            return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
+
+        score_mf = session.query(UserMatchScore).filter_by(
+            source_user_id=final_male_id, target_user_id=final_female_id
+        ).first() or _compute_and_save_score(session, male_member, female_member)
+        score_fm = session.query(UserMatchScore).filter_by(
+            source_user_id=final_female_id, target_user_id=final_male_id
+        ).first() or _compute_and_save_score(session, female_member, male_member)
+
+        # Preserve subject=male, object=female convention
+        matching.subject_id       = final_male_id
+        matching.object_id        = final_female_id
+        matching.grading_metric     = int(score_mf.score)
+        matching.obj_grading_metric = int(score_fm.score)
+
+    if new_cool_name:
+        matching.cool_name = new_cool_name
+
+    session.commit()
+    _invalidate_dashboard_cache()
+    flash(f'已更新草稿配對「{matching.cool_name}」', 'success')
+    return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
+
+
+@bp.route('/matchings/drafts/approve-all', methods=['POST'])
+@login_required
+@admin_required
+def approve_all_drafts():
+    session = get_db()
+    drafts = session.query(Matching).filter(Matching.status == MatchingStatus.DRAFT).all()
+    if not drafts:
+        flash('目前沒有草稿配對。', 'info')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
+    for m in drafts:
+        m.approve_draft()
+    session.commit()
+    process_all_notifications(session)
+    session.commit()
+    _invalidate_dashboard_cache()
+    flash(f'已確認 {len(drafts)} 筆配對並發送通知。', 'success')
+    return redirect(url_for('admin_bp.admin_dashboard', tab='matchings'))
+
+
+@bp.route('/matchings/drafts/discard-all', methods=['POST'])
+@login_required
+@admin_required
+def discard_all_drafts():
+    session = get_db()
+    count = session.query(Matching).filter(Matching.status == MatchingStatus.DRAFT).delete(synchronize_session=False)
+    session.commit()
+    _invalidate_dashboard_cache()
+    flash(f'已刪除 {count} 筆草稿配對。', 'success')
+    return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
+
+
+@bp.route('/matchings/<int:matching_id>/approve-draft', methods=['POST'])
+@login_required
+@admin_required
+def approve_draft(matching_id):
+    session = get_db()
+    matching = session.get(Matching, matching_id)
+    if matching is None or not matching.is_draft:
+        flash('找不到該草稿配對', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
+    matching.approve_draft()
+    session.commit()
+    process_all_notifications(session)
+    session.commit()
+    _invalidate_dashboard_cache()
+    flash(f'已確認配對「{matching.cool_name}」並發送通知。', 'success')
+    return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
+
+
+@bp.route('/matchings/<int:matching_id>/delete-draft', methods=['POST'])
+@login_required
+@admin_required
+def delete_draft(matching_id):
+    session = get_db()
+    matching = session.get(Matching, matching_id)
+    if matching is None or not matching.is_draft:
+        flash('找不到該草稿配對', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
+    cool_name = matching.cool_name
+    session.delete(matching)
+    session.commit()
+    _invalidate_dashboard_cache()
+    flash(f'已刪除草稿配對「{cool_name}」。', 'success')
+    return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
+
+
+@bp.route('/members/<int:user_id>/match-history')
+@login_required
+@admin_required
+def member_match_history(user_id):
+    """Returns JSON with the matching history for a member (for modal display)."""
+    from flask import jsonify
+    from sqlalchemy import or_
+    session = get_db()
+    member = session.get(Member, user_id)
+    if member is None:
+        return jsonify({'error': '找不到會員'}), 404
+    matchings = session.query(Matching).filter(
+        Matching.status != MatchingStatus.DRAFT,
+        or_(Matching.subject_id == user_id, Matching.object_id == user_id)
+    ).order_by(Matching.created_at.desc()).all()
+    history = []
+    for m in matchings:
+        partner_id = m.object_id if m.subject_id == user_id else m.subject_id
+        partner = session.get(Member, partner_id)
+        history.append({
+            'cool_name': m.cool_name,
+            'partner_name': partner.name if partner else '—',
+            'partner_id': partner_id,
+            'status': m.status.value,
+            'created_at': m.created_at.strftime('%Y-%m-%d'),
+        })
+    return jsonify({'member_name': member.name, 'history': history})

@@ -162,6 +162,8 @@ def get_eligible_matching_pool(session: Session):
     2. Web URL is provided
     3. Phone Number exists in LineInfo table
     4. Membership is not expired (expiration_date is null OR >= today)
+    5. Matching window: matching_start_date is null OR <= today
+    6. Matching window: matching_end_date is null OR >= today
     """
     from datetime import date
     today = date.today()
@@ -177,6 +179,12 @@ def get_eligible_matching_pool(session: Session):
 
         # Rule 4: Not expired
         (Member.expiration_date == None) | (Member.expiration_date >= today),
+
+        # Rule 5: Matching window has started
+        (Member.matching_start_date == None) | (Member.matching_start_date <= today),
+
+        # Rule 6: Matching window has not ended
+        (Member.matching_end_date == None) | (Member.matching_end_date >= today),
     ).all()
 
 
