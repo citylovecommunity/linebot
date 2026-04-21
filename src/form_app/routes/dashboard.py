@@ -100,7 +100,8 @@ def matching_detail(matching_id):
                            current_user=current_user,
                            partner=partner,
                            proposal=proposal,
-                           messages=messages
+                           messages=messages,
+                           is_dev=settings.is_dev,
                            )
 
 

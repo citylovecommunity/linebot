@@ -6,39 +6,26 @@ from flask_login import (current_user, login_required,
 from form_app.database import get_db
 from form_app.models import Member
 from form_app.services.security import verify_password
+from form_app.decorators import admin_required
 from form_app.config import settings
 
 bp = Blueprint('auth_bp', __name__)
 
 
-@bp.route('/auto-login/<int:user_id>')
-def auto_login(user_id):
-    # SAFETY NET: Strictly forbid this in production
-    if not settings.is_dev:
-        abort(404)
-
-    # 1. Grab a hardcoded "dev" user or the first user in the DB
-    db = get_db()
-    dev_user = db.query(Member).get(user_id)
-
-    # 2. Log them in programmatically
-    if dev_user:
-        login_user(dev_user)
-        if dev_user.is_admin:
-            return redirect(url_for('admin_bp.admin_dashboard'))
-        return redirect(url_for('dashboard_bp.dashboard'))
-
-    return "Dev user not found", 404
-
 
 @bp.route('/auto-login-admin')
 def auto_login_admin():
     token = request.args.get('token', '')
-    if not settings.is_dev and token != settings.TASK_SECRET:
+    if token != settings.TASK_SECRET:
         abort(404)
 
     db = get_db()
-    admin_user = db.query(Member).filter(Member.is_admin == True).first()
+    if settings.DEV_ADMIN_ID:
+        admin_user = db.query(Member).get(settings.DEV_ADMIN_ID)
+    else:
+        admin_user = db.query(Member).filter(
+            (Member.is_developer == True) | (Member.is_admin == True)
+        ).first()
 
     if not admin_user:
         total = db.query(Member).count()
@@ -50,7 +37,7 @@ def auto_login_admin():
     current_app.logger.info(
         f"auto-login-admin: logging in admin id={admin_user.id} name={admin_user.name}"
     )
-    login_user(admin_user)
+    login_user(admin_user, force=True)
     return redirect(url_for('admin_bp.admin_dashboard'))
 
 

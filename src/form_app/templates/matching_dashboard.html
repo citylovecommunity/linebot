@@ -10,6 +10,19 @@
 
 {% block content %}
 
+{% if is_preview %}
+<div class="container pt-3">
+  <div class="alert alert-warning d-flex align-items-center justify-content-between mb-0 py-2">
+    <span><i class="bi bi-eye me-2"></i><strong>Preview mode</strong> — fake data, sending disabled.</span>
+    <span class="d-flex gap-1">
+      {% for s, label in [(1,'配對中'), (2,'待確認'), (3,'已確認'), (4,'已取消')] %}
+      <a href="?step={{ s }}" class="btn btn-sm {{ 'btn-warning' if status_step == s else 'btn-outline-secondary' }}">{{ label }}</a>
+      {% endfor %}
+    </span>
+  </div>
+</div>
+{% endif %}
+
 <div class="container py-5">
 
     <div class="row mb-5">
@@ -225,7 +238,6 @@
                         <span id="pollIndicator" class="text-success small" style="display:none!important;">
                             <i class="bi bi-circle-fill" style="font-size:.5rem;vertical-align:middle;"></i> 即時更新中
                         </span>
-                        <span id="msgCountBadge" class="badge bg-light text-dark">{{ messages|length }} 則訊息</span>
                     </span>
                 </div>
 
@@ -311,7 +323,6 @@
     const chatInput = document.getElementById("chatInput");
     const chatSendBtn = document.getElementById("chatSendBtn");
     const chatError = document.getElementById("chatError");
-    const msgCountBadge = document.getElementById("msgCountBadge");
     const pollIndicator = document.getElementById("pollIndicator");
     const matchingId = {{ matching.id }};
     const submitUrl = "{{ url_for('dashboard_bp.submit_message', matching_id=matching.id) }}";
@@ -343,9 +354,6 @@
         }
         messageBox.appendChild(el);
         if (msg.id > lastMsgId) lastMsgId = msg.id;
-        // Update badge count
-        const current = parseInt(msgCountBadge.textContent) || 0;
-        msgCountBadge.textContent = (current + 1) + ' 則訊息';
     }
 
     function escapeHtml(str) {

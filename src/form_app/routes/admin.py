@@ -29,6 +29,7 @@ from form_app.services.cool_name import generate_funny_name
 from form_app.services.messaging import process_all_notifications
 from form_app.services.scoring import UserProfileAdapter, calculate_match_score
 from form_app.services.security import hash_password
+from form_app.config import settings
 
 
 bp = Blueprint('admin_bp', __name__, url_prefix='/admin')
@@ -229,6 +230,7 @@ def admin_dashboard():
         breakdowns_by_pair=breakdowns_by_pair,
         member_match_history=member_match_history,
         matched_pairs_set=matched_pairs_set,
+        is_dev=settings.is_dev,
     )
     with _dashboard_cache_lock:
         _dashboard_cache['html'] = response
@@ -295,6 +297,8 @@ def new_user():
             marital_status=request.form.get('marital_status') or None,  # also saved to user_info above
             is_active='is_active' in request.form,
             is_test='is_test' in request.form,
+            is_admin='is_admin' in request.form,
+            is_developer='is_developer' in request.form and current_user.is_developer,
             fill_form_at=datetime.now(),
             user_info=user_info,
             introduction_link=intro_link or None,
@@ -335,6 +339,9 @@ def edit_user(user_id):
         user.marital_status = request.form.get('marital_status') or None
         user.is_active = 'is_active' in request.form
         user.is_test = 'is_test' in request.form
+        user.is_admin = 'is_admin' in request.form
+        if current_user.is_developer:
+            user.is_developer = 'is_developer' in request.form
 
         birthday_str = request.form.get('birthday', '').strip()
         if birthday_str:
@@ -381,6 +388,10 @@ def edit_user(user_id):
         user.user_info['盲約介紹卡一'] = blind_intro_link or None
         _populate_matchmaking_info(user.user_info, request.form)
         flag_modified(user, 'user_info')
+
+        new_password = request.form.get('password', '').strip()
+        if new_password and current_user.is_developer:
+            user.password_hash = hash_password(new_password)
 
         session.commit()
         _invalidate_dashboard_cache()

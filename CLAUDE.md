@@ -90,11 +90,40 @@ A standalone FastAPI app (separate from Flask) that handles:
 
 One-off data operations: ETL from Google Sheets (`etl_load_data.py`), backfills, migrations, manual matching runs. Run directly with `uv run python scripts/<script>.py`.
 
+## Developer Setup
+
+New developers need a developer account bootstrapped once from the shell (no UI exists until the account is set up):
+
+```bash
+uv run python - <<'EOF'
+from form_app.database import SessionLocal
+from form_app.models import Member
+db = SessionLocal()
+me = db.query(Member).filter_by(phone_number='09XXXXXXXX').first()
+me.is_developer = True
+me.is_test = True    # excludes from matching pool
+me.is_active = False # excludes from member stats
+db.commit()
+print('Done:', me.name)
+EOF
+```
+
+Then set `DEV_ADMIN_ID=<your member id>` in `.env` so `/auto-login-admin` always logs in as that account.
+
+**Role model:**
+- `is_admin` — access to the admin panel (member CRUD, matchings, notifications)
+- `is_developer` — all admin access, plus: impersonate any user (`/auto-login/<id>`), reset passwords, grant the developer role to others. `admin_required` passes for both; `developer_required` is developer-only.
+
+**Developer-only UI (admin panel):**
+- 會員 tab → `person-check` icon → opens that member's dashboard in a new tab (impersonate)
+- 配對 tab → chat buttons labelled with each participant's name → opens their chat view directly
+- Edit member form → "重設密碼" section and "Is Developer" checkbox (only visible when logged in as a developer)
+
 ## Important Conventions
 
 - **JSONB form data**: Member preferences and profile data live in `member.user_info` as raw Google Form answers in Chinese. `UserProfileAdapter` provides typed accessors for scoring logic.
 - **`member.user_info` keys are in Chinese**: e.g., `'會員介紹頁網址'`, `'您的出生年月日'`, `'排約等級一'`.
 - **subject/object pattern**: In `Matching`, `subject` is who was scored against `object` using `grading_metric`; `obj_grading_metric` is the reverse. `get_partner(user_id)` returns the other person.
-- **Admin decorator**: `@admin_required` (in `decorators.py`) gates all `/admin` routes.
+- **Auth decorators** (`decorators.py`): `@admin_required` gates `/admin` routes (passes for both admins and developers); `@developer_required` gates impersonate and password-reset actions (developer-only).
 - **Task auth**: `/tasks/*` endpoints check `X-Task-Secret` header against `settings.TASK_SECRET`.
 - The Flask app runs on port **5678**; the FastAPI LINE bot in `main.py` is a separate process.

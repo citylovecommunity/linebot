@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     LINE_CHANNEL_SECRET: str
 
     LINE_TEST_USER_ID: Optional[str] = None
+    DEV_ADMIN_ID: Optional[int] = None
 
     DEV_DB_URL: Optional[str] = None
     PROD_DB_URL: Optional[str] = None

@@ -88,15 +88,18 @@ class Member(Base):
 
     @property
     def all_matches(self):
-        """Returns a combined list of matches where user is subject or object (excludes drafts)."""
-        return [
+        """Returns a combined list of matches where user is subject or object (excludes drafts),
+        ordered by most recent message first, then by creation date."""
+        matches = [
             m for m in self.matches_as_subject + self.matches_as_object
             if m.status is not MatchingStatus.DRAFT
         ]
+        return sorted(matches, key=lambda m: (m.last_message_id or 0), reverse=True)
 
     password_hash: Mapped[Optional[str]]
 
     is_admin:  Mapped[Optional[bool]] = mapped_column(default=False)
+    is_developer: Mapped[Optional[bool]] = mapped_column(default=False)
 
     line_info: Mapped[Optional["Line_Info"]] = relationship(
         back_populates="member",

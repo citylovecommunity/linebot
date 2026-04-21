@@ -7,7 +7,7 @@
 
         <div class="mb-3 mb-md-0 text-center text-md-start">
             <h2 class="fw-bold text-dark mb-1">{{ current_user.proper_name }}的配對</h2>
-            <p class="text-muted small mb-0">你有 <strong>{{ current_user.all_matches|length }}</strong> 個進行中的配對！</p>
+            <p class="text-muted small mb-0">你有 <strong>{{ (preview_matches if preview_matches is defined else current_user.all_matches)|length }}</strong> 個進行中的配對！</p>
         </div>
 
         <div class="d-flex flex-wrap justify-content-center gap-2" id="match-filters">
@@ -41,8 +41,15 @@
     </div>
     {% endif %}
 
+    {% if preview_banner is defined %}
+    <div class="alert alert-warning d-flex align-items-center justify-content-between py-2 mb-3">
+        <span><i class="bi bi-eye me-2"></i><strong>Preview mode</strong> — fake data.</span>
+        <a href="{{ url_for('dev_bp.chat_preview') }}" class="btn btn-sm btn-outline-warning">Chat preview →</a>
+    </div>
+    {% endif %}
+
     <div class="row g-4" id="matches-container">
-        {% for matching in current_user.all_matches %}
+        {% for matching in (preview_matches if preview_matches is defined else current_user.all_matches) %}
         <div class="col-md-6 col-lg-4 match-item" data-status="{{ matching.status.value }}">
 
             <a href="{{ url_for('dashboard_bp.matching_detail', matching_id=matching.id) }}"
@@ -73,9 +80,15 @@
                         </span>
                         {% endif %}
 
-                        <small class="text-muted fw-bold">
-                            <i class="bi bi-heart-fill text-danger"></i>
-                            {{ matching.get_grading(current_user.id) }}%
+                        <small>
+                            {% set score = matching.get_grading(current_user.id) %}
+                            {% if score >= 70 %}
+                            <i class="bi bi-heart-fill text-danger"></i><i class="bi bi-heart-fill text-danger"></i><i class="bi bi-heart-fill text-danger"></i>
+                            {% elif score >= 40 %}
+                            <i class="bi bi-heart-fill text-danger"></i><i class="bi bi-heart-fill text-danger"></i><i class="bi bi-heart text-danger opacity-25"></i>
+                            {% else %}
+                            <i class="bi bi-heart-fill text-danger"></i><i class="bi bi-heart text-danger opacity-25"></i><i class="bi bi-heart text-danger opacity-25"></i>
+                            {% endif %}
                         </small>
                     </div>
 

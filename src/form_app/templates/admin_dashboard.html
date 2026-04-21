@@ -380,7 +380,7 @@
                 </div>
                 {% endif %}
               </td>
-              <td>
+              <td class="text-nowrap">
                 {% if matching.status.value == 'ACTIVE' %}
                 <form method="POST"
                   action="{{ url_for('admin_bp.cancel_matching', matching_id=matching.id) }}"
@@ -557,6 +557,21 @@
           </form>
         </div>
       </div>
+
+      {% if current_user.is_developer %}
+      <div class="card mb-3 border-info">
+        <div class="card-body">
+          <h6 class="card-title"><i class="bi bi-code-slash me-1 text-info"></i> Developer Tools</h6>
+          <p class="text-muted small">Developer-only tools for UI testing.</p>
+          <a href="{{ url_for('dev_bp.dashboard_preview') }}" target="_blank" class="btn btn-outline-info btn-sm me-1">
+            <i class="bi bi-grid me-1"></i> Dashboard Preview
+          </a>
+          <a href="{{ url_for('dev_bp.chat_preview') }}" target="_blank" class="btn btn-outline-info btn-sm">
+            <i class="bi bi-chat-dots me-1"></i> Chat Preview
+          </a>
+        </div>
+      </div>
+      {% endif %}
 
       <div class="card">
         <div class="card-body">
