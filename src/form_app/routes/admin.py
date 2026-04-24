@@ -23,11 +23,12 @@ def _invalidate_dashboard_cache():
 
 from form_app.models import Member, Matching, MatchingStatus, UserMatchScore, DateProposal, ProposalStatus, Line_Info
 from collections import defaultdict
-from form_app.decorators import admin_required
+from form_app.decorators import admin_required, developer_required
 from form_app.database import get_db
 from form_app.services.cool_name import generate_funny_name
 from form_app.services.messaging import process_all_notifications
-from form_app.services.scoring import UserProfileAdapter, calculate_match_score
+from form_app.services.scoring import UserProfileAdapter, calculate_match_score, get_eligible_matching_pool
+from form_app.services.matching import update_unmatched_counters
 from form_app.services.security import hash_password
 from form_app.config import settings
 
@@ -65,6 +66,119 @@ def _populate_matchmaking_info(user_info: dict, form):
 def _set_if_present(d: dict, key: str, value: str):
     if value:
         d[key] = value
+
+
+def _diagnose_unmatched(eligible_pool, draft_matchings, all_matchings, session):
+    """
+    Returns [(member, reason_str, candidates), ...] for eligible members absent
+    from draft_matchings.  candidates is [(Member, combined_score), ...] sorted
+    by score desc — all opposite-gender eligible members never previously matched
+    with this person (regardless of dealbreaker status, for admin override).
+    """
+    from sqlalchemy import or_, and_
+
+    if not draft_matchings:
+        return []
+
+    draft_matched_ids = set()
+    for dm in draft_matchings:
+        draft_matched_ids.add(dm.subject_id)
+        draft_matched_ids.add(dm.object_id)
+
+    unmatched = [m for m in eligible_pool if m.id not in draft_matched_ids]
+    if not unmatched:
+        return []
+
+    eligible_by_id = {m.id: m for m in eligible_pool}
+    eligible_by_gender = defaultdict(set)
+    all_eligible_ids = set()
+    for m in eligible_pool:
+        eligible_by_gender[m.gender].add(m.id)
+        all_eligible_ids.add(m.id)
+
+    # Historical pairs from confirmed/active/cancelled matchings (drafts excluded)
+    historical_pairs = set()
+    for m in all_matchings:
+        historical_pairs.add((m.subject_id, m.object_id))
+        historical_pairs.add((m.object_id, m.subject_id))
+
+    # Batch-fetch all scores touching unmatched users against the eligible pool
+    unmatched_ids = [m.id for m in unmatched]
+    score_rows = session.query(
+        UserMatchScore.source_user_id,
+        UserMatchScore.target_user_id,
+        UserMatchScore.score,
+    ).filter(
+        or_(
+            and_(
+                UserMatchScore.source_user_id.in_(unmatched_ids),
+                UserMatchScore.target_user_id.in_(all_eligible_ids),
+            ),
+            and_(
+                UserMatchScore.source_user_id.in_(all_eligible_ids),
+                UserMatchScore.target_user_id.in_(unmatched_ids),
+            ),
+        )
+    ).all()
+
+    score_map = {(r.source_user_id, r.target_user_id): r.score for r in score_rows}
+
+    results = []
+    for member in unmatched:
+        opposite_gender = 'F' if member.gender == 'M' else 'M'
+        opposite_ids = eligible_by_gender[opposite_gender]
+
+        if not opposite_ids:
+            results.append((member, "配對池中無異性會員", []))
+            continue
+
+        # Candidates not historically paired with this member
+        remaining = {oid for oid in opposite_ids if (member.id, oid) not in historical_pairs}
+
+        if not remaining:
+            results.append((member, "已與配對池內所有異性有過配對記錄", []))
+            continue
+
+        # Tally edges for reason diagnosis
+        valid_count = 0
+        excluded_count = 0
+        no_score_count = 0
+
+        for oid in remaining:
+            s_me_them = score_map.get((member.id, oid))
+            s_them_me = score_map.get((oid, member.id))
+
+            if s_me_them is None and s_them_me is None:
+                no_score_count += 1
+            elif s_me_them is not None and s_them_me is not None \
+                    and s_me_them > 0 and s_them_me > 0:
+                valid_count += 1
+            else:
+                excluded_count += 1
+
+        if no_score_count == len(remaining):
+            reason = "尚未計算配對分數，請重新執行分數計算"
+        elif excluded_count > 0 and valid_count == 0:
+            reason = "與所有候選對象條件不符（雙方條件篩選排除）"
+        else:
+            reason = "部分候選對象缺少分數資料，其餘條件不符"
+
+        # Build candidate list for manual pairing (all non-historical opposite-gender,
+        # sorted by combined score desc so the best options appear first)
+        candidates = []
+        for oid in remaining:
+            candidate = eligible_by_id.get(oid)
+            if not candidate:
+                continue
+            s1 = score_map.get((member.id, oid)) or 0
+            s2 = score_map.get((oid, member.id)) or 0
+            combined = (s1 + s2) / 2
+            candidates.append((candidate, combined))
+        candidates.sort(key=lambda x: x[1], reverse=True)
+
+        results.append((member, reason, candidates))
+
+    return results
 
 
 @bp.route('/dashboard')
@@ -208,6 +322,14 @@ def admin_dashboard():
         for r in _draft_score_rows:
             breakdowns_by_pair[f"{r.source_user_id}:{r.target_user_id}"] = r.breakdown or {}
 
+    # Diagnose eligible members who didn't end up in a draft matching
+    unmatched_with_reasons = []
+    if draft_matchings:
+        eligible_pool = get_eligible_matching_pool(session)
+        unmatched_with_reasons = _diagnose_unmatched(
+            eligible_pool, draft_matchings, all_matchings, session
+        )
+
     response = render_template(
         'admin_dashboard.html',
         today=date.today(),
@@ -231,6 +353,7 @@ def admin_dashboard():
         member_match_history=member_match_history,
         matched_pairs_set=matched_pairs_set,
         is_dev=settings.is_dev,
+        unmatched_with_reasons=unmatched_with_reasons,
     )
     with _dashboard_cache_lock:
         _dashboard_cache['html'] = response
@@ -429,6 +552,85 @@ def delete_user(user_id):
     _invalidate_dashboard_cache()
     flash(f'已刪除會員「{name}」', 'success')
     return redirect(url_for('admin_bp.admin_dashboard'))
+
+
+@bp.route('/users/<int:user_id>/reset-password', methods=['POST'])
+@login_required
+@developer_required
+def reset_user_password(user_id):
+    session = get_db()
+    user = session.get(Member, user_id)
+    if user is None:
+        flash('找不到該會員', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard') + '#actions')
+
+    new_password = request.form.get('new_password', '').strip()
+    if len(new_password) < 6:
+        flash('新密碼至少需要 6 個字元', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard') + '#actions')
+
+    user.password_hash = hash_password(new_password)
+    session.commit()
+    _invalidate_dashboard_cache()
+    flash(f'已重設「{user.name}」的密碼', 'success')
+    return redirect(url_for('admin_bp.admin_dashboard') + '#actions')
+
+
+@bp.route('/matchings/create-draft-pair', methods=['POST'])
+@login_required
+@admin_required
+def create_draft_pair():
+    from sqlalchemy import and_, or_
+    session = get_db()
+
+    try:
+        subject_id = int(request.form['subject_id'])
+        object_id = int(request.form['object_id'])
+    except (KeyError, ValueError):
+        flash('無效的請求', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard') + '#drafts')
+
+    subject = session.get(Member, subject_id)
+    obj = session.get(Member, object_id)
+    if not subject or not obj:
+        flash('找不到會員', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard') + '#drafts')
+
+    if subject.gender == obj.gender:
+        flash('不能配對相同性別的會員', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard') + '#drafts')
+
+    existing = session.query(Matching).filter(
+        or_(
+            and_(Matching.subject_id == subject_id, Matching.object_id == object_id),
+            and_(Matching.subject_id == object_id, Matching.object_id == subject_id),
+        )
+    ).first()
+    if existing:
+        flash(f'「{subject.name}」與「{obj.name}」已有配對記錄', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard') + '#drafts')
+
+    sub_score = session.query(UserMatchScore).filter_by(
+        source_user_id=subject_id, target_user_id=object_id
+    ).first()
+    obj_score = session.query(UserMatchScore).filter_by(
+        source_user_id=object_id, target_user_id=subject_id
+    ).first()
+
+    new_match = Matching(
+        subject_id=subject_id,
+        object_id=object_id,
+        cool_name=generate_funny_name(),
+        grading_metric=int(sub_score.score) if sub_score else 0,
+        obj_grading_metric=int(obj_score.score) if obj_score else 0,
+        status=MatchingStatus.DRAFT,
+        is_match_notified=True,
+    )
+    session.add(new_match)
+    session.commit()
+    _invalidate_dashboard_cache()
+    flash(f'已新增草稿配對：{subject.name} ＆ {obj.name}', 'success')
+    return redirect(url_for('admin_bp.admin_dashboard') + '#drafts')
 
 
 @bp.route('/matchings/<int:matching_id>/cancel', methods=['POST'])
@@ -688,8 +890,19 @@ def approve_all_drafts():
     if not drafts:
         flash('目前沒有草稿配對。', 'info')
         return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
+
+    matched_ids = set()
     for m in drafts:
         m.approve_draft()
+        matched_ids.add(m.subject_id)
+        matched_ids.add(m.object_id)
+
+    # Finalise the cycle: update consecutive_unmatched_weeks now that the
+    # draft is committed. This is the correct moment — not during generation,
+    # so delete+regenerate doesn't cause spurious increments.
+    eligible_pool = get_eligible_matching_pool(session)
+    update_unmatched_counters(eligible_pool, matched_ids, session)
+
     session.commit()
     process_all_notifications(session)
     session.commit()
@@ -720,6 +933,9 @@ def approve_draft(matching_id):
         flash('找不到該草稿配對', 'danger')
         return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
     matching.approve_draft()
+    # Individual approval counts as a partial finalisation for these two members only
+    eligible_pool = get_eligible_matching_pool(session)
+    update_unmatched_counters(eligible_pool, {matching.subject_id, matching.object_id}, session)
     session.commit()
     process_all_notifications(session)
     session.commit()

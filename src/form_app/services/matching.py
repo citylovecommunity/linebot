@@ -1,6 +1,5 @@
 import math
 
-import networkx as nx
 from sqlalchemy import or_
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
@@ -8,179 +7,166 @@ from sqlalchemy.orm import Session
 from form_app.models import Matching, MatchingStatus, UserMatchScore
 from form_app.services.cool_name import generate_funny_name
 
+# Members unmatched for this many consecutive cycles unlock re-matching with
+# historical partners so the pool doesn't shrink to nothing over time.
+REMATCH_THRESHOLD = 2
+
 
 def generate_weekly_matches(users, session: Session):
-    # --- PRE-FETCHING DATA (Optimize N+1 Problem) ---
+    """
+    Greedy sequential matching — each user initiates at most one new match per
+    cycle, but can appear as a candidate in multiple matches.
 
+    Algorithm:
+      1. Sort users by consecutive_unmatched_weeks DESC so long-waiting members
+         get first pick of candidates.
+      2. For each user not yet an initiator this cycle, find their highest-scoring
+         valid candidate (opposite gender, no dealbreaker, not already paired with
+         them this cycle, historical pairs allowed after REMATCH_THRESHOLD).
+      3. Create the pair and mark the user as done for this cycle.
+         The candidate is NOT marked done — they will get their own turn.
+
+    This guarantees every user with at least one valid candidate gets matched,
+    without exhausting the full M×F cross-product in a single cycle.
+    """
     user_ids = [u.id for u in users]
+    if not user_ids:
+        return []
 
-    # 2. Fetch ALL existing matches involving these users in one go
-    # We want a set of pairs that are ALREADY matched to exclude them.
-    existing_matches_query = session.query(Matching.subject_id, Matching.object_id).filter(
+    # Fetch all existing matchings to exclude previously matched pairs
+    existing = session.query(Matching.subject_id, Matching.object_id).filter(
         or_(
             Matching.subject_id.in_(user_ids),
-            Matching.object_id.in_(user_ids)
+            Matching.object_id.in_(user_ids),
         )
     ).all()
 
-    # Create a lookup set for O(1) access.
-    # Store both (A,B) and (B,A) to make checking easy.
-    matched_pairs = set()
-    for sub, obj in existing_matches_query:
+    matched_pairs: set[tuple[int, int]] = set()
+    for sub, obj in existing:
         matched_pairs.add((sub, obj))
         matched_pairs.add((obj, sub))
 
-    # 3. Fetch ALL scores between these users in one go
-    scores_query = session.query(
+    # Batch-fetch cross-gender scores
+    scores = session.query(
         UserMatchScore.source_user_id,
         UserMatchScore.target_user_id,
-        UserMatchScore.score
+        UserMatchScore.score,
     ).filter(
         UserMatchScore.source_user_id.in_(user_ids),
-        UserMatchScore.target_user_id.in_(user_ids)
+        UserMatchScore.target_user_id.in_(user_ids),
     ).all()
 
-    # Create a score map: {(u_id, v_id): score}
-    score_map = {}
-    for src, tgt, score in scores_query:
-        score_map[(src, tgt)] = score
+    score_map: dict[tuple[int, int], float] = {
+        (r.source_user_id, r.target_user_id): r.score for r in scores
+    }
 
-    # --- GRAPH CONSTRUCTION ---
+    male_users   = [u for u in users if u.gender == 'M']
+    female_users = [u for u in users if u.gender == 'F']
 
-    G = nx.Graph()
-    CARDINALITY_BIAS = 10000
+    # Process longest-waiting members first so they get the best candidates
+    sorted_users = sorted(users, key=lambda u: u.consecutive_unmatched_weeks or 0, reverse=True)
 
-    # --- 1. BUILD THE GRAPH ---
-    for i, u in enumerate(users):
-        for j in range(i + 1, len(users)):
-            v = users[j]
+    initiated: set[int] = set()           # users who have already initiated a match
+    cycle_pairs: set[tuple[int, int]] = set()  # canonical (min_id, max_id) pairs created this cycle
+    final_edges: list[tuple[int, int]] = []    # (male_id, female_id)
 
-            # Skip if already matched historically
-            if (u.id, v.id) in matched_pairs:
+    for user in sorted_users:
+        if user.id in initiated:
+            continue  # already initiated a match this cycle
+
+        opposite = female_users if user.gender == 'M' else male_users
+        u_weeks = user.consecutive_unmatched_weeks or 0
+
+        candidates: list[tuple[object, float]] = []
+        for candidate in opposite:
+            # Prevent creating the same pair twice within one cycle
+            pair_key = (min(user.id, candidate.id), max(user.id, candidate.id))
+            if pair_key in cycle_pairs:
                 continue
 
-            # Get scores
-            s_u_v = score_map.get((u.id, v.id), 0)
-            s_v_u = score_map.get((v.id, u.id), 0)
+            # Skip historical pairs unless the re-matching threshold is met
+            if (user.id, candidate.id) in matched_pairs:
+                c_weeks = candidate.consecutive_unmatched_weeks or 0
+                if u_weeks < REMATCH_THRESHOLD and c_weeks < REMATCH_THRESHOLD:
+                    continue
 
-            # Dealbreaker check
-            if s_u_v <= 0 or s_v_u <= 0:
+            s1 = score_map.get((user.id, candidate.id), 0)
+            s2 = score_map.get((candidate.id, user.id), 0)
+            if s1 <= 0 or s2 <= 0:
                 continue
 
-            # Calculate Weight
-            geo_mean = math.sqrt(s_u_v * s_v_u)
-            final_weight = geo_mean + CARDINALITY_BIAS
+            candidates.append((candidate, math.sqrt(s1 * s2)))
 
-            G.add_edge(u.id, v.id, weight=final_weight)
-
-    # --- 2. RUN MAX WEIGHT MATCHING (Strict 1-to-1) ---
-    # Returns a set of tuples: {(id1, id2), (id3, id4)}
-    matching_set = nx.max_weight_matching(G, maxcardinality=True)
-
-    # Convert to a list so we can append leftovers later
-    final_edges = list(matching_set)
-
-    # --- 3. IDENTIFY LEFTOVERS ---
-    # Create a set of all nodes currently in a match
-    matched_nodes = set()
-    for u_id, v_id in matching_set:
-        matched_nodes.add(u_id)
-        matched_nodes.add(v_id)
-
-    # Find nodes in the graph that were NOT matched
-    # Note: We use G.nodes() because if a user had 0 valid edges, they aren't in G at all
-    all_graph_nodes = set(G.nodes())
-    leftover_nodes = all_graph_nodes - matched_nodes
-
-    # --- 4. GREEDY FILL ---
-    # For each leftover, find the best available neighbor.
-    # Track pairs we've already added to avoid duplicating the same couple when
-    # two leftovers are each other's best choice.
-    greedy_pairs: set[frozenset] = set()
-    for node in leftover_nodes:
-        if not G[node]:
+        if not candidates:
             continue
 
-        # Only consider neighbors that are not already matched this week
-        available = {n: attrs for n, attrs in G[node].items() if n not in matched_nodes}
-        if not available:
-            continue
+        best, _ = max(candidates, key=lambda x: x[1])
 
-        best_neighbor = max(available.items(), key=lambda x: x[1]['weight'])
-        target_id = best_neighbor[0]
-
-        pair = frozenset((node, target_id))
-        if pair in greedy_pairs:
-            continue  # Already added from the other side
-
-        greedy_pairs.add(pair)
-        matched_nodes.add(node)
-        matched_nodes.add(target_id)
-        final_edges.append((node, target_id))
+        edge = (user.id, best.id) if user.gender == 'M' else (best.id, user.id)
+        final_edges.append(edge)
+        initiated.add(user.id)
+        cycle_pairs.add((min(user.id, best.id), max(user.id, best.id)))
 
     return final_edges
 
 
+def update_unmatched_counters(eligible_members, matched_ids: set[int], session: Session):
+    """
+    Call when a cycle is finalised (draft approved or direct run).
+    Resets the counter for anyone who appeared in any match; increments others.
+    Never call during draft generation — delete+regenerate must not count.
+    """
+    for member in eligible_members:
+        if member.id in matched_ids:
+            member.consecutive_unmatched_weeks = 0
+        else:
+            member.consecutive_unmatched_weeks = (member.consecutive_unmatched_weeks or 0) + 1
+
+
 def match(subject_id, object_id, session: Session):
-
-    sub_view_score = session.query(UserMatchScore).filter(
-        UserMatchScore.source_user_id == subject_id,
-        UserMatchScore.target_user_id == object_id
+    sub_score = session.query(UserMatchScore).filter_by(
+        source_user_id=subject_id, target_user_id=object_id
+    ).first()
+    obj_score = session.query(UserMatchScore).filter_by(
+        source_user_id=object_id, target_user_id=subject_id
     ).first()
 
-    obj_view_score = session.query(UserMatchScore).filter(
-        UserMatchScore.source_user_id == object_id,
-        UserMatchScore.target_user_id == subject_id
-    ).first()
-
-    # 3. Create the object
     new_match = Matching(
         subject_id=subject_id,
         object_id=object_id,
         cool_name=generate_funny_name(),
-        grading_metric=sub_view_score.score,
-        obj_grading_metric=obj_view_score.score,
+        grading_metric=sub_score.score,
+        obj_grading_metric=obj_score.score,
     )
     session.add(new_match)
-
     return new_match
 
 
 def process_matches_bulk(eligible_members, session: Session, is_draft: bool = False):
     matchings = generate_weekly_matches(eligible_members, session)
+
+    # For direct (non-draft) runs, finalise the cycle counter immediately.
+    # For draft runs, update_unmatched_counters() is called on approval instead.
+    if not is_draft:
+        matched_ids: set[int] = {uid for pair in matchings for uid in pair}
+        update_unmatched_counters(eligible_members, matched_ids, session)
+
     if not matchings:
         return
 
-    # 2. OPTIMIZATION: Pre-fetch all scores in ONE query
-    # We collect all subject/object IDs involved to filter the query
-    involved_user_ids = set()
-    for m in matchings:
-        involved_user_ids.add(m[0])
-        involved_user_ids.add(m[1])
-
-    # Query all scores where both users are in our current matching pool
-    # This replaces the 2 SELECTs per loop.
+    # Batch-fetch scores for bulk insert
+    involved_ids = {uid for pair in matchings for uid in pair}
     raw_scores = session.query(UserMatchScore).filter(
-        UserMatchScore.source_user_id.in_(involved_user_ids),
-        UserMatchScore.target_user_id.in_(involved_user_ids)
+        UserMatchScore.source_user_id.in_(involved_ids),
+        UserMatchScore.target_user_id.in_(involved_ids),
     ).all()
+    score_map = {(s.source_user_id, s.target_user_id): s.score for s in raw_scores}
 
-    # Create a lookup dictionary: (source, target) -> score
-    score_map = {
-        (s.source_user_id, s.target_user_id): s.score
-        for s in raw_scores
-    }
-
-    # 3. Prepare data for Bulk Insert
     matches_to_insert = []
-
     for subject_id, object_id in matchings:
-        # Dictionary lookup is instant vs DB query
         sub_score = score_map.get((subject_id, object_id))
         obj_score = score_map.get((object_id, subject_id))
-
         if sub_score is None or obj_score is None:
-            # Handle missing scores gracefully (log it, skip it, or default to 0)
             continue
 
         row = {
@@ -192,7 +178,7 @@ def process_matches_bulk(eligible_members, session: Session, is_draft: bool = Fa
         }
         if is_draft:
             row["status"] = MatchingStatus.DRAFT.value
-            row["is_match_notified"] = True  # suppress normal notify flow until approved
+            row["is_match_notified"] = True
         matches_to_insert.append(row)
 
     if matches_to_insert:

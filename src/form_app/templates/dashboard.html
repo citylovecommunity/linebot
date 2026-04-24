@@ -83,11 +83,11 @@
                         <small>
                             {% set score = matching.get_grading(current_user.id) %}
                             {% if score >= 70 %}
-                            <i class="bi bi-heart-fill text-danger"></i><i class="bi bi-heart-fill text-danger"></i><i class="bi bi-heart-fill text-danger"></i>
+                            <i class="bi bi-star-fill text-warning"></i><i class="bi bi-star-fill text-warning"></i><i class="bi bi-star-fill text-warning"></i>
                             {% elif score >= 40 %}
-                            <i class="bi bi-heart-fill text-danger"></i><i class="bi bi-heart-fill text-danger"></i><i class="bi bi-heart text-danger opacity-25"></i>
+                            <i class="bi bi-star-fill text-warning"></i><i class="bi bi-star-fill text-warning"></i><i class="bi bi-star text-warning opacity-25"></i>
                             {% else %}
-                            <i class="bi bi-heart-fill text-danger"></i><i class="bi bi-heart text-danger opacity-25"></i><i class="bi bi-heart text-danger opacity-25"></i>
+                            <i class="bi bi-star-fill text-warning"></i><i class="bi bi-star text-warning opacity-25"></i><i class="bi bi-star text-warning opacity-25"></i>
                             {% endif %}
                         </small>
                     </div>

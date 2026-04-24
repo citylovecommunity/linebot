@@ -146,6 +146,11 @@ class Member(Base):
     matching_start_date: Mapped[Optional[date]]
     matching_end_date: Mapped[Optional[date]]
 
+    # Tracks how many consecutive matching cycles this member was eligible but unmatched.
+    # Reset to 0 each time they are successfully paired.
+    # Used to give priority boosts and unlock re-matching with historical partners.
+    consecutive_unmatched_weeks: Mapped[int] = mapped_column(default=0)
+
     @property
     def membership_months(self) -> Optional[int]:
         if not self.user_info:

@@ -48,6 +48,14 @@
         操作
       </button>
     </li>
+    {% if current_user.is_developer %}
+    <li class="nav-item" role="presentation">
+      <button class="nav-link text-info" id="dev-tab" data-bs-toggle="tab" data-bs-target="#dev"
+        type="button" role="tab">
+        <i class="bi bi-code-slash me-1"></i> Dev
+      </button>
+    </li>
+    {% endif %}
   </ul>
 
   <div class="tab-content border border-top-0 rounded-bottom p-3 bg-white shadow-sm">
@@ -190,8 +198,8 @@
           <h5 class="mb-0">草稿配對 <span class="badge bg-warning text-dark ms-1">{{ draft_matchings|length }}</span></h5>
           <p class="text-muted small mb-0 mt-1">本週自動配對結果，請確認後再發送通知給會員。</p>
         </div>
-        {% if draft_matchings %}
         <div class="d-flex gap-2">
+          {% if draft_matchings %}
           <form method="POST" action="{{ url_for('admin_bp.discard_all_drafts') }}"
             onsubmit="return confirm('確定要刪除所有草稿配對嗎？')">
             <button type="submit" class="btn btn-sm btn-outline-danger">
@@ -204,14 +212,91 @@
               <i class="bi bi-check-all"></i> 確認全部並發送通知
             </button>
           </form>
+          {% else %}
+          <form method="POST" action="{{ url_for('tasks_bp.task_match_all_users') }}?save_as_draft=true"
+            id="draft-match-form">
+            <button type="submit" class="btn btn-sm btn-primary">
+              <i class="bi bi-eye"></i> 生成草稿配對
+            </button>
+          </form>
+          {% endif %}
         </div>
-        {% endif %}
       </div>
+
+      {% if unmatched_with_reasons %}
+      <div class="card border-warning mb-3">
+        <div class="card-header bg-warning text-dark py-2">
+          <i class="bi bi-person-x-fill me-1"></i>
+          <strong>本週未配對會員（{{ unmatched_with_reasons|length }} 人）</strong>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm mb-0 align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>姓名</th>
+                <th>性別</th>
+                <th>連續未配對</th>
+                <th>未配對原因</th>
+                <th>手動配對</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for member, reason, candidates in unmatched_with_reasons %}
+              <tr>
+                <td class="fw-semibold">{{ member.name }}</td>
+                <td>{{ '男' if member.gender == 'M' else '女' }}</td>
+                <td class="text-center">
+                  {% set w = member.consecutive_unmatched_weeks or 0 %}
+                  {% if w == 0 %}
+                  <span class="badge bg-secondary">首次</span>
+                  {% elif w >= 2 %}
+                  <span class="badge bg-danger">{{ w }} 週</span>
+                  {% else %}
+                  <span class="badge bg-warning text-dark">{{ w }} 週</span>
+                  {% endif %}
+                </td>
+                <td class="text-muted small">{{ reason }}</td>
+                <td>
+                  {% if candidates %}
+                  <form method="POST" action="{{ url_for('admin_bp.create_draft_pair') }}"
+                        class="d-flex gap-1 align-items-center"
+                        onsubmit="return confirm('確定要手動建立此草稿配對嗎？')">
+                    <input type="hidden" name="subject_id" value="{{ member.id }}">
+                    <select name="object_id" class="form-select form-select-sm" style="min-width:140px;" required>
+                      <option value="">選擇對象…</option>
+                      {% for candidate, score in candidates %}
+                      <option value="{{ candidate.id }}">
+                        {{ candidate.name }}{% if score %} ({{ score|int }}){% endif %}
+                      </option>
+                      {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-primary text-nowrap">
+                      <i class="bi bi-plus-circle"></i>
+                    </button>
+                  </form>
+                  {% else %}
+                  <span class="text-muted small">無可配對對象</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <a href="{{ url_for('admin_bp.edit_user', user_id=member.id) }}"
+                     class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-pencil"></i>
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
 
       {% if not draft_matchings %}
       <div class="text-center py-5 text-muted">
         <i class="bi bi-inbox fs-1"></i>
-        <p class="mt-2">目前沒有草稿配對。<br>在「操作」頁籤中點選「生成草稿配對」來預覽本週配對結果。</p>
+        <p class="mt-2">目前沒有草稿配對。點選右上角「生成草稿配對」來預覽本週配對結果。</p>
       </div>
       {% else %}
       <div class="table-responsive">
@@ -539,40 +624,6 @@
         </div>
       </div>
 
-      <div class="card mb-3">
-        <div class="card-body">
-          <h6 class="card-title">生成草稿配對 <span class="badge bg-success ms-1">推薦</span></h6>
-          <p class="text-muted small">計算配對分數並生成草稿，供管理員審核後再發送通知給會員。</p>
-          {% if draft_matchings %}
-          <div class="alert alert-warning py-2 mb-2 small">
-            <i class="bi bi-exclamation-triangle"></i>
-            目前已有 {{ draft_matchings|length }} 筆草稿，請先在「草稿配對」頁籤中處理。
-          </div>
-          {% endif %}
-          <form method="POST" action="{{ url_for('tasks_bp.task_match_all_users') }}?save_as_draft=true"
-            id="draft-match-form">
-            <button type="submit" class="btn btn-primary" {{ 'disabled' if draft_matchings }}>
-              <i class="bi bi-eye"></i> 生成草稿配對
-            </button>
-          </form>
-        </div>
-      </div>
-
-      {% if current_user.is_developer %}
-      <div class="card mb-3 border-info">
-        <div class="card-body">
-          <h6 class="card-title"><i class="bi bi-code-slash me-1 text-info"></i> Developer Tools</h6>
-          <p class="text-muted small">Developer-only tools for UI testing.</p>
-          <a href="{{ url_for('dev_bp.dashboard_preview') }}" target="_blank" class="btn btn-outline-info btn-sm me-1">
-            <i class="bi bi-grid me-1"></i> Dashboard Preview
-          </a>
-          <a href="{{ url_for('dev_bp.chat_preview') }}" target="_blank" class="btn btn-outline-info btn-sm">
-            <i class="bi bi-chat-dots me-1"></i> Chat Preview
-          </a>
-        </div>
-      </div>
-      {% endif %}
-
       <div class="card">
         <div class="card-body">
           <h6 class="card-title">直接執行自動配對</h6>
@@ -586,6 +637,56 @@
         </div>
       </div>
     </div>
+
+    <!-- Dev 頁籤 -->
+    {% if current_user.is_developer %}
+    <div class="tab-pane fade" id="dev" role="tabpanel">
+      <h5 class="mb-3"><i class="bi bi-code-slash me-2 text-info"></i>Developer Tools</h5>
+
+      <div class="card mb-3 border-info">
+        <div class="card-body">
+          <h6 class="card-title">UI 預覽</h6>
+          <p class="text-muted small">開啟假資料的會員頁面預覽，用於 UI 測試。</p>
+          <a href="{{ url_for('dev_bp.dashboard_preview') }}" target="_blank" class="btn btn-outline-info btn-sm me-1">
+            <i class="bi bi-grid me-1"></i> Dashboard Preview
+          </a>
+          <a href="{{ url_for('dev_bp.chat_preview') }}" target="_blank" class="btn btn-outline-info btn-sm">
+            <i class="bi bi-chat-dots me-1"></i> Chat Preview
+          </a>
+        </div>
+      </div>
+
+      <div class="card mb-3 border-warning">
+        <div class="card-body">
+          <h6 class="card-title"><i class="bi bi-shield-lock me-1 text-warning"></i> 重設會員密碼</h6>
+          <p class="text-muted small">直接重設任意會員的密碼，無需知道舊密碼。</p>
+          <form method="POST" id="reset-pw-form" onsubmit="return confirm('確定要重設「' + document.getElementById('reset-pw-member-select').options[document.getElementById('reset-pw-member-select').selectedIndex].text + '」的密碼嗎？')">
+            <input type="hidden" name="new_password" id="reset-pw-hidden">
+            <div class="row g-2 align-items-end">
+              <div class="col-sm-5">
+                <label class="form-label small mb-1">選擇會員</label>
+                <select class="form-select form-select-sm" id="reset-pw-member-select" required>
+                  <option value="">-- 選擇會員 --</option>
+                  {% for m in members %}
+                  <option value="{{ url_for('admin_bp.reset_user_password', user_id=m.id) }}">{{ m.name }} ({{ m.phone_number }})</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-sm-4">
+                <label class="form-label small mb-1">新密碼（至少 6 字元）</label>
+                <input type="text" class="form-control form-control-sm" id="reset-pw-input" placeholder="新密碼" minlength="6" required>
+              </div>
+              <div class="col-sm-3">
+                <button type="submit" class="btn btn-warning btn-sm w-100">
+                  <i class="bi bi-key me-1"></i> 重設密碼
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endif %}
 
   </div>
 </div>
@@ -866,6 +967,17 @@
     </div>
   </div>
 </div>
+
+<!-- Reset password JS -->
+<script>
+  document.getElementById('reset-pw-form')?.addEventListener('submit', function(e) {
+    const select = document.getElementById('reset-pw-member-select');
+    const pwInput = document.getElementById('reset-pw-input');
+    if (!select.value || pwInput.value.length < 6) { e.preventDefault(); return; }
+    document.getElementById('reset-pw-hidden').value = pwInput.value;
+    this.action = select.value;
+  });
+</script>
 
 <!-- 配對記錄 Modal -->
 <div class="modal fade" id="matchHistoryModal" tabindex="-1">

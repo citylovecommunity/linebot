@@ -19,7 +19,7 @@
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
         <div class="container">
             <a class="navbar-brand fw-bold" href="{{ url_for('index') }}">
-                <i class="bi bi-heart-fill text-danger"></i> CityLove
+                <i class="bi bi-people-fill"></i> CityLove
             </a>
 
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -39,12 +39,12 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('dashboard_bp.dashboard') }}">Dashboard</a>
                     </li>
+                    {% endif %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('dashboard_bp.profile') }}">
-                            <i class="bi bi-person-circle"></i> Profile
+                            <i class="bi bi-person-circle"></i> 個人設定
                         </a>
                     </li>
-                    {% endif %}
                     <li class="nav-item">
                         <a class="nav-link text-danger" href="{{ url_for('auth_bp.logout') }}">Logout</a>
                     </li>

@@ -104,7 +104,7 @@
               <span><i class="bi bi-rulers"></i> {{ m.height }}cm</span>
               {% endif %}
               {% if m.marital_status %}
-              <span><i class="bi bi-heart"></i> {{ m.marital_status }}</span>
+              <span><i class="bi bi-person"></i> {{ m.marital_status }}</span>
               {% endif %}
             </div>
             {% set hobbies = m.user_info.get('您的休閒興趣 (可複選)', '') if m.user_info else '' %}
@@ -172,7 +172,7 @@
               <span><i class="bi bi-rulers"></i> {{ m.height }}cm</span>
               {% endif %}
               {% if m.marital_status %}
-              <span><i class="bi bi-heart"></i> {{ m.marital_status }}</span>
+              <span><i class="bi bi-person"></i> {{ m.marital_status }}</span>
               {% endif %}
             </div>
             {% set hobbies = m.user_info.get('您的休閒興趣 (可複選)', '') if m.user_info else '' %}
