@@ -25,28 +25,6 @@
 
 <div class="container py-5">
 
-    <div class="row mb-5">
-        <div class="col-12">
-            <div class="modern-card p-4">
-                <div class="step-indicator d-flex justify-content-between text-center">
-                    <div class="step-item {{ 'step-completed' if status_step > 1 else 'step-active' }}">
-                        <div class="step-dot"><i class="bi bi-people-fill"></i></div>
-                        <small class="fw-bold">配對中</small>
-                    </div>
-                    <div
-                        class="step-item {{ 'step-completed' if status_step > 2 else ('step-active' if status_step == 2 else '') }}">
-                        <div class="step-dot"><i class="bi bi-calendar-range"></i></div>
-                        <small class="fw-bold">任務規劃中</small>
-                    </div>
-                    <div class="step-item {{ 'step-completed' if status_step == 3 }}">
-                        <div class="step-dot"><i class="bi bi-check-lg"></i></div>
-                        <small class="fw-bold">配對完成</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <div class="row g-4">
         <div class="col-lg-4 d-flex flex-column">
 

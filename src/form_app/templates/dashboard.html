@@ -6,15 +6,13 @@
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-center dashboard-header pb-3">
 
         <div class="mb-3 mb-md-0 text-center text-md-start">
-            <h2 class="fw-bold text-dark mb-1">{{ current_user.proper_name }}的配對</h2>
-            <p class="text-muted small mb-0">你有 <strong>{{ (preview_matches if preview_matches is defined else current_user.all_matches)|length }}</strong> 個進行中的配對！</p>
+            <h2 class="fw-bold text-dark mb-1">{{ current_user.proper_name }}，你好！</h2>
+            <p class="text-muted small mb-0">目前有 <strong>{{ (preview_matches if preview_matches is defined else current_user.all_matches)|selectattr('is_active')|list|length }}</strong> 位認識對象</p>
         </div>
 
         <div class="d-flex flex-wrap justify-content-center gap-2" id="match-filters">
-            <button class="btn btn-sm btn-outline-dark rounded-pill px-3 active" data-filter="all">全部</button>
-            <button class="btn btn-sm btn-outline-dark rounded-pill px-3" data-filter="ACTIVE">配對中</button>
-            <button class="btn btn-sm btn-outline-dark rounded-pill px-3" data-filter="COMPLETED">已完成</button>
-            <button class="btn btn-sm btn-outline-dark rounded-pill px-3" data-filter="CANCELLED">已取消</button>
+            <button class="btn btn-sm btn-outline-dark rounded-pill px-3 active" data-filter="ACTIVE">認識中</button>
+            <button class="btn btn-sm btn-outline-dark rounded-pill px-3" data-filter="ended">已結束</button>
         </div>
     </div>
 
@@ -64,15 +62,11 @@
                         </span>
                         {% elif matching.is_active %}
                         <span class="badge rounded-pill bg-success bg-opacity-10 text-success">
-                            <i class="bi bi-activity me-1"></i> 配對中
+                            <i class="bi bi-activity me-1"></i> 認識中
                         </span>
-                        {% elif matching.is_completed %}
+                        {% elif matching.is_completed or matching.is_cancelled %}
                         <span class="badge rounded-pill bg-secondary bg-opacity-10 text-secondary">
-                            <i class="bi bi-check-circle me-1"></i> 已完成
-                        </span>
-                        {% elif matching.is_cancelled %}
-                        <span class="badge rounded-pill bg-danger bg-opacity-10 text-danger">
-                            <i class="bi bi-x-circle me-1"></i> 已取消
+                            <i class="bi bi-dash-circle me-1"></i> 已結束
                         </span>
                         {% else %}
                         <span class="badge rounded-pill bg-light text-dark border">
@@ -150,31 +144,28 @@
     document.addEventListener('DOMContentLoaded', function () {
         const filterButtons = document.querySelectorAll('#match-filters button');
         const matchItems = document.querySelectorAll('.match-item');
+        const endedStatuses = ['CANCELLED', 'COMPLETED'];
+
+        function applyFilter(filterValue) {
+            matchItems.forEach(item => {
+                const itemStatus = item.getAttribute('data-status');
+                const matches =
+                    (filterValue === 'ended' && endedStatuses.includes(itemStatus)) ||
+                    itemStatus === filterValue;
+                item.style.display = matches ? 'block' : 'none';
+            });
+        }
 
         filterButtons.forEach(button => {
             button.addEventListener('click', () => {
-                // 1. Remove 'active' class from all buttons
                 filterButtons.forEach(btn => btn.classList.remove('active'));
-                // 2. Add 'active' class to clicked button
                 button.classList.add('active');
-
-                const filterValue = button.getAttribute('data-filter');
-
-                matchItems.forEach(item => {
-                    const itemStatus = item.getAttribute('data-status');
-
-                    // Logic: 
-                    // If filter is 'all', show everything.
-                    // Otherwise, check if item's status matches the filter.
-                    // Note: You might need to adjust logic if one button maps to multiple DB statuses
-                    if (filterValue === 'all' || itemStatus === filterValue) {
-                        item.style.display = 'block'; // Or 'flex' depending on your layout, but block works for Bootstrap cols
-                    } else {
-                        item.style.display = 'none';
-                    }
-                });
+                applyFilter(button.getAttribute('data-filter'));
             });
         });
+
+        // Default: show active matches only
+        applyFilter('ACTIVE');
     });
 </script>
 {% endblock %}
