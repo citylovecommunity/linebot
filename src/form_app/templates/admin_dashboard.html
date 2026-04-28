@@ -80,14 +80,14 @@
         </div>
 
         <div class="btn-group btn-group-sm" role="group">
-          <button class="btn btn-outline-secondary active" onclick="setFilter('status','all',this)">全部</button>
-          <button class="btn btn-outline-success" onclick="setFilter('status','active',this)">啟用中</button>
+          <button class="btn btn-outline-secondary" onclick="setFilter('status','all',this)">全部</button>
+          <button class="btn btn-outline-success active" onclick="setFilter('status','active',this)">啟用中</button>
           <button class="btn btn-outline-secondary" onclick="setFilter('status','inactive',this)">已停用</button>
         </div>
 
         <div class="btn-group btn-group-sm" role="group">
-          <button class="btn btn-outline-secondary active" onclick="setFilter('eligible','all',this)">全部</button>
-          <button class="btn btn-outline-success" onclick="setFilter('eligible','ready',this)">合格</button>
+          <button class="btn btn-outline-secondary" onclick="setFilter('eligible','all',this)">全部</button>
+          <button class="btn btn-outline-success active" onclick="setFilter('eligible','ready',this)">合格</button>
           <button class="btn btn-outline-danger" onclick="setFilter('eligible','not-ready',this)">不合格</button>
         </div>
 
@@ -111,7 +111,8 @@
               <th>等級</th>
               <th>狀態</th>
               <th>資格</th>
-              <th class="sortable" data-col="7" style="cursor:pointer;">到期日 <i class="bi bi-arrow-down-up small"></i></th>
+              <th class="sortable" data-col="7" style="cursor:pointer;">未配對 <i class="bi bi-arrow-down-up small"></i></th>
+              <th class="sortable" data-col="8" style="cursor:pointer;">到期日 <i class="bi bi-arrow-down-up small"></i></th>
               <th>操作</th>
             </tr>
           </thead>
@@ -126,7 +127,7 @@
             <tr
               data-gender="{{ member.gender }}"
               data-status="{{ 'active' if member.is_member_active else 'inactive' }}"
-              data-eligible="{{ 'ready' if (member.id in match_ready_ids and member.is_member_active and not member.is_test) else 'not-ready' }}"
+              data-eligible="{{ 'not-ready' if non_eligible_map.get(member.id) else 'ready' }}"
               data-expiry="{{ expiry_state }}">
               <td class="text-muted small" data-val="{{ member.id }}">{{ member.id }}</td>
               <td data-val="{{ member.name }}">{{ member.name }}</td>
@@ -151,6 +152,18 @@
                   {% endfor %}
                 {% else %}
                 <span class="badge bg-success">✓</span>
+                {% endif %}
+              </td>
+              <td class="text-center small" data-val="{{ weeks_unmatched_by_id.get(member.id) if weeks_unmatched_by_id.get(member.id) is not none else 9999 }}">
+                {% set w = weeks_unmatched_by_id.get(member.id) %}
+                {% if w is none %}
+                <span class="text-muted">從未</span>
+                {% elif w == 0 %}
+                <span class="badge bg-success">本週</span>
+                {% elif w >= 4 %}
+                <span class="badge bg-danger">{{ w }}w</span>
+                {% else %}
+                <span class="badge bg-warning text-dark">{{ w }}w</span>
                 {% endif %}
               </td>
               <td class="small" data-val="{{ exp.strftime('%Y-%m-%d') if exp else '9999' }}">
@@ -223,77 +236,15 @@
         </div>
       </div>
 
-      {% if unmatched_with_reasons %}
-      <div class="card border-warning mb-3">
-        <div class="card-header bg-warning text-dark py-2">
-          <i class="bi bi-person-x-fill me-1"></i>
-          <strong>本週未配對會員（{{ unmatched_with_reasons|length }} 人）</strong>
-        </div>
-        <div class="table-responsive">
-          <table class="table table-sm mb-0 align-middle">
-            <thead class="table-light">
-              <tr>
-                <th>姓名</th>
-                <th>性別</th>
-                <th>連續未配對</th>
-                <th>未配對原因</th>
-                <th>手動配對</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for member, reason, candidates in unmatched_with_reasons %}
-              <tr>
-                <td class="fw-semibold">{{ member.name }}</td>
-                <td>{{ '男' if member.gender == 'M' else '女' }}</td>
-                <td class="text-center">
-                  {% set w = weeks_unmatched_by_id.get(member.id) %}
-                  {% if w is none %}
-                  <span class="badge bg-secondary">從未配對</span>
-                  {% elif w == 0 %}
-                  <span class="badge bg-success">本週</span>
-                  {% elif w >= 4 %}
-                  <span class="badge bg-danger">{{ w }} 週</span>
-                  {% else %}
-                  <span class="badge bg-warning text-dark">{{ w }} 週</span>
-                  {% endif %}
-                </td>
-                <td class="text-muted small">{{ reason }}</td>
-                <td>
-                  {% if candidates %}
-                  <form method="POST" action="{{ url_for('admin_bp.create_draft_pair') }}"
-                        class="d-flex gap-1 align-items-center"
-                        onsubmit="return confirm('確定要手動建立此草稿配對嗎？')">
-                    <input type="hidden" name="subject_id" value="{{ member.id }}">
-                    <select name="object_id" class="form-select form-select-sm" style="min-width:140px;" required>
-                      <option value="">選擇對象…</option>
-                      {% for candidate, score in candidates %}
-                      <option value="{{ candidate.id }}">
-                        {{ candidate.name }}{% if score %} ({{ score|int }}){% endif %}
-                      </option>
-                      {% endfor %}
-                    </select>
-                    <button type="submit" class="btn btn-sm btn-primary text-nowrap">
-                      <i class="bi bi-plus-circle"></i>
-                    </button>
-                  </form>
-                  {% else %}
-                  <span class="text-muted small">無可配對對象</span>
-                  {% endif %}
-                </td>
-                <td>
-                  <a href="{{ url_for('admin_bp.edit_user', user_id=member.id) }}"
-                     class="btn btn-outline-secondary btn-sm">
-                    <i class="bi bi-pencil"></i>
-                  </a>
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      {% endif %}
+      <p class="text-muted small mb-2">
+        <i class="bi bi-info-circle me-1"></i>
+        草稿配對只會為<strong>超過一週未配對</strong>的合格會員尋找對象，依等待時間由長至短依序處理。
+        本週剛配對的會員不會作為發起方，但仍可能被選為候選人。
+      </p>
+      <p class="text-muted small mb-3">
+        <span class="badge bg-danger me-1">⚠</span>
+        標紅的配對存在硬排除條件（如年齡、飲食、宗教等），請在發送通知前人工確認是否刪除。
+      </p>
 
       {% if not draft_matchings %}
       <div class="text-center py-5 text-muted">
@@ -301,6 +252,59 @@
         <p class="mt-2">目前沒有草稿配對。點選右上角「生成草稿配對」來預覽本週配對結果。</p>
       </div>
       {% else %}
+      {% if no_candidate_users %}
+      <div class="card border-danger mb-3">
+        <div class="card-header bg-danger text-white py-2">
+          <i class="bi bi-exclamation-triangle-fill me-1"></i>
+          <strong>以下會員因硬排除條件無法自動配對，請人工處理後再發送通知（{{ no_candidate_users|length }} 人）</strong>
+        </div>
+        <div class="card-body p-2">
+          {% for u in no_candidate_users %}
+          {% set w = weeks_unmatched_by_id.get(u.id) %}
+          {% set candidates = no_candidate_candidates.get(u.id, []) %}
+          <div class="d-flex align-items-center gap-2 flex-wrap py-2 {% if not loop.last %}border-bottom{% endif %}">
+            <div style="min-width:120px">
+              <span class="fw-semibold">{{ u.name }}</span>
+              <span class="text-muted small ms-1">{{ '男' if u.gender == 'M' else '女' }}</span>
+              <div>
+                {% if w is none %}<span class="badge bg-secondary">從未配對</span>
+                {% else %}<span class="badge bg-danger">{{ w }}w 未配對</span>{% endif %}
+              </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+              onclick="showMemberInfo({{ u.id }})"><i class="bi bi-person-lines-fill me-1"></i>會員資料</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+              onclick="showMatchHistory({{ u.id }}, '{{ u.name }}')">查看配對記錄</button>
+            {% if candidates %}
+            <form method="POST" action="{{ url_for('admin_bp.create_draft_pair') }}"
+                  class="d-flex gap-1 align-items-center"
+                  onsubmit="return confirm('確定要手動建立此草稿配對嗎？')">
+              <input type="hidden" name="subject_id" value="{{ u.id }}">
+              <select name="object_id" class="form-select form-select-sm" style="min-width:160px" required>
+                <option value="">選擇對象…</option>
+                {% for candidate, score in candidates %}
+                <option value="{{ candidate.id }}">
+                  {{ candidate.name }}{% if score %} ({{ score|int }}){% endif %}
+                </option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="btn btn-sm btn-danger text-nowrap">
+                <i class="bi bi-plus-circle me-1"></i>手動配對
+              </button>
+            </form>
+            {% else %}
+            <span class="text-muted small">無可選對象</span>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      <p class="text-muted small mb-2">
+        <i class="bi bi-clock me-1"></i>
+        配對清單生成時間：<strong>{{ draft_matchings[0].created_at.strftime('%Y-%m-%d %H:%M') }}</strong>
+        （共 {{ draft_matchings|length }} 組）
+      </p>
       <div class="table-responsive">
         <table class="table table-hover table-sm align-middle">
           <thead class="table-dark">
@@ -323,33 +327,44 @@
             {% set female_id = female.id if female else matching.object_id %}
             {% set subj_bd = breakdowns_by_pair.get(matching.subject_id|string + ':' + matching.object_id|string, {}) %}
             {% set obj_bd  = breakdowns_by_pair.get(matching.object_id|string + ':' + matching.subject_id|string, {}) %}
-            <tr>
-              <td class="text-muted small">{{ loop.index }}</td>
+            {% set has_dealbreaker = matching.grading_metric == -9999 or matching.obj_grading_metric == -9999 %}
+            <tr {% if has_dealbreaker %}class="table-danger"{% endif %}>
+              <td class="text-muted small">{{ loop.index }}{% if has_dealbreaker %} <span class="badge bg-danger" title="硬排除條件">⚠</span>{% endif %}</td>
               <td><span class="fw-semibold">{{ matching.cool_name }}</span></td>
               <td>
-                <button type="button" class="btn btn-link p-0 text-primary fw-semibold text-decoration-none"
-                  onclick="showMatchHistory({{ male_id }}, '{{ male.name if male else '' }}')">{{ male.name if male else '—' }}</button>
+                <span class="text-primary fw-semibold">{{ male.name if male else '—' }}</span>
+                {% if male %}{% set mw = weeks_unmatched_by_id.get(male.id) %}
+                {% if mw is none %}<span class="badge bg-secondary ms-1" style="font-size:.65em">從未</span>
+                {% elif mw >= 4 %}<span class="badge bg-danger ms-1" style="font-size:.65em">{{ mw }}w</span>
+                {% elif mw >= 1 %}<span class="badge bg-warning text-dark ms-1" style="font-size:.65em">{{ mw }}w</span>
+                {% endif %}{% endif %}
                 <div class="text-muted small">
                   {% if male and male.birthday %}{{ 2026 - male.birthday.year }}歲{% endif %}
                   {% if male and male.height %} · {{ male.height }}cm{% endif %}
                 </div>
                 {% if male %}
-                <button type="button" class="btn btn-link p-0 small text-muted" onclick="showMemberInfo({{ male.id }})">
-                  <i class="bi bi-person-lines-fill"></i>
-                </button>
+                <div class="mt-1">
+                  <button type="button" class="btn btn-link p-0 small text-muted me-1" onclick="showMemberInfo({{ male.id }})"><i class="bi bi-person-lines-fill"></i></button>
+                  <button type="button" class="btn btn-link p-0 small" onclick="showMatchHistory({{ male_id }}, '{{ male.name if male else '' }}')">查看配對記錄</button>
+                </div>
                 {% endif %}
               </td>
               <td>
-                <button type="button" class="btn btn-link p-0 text-danger fw-semibold text-decoration-none"
-                  onclick="showMatchHistory({{ female_id }}, '{{ female.name if female else '' }}')">{{ female.name if female else '—' }}</button>
+                <span class="text-danger fw-semibold">{{ female.name if female else '—' }}</span>
+                {% if female %}{% set fw = weeks_unmatched_by_id.get(female.id) %}
+                {% if fw is none %}<span class="badge bg-secondary ms-1" style="font-size:.65em">從未</span>
+                {% elif fw >= 4 %}<span class="badge bg-danger ms-1" style="font-size:.65em">{{ fw }}w</span>
+                {% elif fw >= 1 %}<span class="badge bg-warning text-dark ms-1" style="font-size:.65em">{{ fw }}w</span>
+                {% endif %}{% endif %}
                 <div class="text-muted small">
                   {% if female and female.birthday %}{{ 2026 - female.birthday.year }}歲{% endif %}
                   {% if female and female.height %} · {{ female.height }}cm{% endif %}
                 </div>
                 {% if female %}
-                <button type="button" class="btn btn-link p-0 small text-muted" onclick="showMemberInfo({{ female.id }})">
-                  <i class="bi bi-person-lines-fill"></i>
-                </button>
+                <div class="mt-1">
+                  <button type="button" class="btn btn-link p-0 small text-muted me-1" onclick="showMemberInfo({{ female.id }})"><i class="bi bi-person-lines-fill"></i></button>
+                  <button type="button" class="btn btn-link p-0 small" onclick="showMatchHistory({{ female_id }}, '{{ female.name if female else '' }}')">查看配對記錄</button>
+                </div>
                 {% endif %}
               </td>
               <td class="small">
@@ -395,6 +410,7 @@
         </table>
       </div>
       {% endif %}
+
     </div>
 
     <!-- 配對頁籤 -->
@@ -686,7 +702,7 @@
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
 <script>
   // ── 會員篩選與排序 ──
-  const filters = { gender: 'all', status: 'all', eligible: 'all', expiry: 'all' };
+  const filters = { gender: 'all', status: 'active', eligible: 'ready', expiry: 'all' };
   let sortCol = null, sortAsc = true;
 
   function setFilter(key, val, btn) {

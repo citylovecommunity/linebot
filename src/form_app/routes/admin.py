@@ -336,11 +336,58 @@ def admin_dashboard():
 
     # Diagnose eligible members who didn't end up in a draft matching
     unmatched_with_reasons = []
+    no_candidate_users = []
     if draft_matchings:
         eligible_pool = get_eligible_matching_pool(session)
         unmatched_with_reasons = _diagnose_unmatched(
             eligible_pool, draft_matchings, all_matchings, session
         )
+
+        # Find initiator-eligible users (weeks_unmatched >= 1) who had zero
+        # valid candidates after hard-rule and historical-pair exclusion.
+        draft_paired_ids = {uid for m in draft_matchings for uid in (m.subject_id, m.object_id)}
+        initiator_unmatched = [
+            m for m in eligible_pool
+            if m.id not in draft_paired_ids
+            and (weeks_unmatched_by_id.get(m.id) or 0) >= 1
+        ]
+        if initiator_unmatched:
+            from sqlalchemy import tuple_
+            pool_ids = [m.id for m in eligible_pool]
+            candidate_scores = session.query(
+                UserMatchScore.source_user_id,
+                UserMatchScore.target_user_id,
+                UserMatchScore.score,
+            ).filter(
+                UserMatchScore.source_user_id.in_([m.id for m in initiator_unmatched]),
+                UserMatchScore.target_user_id.in_(pool_ids),
+            ).all()
+            score_fwd = {(r.source_user_id, r.target_user_id): r.score for r in candidate_scores}
+
+            reverse_scores = session.query(
+                UserMatchScore.source_user_id,
+                UserMatchScore.target_user_id,
+                UserMatchScore.score,
+            ).filter(
+                UserMatchScore.source_user_id.in_(pool_ids),
+                UserMatchScore.target_user_id.in_([m.id for m in initiator_unmatched]),
+            ).all()
+            score_rev = {(r.source_user_id, r.target_user_id): r.score for r in reverse_scores}
+
+            for user in initiator_unmatched:
+                opposite = [m for m in eligible_pool if m.gender != user.gender]
+                has_valid = any(
+                    score_fwd.get((user.id, c.id), 0) > 0
+                    and score_rev.get((c.id, user.id), 0) > 0
+                    and (user.id, c.id) not in matched_pairs_set
+                    for c in opposite
+                )
+                if not has_valid:
+                    no_candidate_users.append(user)
+
+        # Deduplicate by id (safety net)
+        seen_ids: set[int] = set()
+        no_candidate_users = [u for u in no_candidate_users if not (u.id in seen_ids or seen_ids.add(u.id))]
 
     response = render_template(
         'admin_dashboard.html',
@@ -366,6 +413,8 @@ def admin_dashboard():
         matched_pairs_set=matched_pairs_set,
         is_dev=settings.is_dev,
         unmatched_with_reasons=unmatched_with_reasons,
+        no_candidate_users=no_candidate_users,
+        no_candidate_candidates={m.id: candidates for m, _, candidates in unmatched_with_reasons},
         weeks_unmatched_by_id=weeks_unmatched_by_id,
     )
     with _dashboard_cache_lock:
