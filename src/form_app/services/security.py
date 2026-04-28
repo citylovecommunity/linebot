@@ -29,4 +29,6 @@ def verify_password(stored_hash: str, plain_password: str) -> bool:
     Returns:
         bool: True if password matches, False otherwise.
     """
+    if not stored_hash:
+        return False
     return check_password_hash(stored_hash, plain_password)

@@ -1,50 +1,17 @@
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for, current_app, abort
-from flask_login import (current_user, login_required,
-                         login_user, logout_user)
+from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask_login import current_user, login_required, login_user, logout_user
 
 from form_app.database import get_db
 from form_app.models import Member
 from form_app.services.security import verify_password
-from form_app.decorators import admin_required
-from form_app.config import settings
 
 bp = Blueprint('auth_bp', __name__)
-
-
-
-@bp.route('/auto-login-admin')
-def auto_login_admin():
-    token = request.args.get('token', '')
-    if token != settings.TASK_SECRET:
-        abort(404)
-
-    db = get_db()
-    if settings.DEV_ADMIN_ID:
-        admin_user = db.query(Member).get(settings.DEV_ADMIN_ID)
-    else:
-        admin_user = db.query(Member).filter(
-            (Member.is_developer == True) | (Member.is_admin == True)
-        ).first()
-
-    if not admin_user:
-        total = db.query(Member).count()
-        current_app.logger.warning(
-            f"auto-login-admin: no admin user found. Total members in DB: {total}"
-        )
-        return f"No admin user found (total members: {total})", 404
-
-    current_app.logger.info(
-        f"auto-login-admin: logging in admin id={admin_user.id} name={admin_user.name}"
-    )
-    login_user(admin_user, force=True)
-    return redirect(url_for('admin_bp.admin_dashboard'))
 
 
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
-        # Check logic here too in case they are already logged in
         if current_user.is_admin:
             return redirect(url_for('admin_bp.admin_dashboard'))
         return redirect(url_for('dashboard_bp.dashboard'))
@@ -63,10 +30,8 @@ def login():
 
         login_user(user, remember=remember)
 
-        # --- NEW ADMIN LOGIC HERE ---
         if user.is_admin:
             return redirect(url_for('admin_bp.admin_dashboard'))
-        # ----------------------------
 
         next_page = request.args.get('next')
         if not next_page or not next_page.startswith('/'):

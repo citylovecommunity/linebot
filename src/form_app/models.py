@@ -43,7 +43,11 @@ class Member(Base):
     phone_number: Mapped[str] = mapped_column(
         unique=True, index=True, nullable=False)
 
-    is_active: Mapped[bool] = mapped_column(default=True)
+    is_member_active: Mapped[bool] = mapped_column(default=True)
+
+    @property
+    def is_active(self) -> bool:
+        return True
     updated_at: Mapped[datetime] = mapped_column(
         onupdate=datetime.now, default=datetime.now)
 

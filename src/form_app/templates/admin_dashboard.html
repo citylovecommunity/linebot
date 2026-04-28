@@ -125,8 +125,8 @@
             {% else %}{% set expiry_state = 'none' %}{% endif %}
             <tr
               data-gender="{{ member.gender }}"
-              data-status="{{ 'active' if member.is_active else 'inactive' }}"
-              data-eligible="{{ 'ready' if (member.id in match_ready_ids and member.is_active and not member.is_test) else 'not-ready' }}"
+              data-status="{{ 'active' if member.is_member_active else 'inactive' }}"
+              data-eligible="{{ 'ready' if (member.id in match_ready_ids and member.is_member_active and not member.is_test) else 'not-ready' }}"
               data-expiry="{{ expiry_state }}">
               <td class="text-muted small" data-val="{{ member.id }}">{{ member.id }}</td>
               <td data-val="{{ member.name }}">{{ member.name }}</td>
@@ -134,7 +134,7 @@
               <td>{{ member.phone_number }}</td>
               <td>{{ member.rank or '—' }}</td>
               <td>
-                {% if member.is_active %}
+                {% if member.is_member_active %}
                 <span class="badge bg-success">啟用</span>
                 {% else %}
                 <span class="badge bg-secondary">停用</span>
@@ -247,10 +247,12 @@
                 <td class="fw-semibold">{{ member.name }}</td>
                 <td>{{ '男' if member.gender == 'M' else '女' }}</td>
                 <td class="text-center">
-                  {% set w = member.consecutive_unmatched_weeks or 0 %}
-                  {% if w == 0 %}
-                  <span class="badge bg-secondary">首次</span>
-                  {% elif w >= 2 %}
+                  {% set w = weeks_unmatched_by_id.get(member.id) %}
+                  {% if w is none %}
+                  <span class="badge bg-secondary">從未配對</span>
+                  {% elif w == 0 %}
+                  <span class="badge bg-success">本週</span>
+                  {% elif w >= 4 %}
                   <span class="badge bg-danger">{{ w }} 週</span>
                   {% else %}
                   <span class="badge bg-warning text-dark">{{ w }} 週</span>
@@ -308,7 +310,6 @@
               <th>男生</th>
               <th>女生</th>
               <th>分數（男→女 / 女→男）</th>
-              <th>過往配對</th>
               <th>操作</th>
             </tr>
           </thead>
@@ -322,33 +323,33 @@
             {% set female_id = female.id if female else matching.object_id %}
             {% set subj_bd = breakdowns_by_pair.get(matching.subject_id|string + ':' + matching.object_id|string, {}) %}
             {% set obj_bd  = breakdowns_by_pair.get(matching.object_id|string + ':' + matching.subject_id|string, {}) %}
-            {% set male_history   = member_match_history.get(male_id,   []) %}
-            {% set female_history = member_match_history.get(female_id, []) %}
             <tr>
               <td class="text-muted small">{{ loop.index }}</td>
               <td><span class="fw-semibold">{{ matching.cool_name }}</span></td>
               <td>
-                <span class="text-primary fw-semibold">{{ male.name if male else '—' }}</span>
+                <button type="button" class="btn btn-link p-0 text-primary fw-semibold text-decoration-none"
+                  onclick="showMatchHistory({{ male_id }}, '{{ male.name if male else '' }}')">{{ male.name if male else '—' }}</button>
                 <div class="text-muted small">
                   {% if male and male.birthday %}{{ 2026 - male.birthday.year }}歲{% endif %}
                   {% if male and male.height %} · {{ male.height }}cm{% endif %}
                 </div>
-                {% if male and male.introduction_link %}
-                <a href="{{ male.introduction_link }}" target="_blank" class="small">
-                  <i class="bi bi-box-arrow-up-right"></i>
-                </a>
+                {% if male %}
+                <button type="button" class="btn btn-link p-0 small text-muted" onclick="showMemberInfo({{ male.id }})">
+                  <i class="bi bi-person-lines-fill"></i>
+                </button>
                 {% endif %}
               </td>
               <td>
-                <span class="text-danger fw-semibold">{{ female.name if female else '—' }}</span>
+                <button type="button" class="btn btn-link p-0 text-danger fw-semibold text-decoration-none"
+                  onclick="showMatchHistory({{ female_id }}, '{{ female.name if female else '' }}')">{{ female.name if female else '—' }}</button>
                 <div class="text-muted small">
                   {% if female and female.birthday %}{{ 2026 - female.birthday.year }}歲{% endif %}
                   {% if female and female.height %} · {{ female.height }}cm{% endif %}
                 </div>
-                {% if female and female.introduction_link %}
-                <a href="{{ female.introduction_link }}" target="_blank" class="small">
-                  <i class="bi bi-box-arrow-up-right"></i>
-                </a>
+                {% if female %}
+                <button type="button" class="btn btn-link p-0 small text-muted" onclick="showMemberInfo({{ female.id }})">
+                  <i class="bi bi-person-lines-fill"></i>
+                </button>
                 {% endif %}
               </td>
               <td class="small">
@@ -364,17 +365,6 @@
                   <div>←：{% for k, v in obj_bd.items() %}<span class="me-1">{{ k }}{% if v %}=<b>{{ v }}</b>{% endif %}</span>{% endfor %}</div>
                   {% endif %}
                 </div>
-                {% endif %}
-              </td>
-              <td class="small">
-                {% if male_history %}
-                <div class="text-muted mb-1">{{ male.name if male else '' }}：{% for pid, cname, cat in male_history %}<span class="badge bg-light text-dark border me-1">{{ members_by_id.get(pid).name if members_by_id.get(pid) else pid }}</span>{% endfor %}</div>
-                {% endif %}
-                {% if female_history %}
-                <div class="text-muted">{{ female.name if female else '' }}：{% for pid, cname, cat in female_history %}<span class="badge bg-light text-dark border me-1">{{ members_by_id.get(pid).name if members_by_id.get(pid) else pid }}</span>{% endfor %}</div>
-                {% endif %}
-                {% if not male_history and not female_history %}
-                <span class="text-muted">—</span>
                 {% endif %}
               </td>
               <td class="text-nowrap">
@@ -830,7 +820,7 @@
   // Build member lookup from template data
   const allMembers = [
     {% for m in members %}
-    {% if m.is_active and not m.is_test %}
+    {% if m.is_member_active and not m.is_test %}
     { id: {{ m.id }}, name: {{ m.name | tojson }}, gender: {{ m.gender | tojson }},
       age: {% if m.birthday %}{{ 2026 - m.birthday.year }}{% else %}null{% endif %},
       height: {{ m.height or 'null' }} },
@@ -871,6 +861,47 @@
     document.getElementById('edit-female-search').value = '';
 
     new bootstrap.Modal(document.getElementById('editDraftModal')).show();
+  }
+
+  // ── 會員資訊 Modal ──
+  const membersData = {
+    {% for m in members %}
+    {{ m.id }}: {
+      name: {{ m.name | tojson }},
+      gender: {{ m.gender | tojson }},
+      age: {% if m.birthday %}{{ 2026 - m.birthday.year }}{% else %}null{% endif %},
+      height: {% if m.height %}{{ m.height }}{% else %}null{% endif %},
+      rank: {{ (m.rank or '') | tojson }},
+      marital_status: {{ (m.marital_status or '') | tojson }},
+      pref_min_height: {% if m.pref_min_height %}{{ m.pref_min_height }}{% else %}null{% endif %},
+      pref_max_height: {% if m.pref_max_height %}{{ m.pref_max_height }}{% else %}null{% endif %},
+      pref_oldest_birth_year: {% if m.pref_oldest_birth_year %}{{ m.pref_oldest_birth_year }}{% else %}null{% endif %},
+      pref_youngest_birth_year: {% if m.pref_youngest_birth_year %}{{ m.pref_youngest_birth_year }}{% else %}null{% endif %},
+      introduction_link: {{ (m.introduction_link or '') | tojson }},
+    },
+    {% endfor %}
+  };
+
+  function showMemberInfo(memberId) {
+    const m = membersData[memberId];
+    if (!m) return;
+    const genderLabel = m.gender === 'M' ? '男' : '女';
+    const rows = [
+      ['姓名', m.name],
+      ['性別', genderLabel],
+      ['年齡', m.age ? m.age + ' 歲' : '—'],
+      ['身高', m.height ? m.height + ' cm' : '—'],
+      ['等級', m.rank || '—'],
+      ['感情狀況', m.marital_status || '—'],
+      ['身高偏好', (m.pref_min_height || m.pref_max_height) ? (m.pref_min_height || '?') + ' – ' + (m.pref_max_height || '?') + ' cm' : '—'],
+      ['年齡偏好', (m.pref_oldest_birth_year || m.pref_youngest_birth_year) ? (m.pref_oldest_birth_year || '?') + ' – ' + (m.pref_youngest_birth_year || '?') + ' 年生' : '—'],
+    ].map(([label, val]) => `<tr><th class="text-muted fw-normal small" style="width:35%">${label}</th><td>${val}</td></tr>`).join('');
+    const introBtn = m.introduction_link
+      ? `<div class="mt-3"><a href="${m.introduction_link}" target="_blank" class="btn btn-sm btn-outline-primary w-100"><i class="bi bi-person-badge me-1"></i>查看介紹頁</a></div>`
+      : '';
+    document.getElementById('member-info-modal-title').textContent = m.name + ' 的資料';
+    document.getElementById('member-info-modal-body').innerHTML = `<table class="table table-sm mb-0">${rows}</table>${introBtn}`;
+    new bootstrap.Modal(document.getElementById('memberInfoModal')).show();
   }
 
   // ── 配對記錄 Modal ──
@@ -978,6 +1009,19 @@
     this.action = select.value;
   });
 </script>
+
+<!-- 會員資訊 Modal -->
+<div class="modal fade" id="memberInfoModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title" id="member-info-modal-title"></h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-3" id="member-info-modal-body"></div>
+    </div>
+  </div>
+</div>
 
 <!-- 配對記錄 Modal -->
 <div class="modal fade" id="matchHistoryModal" tabindex="-1">

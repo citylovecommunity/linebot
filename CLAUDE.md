@@ -101,18 +101,16 @@ from form_app.models import Member
 db = SessionLocal()
 me = db.query(Member).filter_by(phone_number='09XXXXXXXX').first()
 me.is_developer = True
-me.is_test = True    # excludes from matching pool
-me.is_active = False # excludes from member stats
+me.is_test = True         # excludes from matching pool
+me.is_member_active = False  # excludes from member stats
 db.commit()
 print('Done:', me.name)
 EOF
 ```
 
-Then set `DEV_ADMIN_ID=<your member id>` in `.env` so `/auto-login-admin` always logs in as that account.
-
 **Role model:**
 - `is_admin` — access to the admin panel (member CRUD, matchings, notifications)
-- `is_developer` — all admin access, plus: impersonate any user (`/auto-login/<id>`), reset passwords, grant the developer role to others. `admin_required` passes for both; `developer_required` is developer-only.
+- `is_developer` — all admin access, plus: reset passwords, grant the developer role to others. `admin_required` passes for both; `developer_required` is developer-only.
 
 **Developer-only UI (admin panel):**
 - 會員 tab → `person-check` icon → opens that member's dashboard in a new tab (impersonate)

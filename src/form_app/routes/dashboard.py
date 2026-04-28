@@ -46,7 +46,7 @@ def debug_user():
     return {
         "is_authenticated": current_user.is_authenticated,
         "is_anonymous": current_user.is_anonymous,
-        "is_active": current_user.is_active if hasattr(current_user, 'is_active') else "N/A",
+        "is_active": current_user.is_member_active if hasattr(current_user, 'is_member_active') else "N/A",
         "user_id": current_user.get_id() if hasattr(current_user, 'get_id') else "N/A",
     }
 

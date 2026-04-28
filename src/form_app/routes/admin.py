@@ -258,7 +258,7 @@ def admin_dashboard():
     non_eligible = []
     for member in all_members:
         reasons = []
-        if not member.is_active:
+        if not member.is_member_active:
             reasons.append("帳號已停用")
         if member.is_test:
             reasons.append("測試帳號")
@@ -278,7 +278,7 @@ def admin_dashboard():
     total_users = len(all_members)
     eligible_count = sum(
         1 for m in all_members
-        if m.id in match_ready_ids and m.is_active and not m.is_test
+        if m.id in match_ready_ids and m.is_member_active and not m.is_test
     )
     active_matchings = sum(
         1 for m in all_matchings if m.status == MatchingStatus.ACTIVE
@@ -302,6 +302,18 @@ def admin_dashboard():
     for m in all_matchings:
         member_match_history[m.subject_id].append((m.object_id, m.cool_name, m.created_at))
         member_match_history[m.object_id].append((m.subject_id, m.cool_name, m.created_at))
+
+    # Weeks since each member's last matching (computed from history, not the stored counter)
+    _today = date.today()
+    weeks_unmatched_by_id: dict = {}
+    for m in all_members:
+        history = member_match_history.get(m.id, [])
+        if not history:
+            weeks_unmatched_by_id[m.id] = None
+        else:
+            latest_dt = max(h[2] for h in history)
+            latest_date = latest_dt.date() if hasattr(latest_dt, 'date') else latest_dt
+            weeks_unmatched_by_id[m.id] = max(0, (_today - latest_date).days // 7)
 
     # Build set of previously matched pairs for manual-pair highlight
     matched_pairs_set = set()
@@ -354,6 +366,7 @@ def admin_dashboard():
         matched_pairs_set=matched_pairs_set,
         is_dev=settings.is_dev,
         unmatched_with_reasons=unmatched_with_reasons,
+        weeks_unmatched_by_id=weeks_unmatched_by_id,
     )
     with _dashboard_cache_lock:
         _dashboard_cache['html'] = response
@@ -418,7 +431,7 @@ def new_user():
             height=int(request.form['height']) if request.form.get('height') else None,
             rank=request.form.get('rank') or None,
             marital_status=request.form.get('marital_status') or None,  # also saved to user_info above
-            is_active='is_active' in request.form,
+            is_member_active='is_active' in request.form,
             is_test='is_test' in request.form,
             is_admin='is_admin' in request.form,
             is_developer='is_developer' in request.form and current_user.is_developer,
@@ -460,7 +473,7 @@ def edit_user(user_id):
         user.email = request.form.get('email') or None
         user.rank = request.form.get('rank') or None
         user.marital_status = request.form.get('marital_status') or None
-        user.is_active = 'is_active' in request.form
+        user.is_member_active = 'is_active' in request.form
         user.is_test = 'is_test' in request.form
         user.is_admin = 'is_admin' in request.form
         if current_user.is_developer:
@@ -730,7 +743,7 @@ def new_matching():
 
     all_members = (
         session.query(Member)
-        .filter(Member.is_active == True)
+        .filter(Member.is_member_active == True)
         .options(joinedload(Member.line_info))
         .order_by(Member.name)
         .all()
@@ -787,7 +800,7 @@ def notify_expiring():
     session = get_db()
     expiring = session.query(Member).filter(
         and_(
-            Member.is_active == True,
+            Member.is_member_active == True,
             Member.is_test == False,
             Member.expiration_date != None,
             Member.expiration_date >= today,

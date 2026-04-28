@@ -169,7 +169,7 @@ def get_eligible_matching_pool(session: Session):
     today = date.today()
 
     return session.query(Member).filter(
-        Member.is_active == True,
+        Member.is_member_active == True,
         Member.is_test == False,
 
         Member.introduction_link != None,

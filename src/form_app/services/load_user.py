@@ -86,7 +86,7 @@ def transform_data(raw_records):
 
             # Status Flags
             # Logic from your pandas map
-            "is_active": row.get('會員暫停') == "FALSE",
+            "is_member_active": row.get('會員暫停') == "FALSE",
             "is_test": "測試" in str(row.get('這個帳號是誰？', '')),
             "fill_form_at": parse_chinese_datetime(row.get('時間戳記')),
 

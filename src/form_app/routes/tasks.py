@@ -125,7 +125,7 @@ def task_notify_expiring_members():
     session = get_db()
     expiring = session.query(Member).filter(
         and_(
-            Member.is_active == True,
+            Member.is_member_active == True,
             Member.is_test == False,
             Member.expiration_date != None,
             Member.expiration_date >= today,
