@@ -22,4 +22,4 @@ RUN uv sync --frozen
 # 6. Expose port
 EXPOSE 5678
 
-CMD ["uv", "run", "gunicorn", "-w", "4", "-b", "0.0.0.0:5678", "form_app.app:app"]
+CMD ["uv", "run", "gunicorn", "-w", "4", "-b", "0.0.0.0:5678", "--timeout", "120", "form_app.app:app"]

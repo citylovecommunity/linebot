@@ -34,6 +34,7 @@ def collect_unread_message_texts(session):
             and_(Message.read_at.is_(None),
                  Message.is_notified.is_not(True)),
         )
+        .options(joinedload(Message.matching), joinedload(Message.user))
         .all()
     )
 
@@ -79,9 +80,11 @@ def collect_date_proposal_texts(session):
     # Query: Find PENDING proposals that haven't been notified yet
     # Assuming you have a 'notified' flag or checking timestamps on proposals
     proposals = (
-        session.query(DateProposal).where(
+        session.query(DateProposal)
+        .where(
             DateProposal.is_pending_notified.is_not(True),
             DateProposal.status == 'PENDING')
+        .options(joinedload(DateProposal.matching))
     )
 
     for proposal in proposals:
@@ -110,9 +113,11 @@ def collect_confirmed_date_proposal_texts(session):
     # Query: Find PENDING proposals that haven't been notified yet
     # Assuming you have a 'notified' flag or checking timestamps on proposals
     proposals = (
-        session.query(DateProposal).where(
+        session.query(DateProposal)
+        .where(
             DateProposal.is_confirmed_notified.is_not(True),
             DateProposal.status == 'CONFIRMED')
+        .options(joinedload(DateProposal.matching))
     )
 
     for proposal in proposals:
@@ -142,6 +147,7 @@ def collect_new_match_texts(session):
     new_matchings = (
         session.query(Matching)
         .filter(Matching.is_match_notified.is_not(True))
+        .options(joinedload(Matching.subject), joinedload(Matching.object))
         .all()
     )
 
