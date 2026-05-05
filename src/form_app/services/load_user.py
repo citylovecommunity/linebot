@@ -129,11 +129,13 @@ def load_data_bulk(clean_data, session):
 
     # 2. Define the Upsert Logic (ON CONFLICT DO UPDATE)
     # We want to update everything EXCEPT 'id' and maybe 'created_at'
+    # Exclude columns that are managed by admins in the UI and must not be
+    # overwritten by the sheet sync (e.g. admin manually stopped a membership).
+    ADMIN_MANAGED = {'id', 'password_hash', 'is_member_active', 'is_admin', 'is_developer', 'is_test'}
     update_dict = {
         col.name: col
         for col in stmt.excluded
-        # Protect ID
-        if col.name not in ['id', 'password_hash']
+        if col.name not in ADMIN_MANAGED
     }
 
     # 3. Execute

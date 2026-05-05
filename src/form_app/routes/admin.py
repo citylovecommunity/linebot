@@ -6,6 +6,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_required, current_user
 from sqlalchemy.orm import joinedload, defer
 from sqlalchemy.orm.attributes import flag_modified
+from sqlalchemy.exc import IntegrityError
 
 # ── Admin dashboard cache ──────────────────────────────────────────────────────
 # The dashboard queries are expensive (remote Neon DB in Singapore).
@@ -497,7 +498,12 @@ def new_user():
             password_hash=hash_password(password_plain) if password_plain else None,  # defaults to birthday if set above
         )
         session.add(member)
-        session.commit()
+        try:
+            session.commit()
+        except IntegrityError:
+            session.rollback()
+            flash(f'手機號碼 {member.phone_number} 已存在，請使用其他號碼', 'danger')
+            return render_template('admin_user_form.html', user=None)
         _invalidate_dashboard_cache()
         flash(f'已新增會員 {member.name}', 'success')
         return redirect(url_for('admin_bp.admin_dashboard'))
@@ -578,7 +584,12 @@ def edit_user(user_id):
         if new_password and current_user.is_developer:
             user.password_hash = hash_password(new_password)
 
-        session.commit()
+        try:
+            session.commit()
+        except IntegrityError:
+            session.rollback()
+            flash(f'手機號碼 {user.phone_number} 已存在，請使用其他號碼', 'danger')
+            return render_template('admin_user_form.html', user=user)
         _invalidate_dashboard_cache()
         flash(f'已更新會員 {user.name}', 'success')
         return redirect(url_for('admin_bp.admin_dashboard'))
