@@ -1,5 +1,3 @@
-import threading
-import time as _time
 from datetime import datetime, date
 
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session as flask_session
@@ -8,19 +6,32 @@ from sqlalchemy.orm import joinedload, defer
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.exc import IntegrityError
 
-# ── Admin dashboard cache ──────────────────────────────────────────────────────
-# The dashboard queries are expensive (remote Neon DB in Singapore).
-# Cache the rendered HTML for 60s. The cache is bypassed automatically when
-# Flask has pending flash messages, which means the admin just performed an
-# action and needs to see fresh data.
-_dashboard_cache: dict = {'html': None, 'expires': 0.0}
-_dashboard_cache_lock = threading.Lock()
+# ── Redis-backed dashboard cache ───────────────────────────────────────────────
+# Shared across all gunicorn workers so invalidation is consistent.
+# Falls back to no-cache if REDIS_URL is not configured.
+_DASHBOARD_CACHE_KEY = 'admin:dashboard_html'
 _DASHBOARD_CACHE_TTL = 60  # seconds
+
+_redis_client = None
+
+def _get_redis():
+    global _redis_client
+    if _redis_client is None:
+        from form_app.config import settings
+        if settings.REDIS_URL:
+            import redis
+            _redis_client = redis.from_url(
+                settings.REDIS_URL,
+                decode_responses=True,
+                ssl_cert_reqs=None,
+            )
+    return _redis_client
 
 
 def _invalidate_dashboard_cache():
-    with _dashboard_cache_lock:
-        _dashboard_cache['expires'] = 0.0
+    r = _get_redis()
+    if r:
+        r.delete(_DASHBOARD_CACHE_KEY)
 
 from form_app.models import Member, Matching, MatchingStatus, UserMatchScore, DateProposal, ProposalStatus, Line_Info
 from collections import defaultdict
@@ -186,13 +197,12 @@ def _diagnose_unmatched(eligible_pool, draft_matchings, all_matchings, session):
 @login_required
 @admin_required
 def admin_dashboard():
-    # Serve cached HTML if available and no pending flash messages
+    cache = _get_redis()
     has_flash = bool(flask_session.get('_flashes'))
-    now = _time.time()
-    if not has_flash:
-        with _dashboard_cache_lock:
-            if _dashboard_cache['html'] and now < _dashboard_cache['expires']:
-                return _dashboard_cache['html']
+    if not has_flash and cache:
+        cached = cache.get(_DASHBOARD_CACHE_KEY)
+        if cached:
+            return cached
 
     session = get_db()
 
@@ -304,6 +314,13 @@ def admin_dashboard():
         member_match_history[m.subject_id].append((m.object_id, m.cool_name, m.created_at))
         member_match_history[m.object_id].append((m.subject_id, m.cool_name, m.created_at))
 
+    # Historical partner ids per member — used in the edit-draft modal to hide
+    # candidates that were already paired with the fixed member.
+    member_historical_partners: dict[int, list[int]] = {
+        mid: [entry[0] for entry in history]
+        for mid, history in member_match_history.items()
+    }
+
     # Weeks since each member's last matching (computed from history, not the stored counter)
     _today = date.today()
     weeks_unmatched_by_id: dict = {}
@@ -412,15 +429,15 @@ def admin_dashboard():
         breakdowns_by_pair=breakdowns_by_pair,
         member_match_history=member_match_history,
         matched_pairs_set=matched_pairs_set,
+        member_historical_partners=member_historical_partners,
         is_dev=settings.is_dev,
         unmatched_with_reasons=unmatched_with_reasons,
         no_candidate_users=no_candidate_users,
         no_candidate_candidates={m.id: candidates for m, _, candidates in unmatched_with_reasons},
         weeks_unmatched_by_id=weeks_unmatched_by_id,
     )
-    with _dashboard_cache_lock:
-        _dashboard_cache['html'] = response
-        _dashboard_cache['expires'] = _time.time() + _DASHBOARD_CACHE_TTL
+    if cache and not has_flash:
+        cache.setex(_DASHBOARD_CACHE_KEY, _DASHBOARD_CACHE_TTL, response)
     return response
 
 
@@ -661,27 +678,30 @@ def create_draft_pair():
         object_id = int(request.form['object_id'])
     except (KeyError, ValueError):
         flash('無效的請求', 'danger')
-        return redirect(url_for('admin_bp.admin_dashboard') + '#drafts')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
 
     subject = session.get(Member, subject_id)
     obj = session.get(Member, object_id)
     if not subject or not obj:
         flash('找不到會員', 'danger')
-        return redirect(url_for('admin_bp.admin_dashboard') + '#drafts')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
 
     if subject.gender == obj.gender:
         flash('不能配對相同性別的會員', 'danger')
-        return redirect(url_for('admin_bp.admin_dashboard') + '#drafts')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
 
+    # Only block if either member is already in an active or pending draft matching.
+    # CANCELLED / COMPLETED history is allowed to be re-paired.
     existing = session.query(Matching).filter(
         or_(
             and_(Matching.subject_id == subject_id, Matching.object_id == object_id),
             and_(Matching.subject_id == object_id, Matching.object_id == subject_id),
-        )
+        ),
+        Matching.status.in_([MatchingStatus.ACTIVE, MatchingStatus.DRAFT]),
     ).first()
     if existing:
-        flash(f'「{subject.name}」與「{obj.name}」已有配對記錄', 'danger')
-        return redirect(url_for('admin_bp.admin_dashboard') + '#drafts')
+        flash(f'「{subject.name}」與「{obj.name}」已有進行中的配對', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
 
     sub_score = session.query(UserMatchScore).filter_by(
         source_user_id=subject_id, target_user_id=object_id
@@ -703,7 +723,7 @@ def create_draft_pair():
     session.commit()
     _invalidate_dashboard_cache()
     flash(f'已新增草稿配對：{subject.name} ＆ {obj.name}', 'success')
-    return redirect(url_for('admin_bp.admin_dashboard') + '#drafts')
+    return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
 
 
 @bp.route('/matchings/<int:matching_id>/cancel', methods=['POST'])
@@ -926,11 +946,25 @@ def edit_draft(matching_id):
         return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
 
     if final_male_id != cur_male_id or final_female_id != cur_female_id:
+        from sqlalchemy import or_
         male_member   = session.get(Member, final_male_id)
         female_member = session.get(Member, final_female_id)
         if not male_member or not female_member:
             flash('找不到指定會員', 'danger')
             return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
+
+        # Check that the newly assigned members aren't already in another active/draft matching.
+        for member, label in ((male_member, '男生'), (female_member, '女生')):
+            if member.id in (cur_male_id, cur_female_id):
+                continue  # unchanged side — no conflict possible
+            conflict = session.query(Matching).filter(
+                or_(Matching.subject_id == member.id, Matching.object_id == member.id),
+                Matching.status.in_([MatchingStatus.ACTIVE, MatchingStatus.DRAFT]),
+                Matching.id != matching_id,
+            ).first()
+            if conflict:
+                flash(f'「{member.name}」已有進行中的配對，無法加入草稿', 'danger')
+                return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
 
         score_mf = session.query(UserMatchScore).filter_by(
             source_user_id=final_male_id, target_user_id=final_female_id

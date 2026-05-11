@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     PROD_FORM_WEB_URL: Optional[str] = None
     DEV_FORM_WEB_URL: Optional[str] = None
 
+    REDIS_URL: Optional[str] = None
+
     model_config = SettingsConfigDict(
         env_file='.env', env_file_encoding='utf-8', extra='ignore')
 

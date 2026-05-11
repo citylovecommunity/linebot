@@ -754,13 +754,23 @@
 
   applyFiltersAndSort();
 
-  // ── 頁籤切換（從 ?tab= 參數） ──
+  // ── 頁籤切換（從 ?tab= 參數，並在切換時同步更新 URL） ──
   const params = new URLSearchParams(window.location.search);
   const tabName = params.get('tab');
   if (tabName) {
     const tabEl = document.getElementById(tabName + '-tab');
     if (tabEl) new bootstrap.Tab(tabEl).show();
   }
+
+  // Keep ?tab= in sync so refresh lands on the tab the user is actually on.
+  document.querySelectorAll('[data-bs-toggle="tab"]').forEach(tabEl => {
+    tabEl.addEventListener('shown.bs.tab', function(e) {
+      const name = e.target.id.replace(/-tab$/, '');
+      const url = new URL(window.location);
+      url.searchParams.set('tab', name);
+      window.history.replaceState({}, '', url);
+    });
+  });
 
   // ── 約會行事曆 ──
   const calendarEvents = [
@@ -816,19 +826,31 @@
   // 生成草稿配對加 TASK_SECRET header
   const draftForm = document.getElementById('draft-match-form');
   if (draftForm) {
+    const btn = draftForm.querySelector('button[type=submit]');
+    // Restore loading state if a request was in flight when the user refreshed
+    if (sessionStorage.getItem('draftGenerating') === '1') {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 計算中…';
+    }
     draftForm.addEventListener('submit', function(e) {
       e.preventDefault();
       if (!confirm('生成草稿配對？系統將計算配對結果但暫不通知會員。')) return;
-      const btn = draftForm.querySelector('button[type=submit]');
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 計算中…';
+      sessionStorage.setItem('draftGenerating', '1');
       fetch('{{ url_for("tasks_bp.task_match_all_users") }}?save_as_draft=true', {
         method: 'POST',
         headers: { 'X-Task-Secret': '{{ config.get("TASK_SECRET", "") }}' }
       }).then(r => r.text().then(t => {
-        if (r.ok) { alert('草稿已生成：' + t); window.location.href = window.location.pathname + '?tab=drafts'; }
+        sessionStorage.removeItem('draftGenerating');
+        if (r.ok) { window.location.href = window.location.pathname + '?tab=drafts'; }
         else { alert('執行失敗：' + t); btn.disabled = false; btn.innerHTML = '<i class="bi bi-eye"></i> 生成草稿配對'; }
-      }));
+      })).catch(() => {
+        sessionStorage.removeItem('draftGenerating');
+        alert('網路錯誤，請重試');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-eye"></i> 生成草稿配對';
+      });
     });
   }
 
@@ -846,12 +868,29 @@
   const males   = allMembers.filter(m => m.gender === 'M');
   const females = allMembers.filter(m => m.gender === 'F');
 
-  function buildMemberOptions(list, selectedId) {
-    return list.map(m => {
+  // Historical partners per member: {memberId: Set([partnerId, ...])}
+  // Used to hide candidates who were already paired with the fixed member.
+  const historicalPartners = {
+    {% for mid, partners in member_historical_partners.items() %}
+    {{ mid }}: new Set([{{ partners | join(', ') }}]),
+    {% endfor %}
+  };
+
+  // excludeFromWarning: current draft's member ids (don't show ⚠ for themselves)
+  // historicalPartnersOf: hide members who were already paired with this id
+  function buildMemberOptions(list, selectedId, historicalPartnersOf = null) {
+    const historical = historicalPartnersOf ? (historicalPartners[historicalPartnersOf] || new Set()) : new Set();
+    let hiddenCount = 0;
+    const options = list.map(m => {
+      if (m.id !== selectedId && historical.has(m.id)) { hiddenCount++; return ''; }
       const info = [m.age ? m.age + '歲' : null, m.height ? m.height + 'cm' : null].filter(Boolean).join('·');
       const label = m.name + (info ? ' (' + info + ')' : '');
       return `<option value="${m.id}" ${m.id === selectedId ? 'selected' : ''}>${label}</option>`;
     }).join('');
+    const note = hiddenCount > 0
+      ? `<option disabled>── 已隱藏 ${hiddenCount} 位曾配對過的會員 ──</option>`
+      : '';
+    return options + note;
   }
 
   function filterSelect(inputEl, selectEl) {
@@ -869,8 +908,9 @@
 
     const maleSelect   = document.getElementById('edit-male-select');
     const femaleSelect = document.getElementById('edit-female-select');
-    maleSelect.innerHTML   = buildMemberOptions(males,   maleId);
-    femaleSelect.innerHTML = buildMemberOptions(females, femaleId);
+    // Hide females already paired with this male (and vice versa).
+    maleSelect.innerHTML   = buildMemberOptions(males,   maleId,   femaleId);
+    femaleSelect.innerHTML = buildMemberOptions(females, femaleId, maleId);
 
     // Clear search boxes
     document.getElementById('edit-male-search').value   = '';

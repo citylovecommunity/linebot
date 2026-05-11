@@ -53,7 +53,14 @@ def task_match_all_users():
             return f"草稿配對已存在（{existing_drafts} 筆），請先在管理後台處理後再重新生成。", 409
 
     eligible_members = get_eligible_matching_pool(session)
-    run_matching_score_optimized(eligible_members, session)
+
+    # Re-scoring is expensive (O(M×F) pairs). For draft generation, reuse
+    # existing UserMatchScore rows unless the caller explicitly requests a rescore.
+    # Direct live runs always rescore so they pick up any profile changes.
+    force_rescore = request.args.get('force_rescore', 'false').lower() == 'true'
+    if not save_as_draft or force_rescore:
+        run_matching_score_optimized(eligible_members, session)
+
     process_matches_bulk(eligible_members, session, is_draft=save_as_draft)
     session.commit()
 
