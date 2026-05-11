@@ -154,7 +154,7 @@ class UserProfileAdapter:
         return self._parse_int("您期待認識的對象最小年紀", 2030)
 
 
-def get_eligible_matching_pool(session: Session):
+def get_eligible_matching_pool(session: Session, defer_user_info: bool = False):
     """
     Returns a Query object containing ONLY users who have the 'Right to Enter'.
     Criteria:
@@ -168,7 +168,8 @@ def get_eligible_matching_pool(session: Session):
     from datetime import date
     today = date.today()
 
-    return session.query(Member).filter(
+    from sqlalchemy.orm import defer as sa_defer
+    q = session.query(Member).filter(
         Member.is_member_active == True,
         Member.is_test == False,
 
@@ -185,7 +186,10 @@ def get_eligible_matching_pool(session: Session):
 
         # Rule 6: Matching window has not ended
         (Member.matching_end_date == None) | (Member.matching_end_date >= today),
-    ).all()
+    )
+    if defer_user_info:
+        q = q.options(sa_defer(Member.user_info))
+    return q.all()
 
 
 def calculate_match_score(me_adapter, candidate_adapter):

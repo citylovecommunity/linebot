@@ -352,60 +352,10 @@ def admin_dashboard():
         for r in _draft_score_rows:
             breakdowns_by_pair[f"{r.source_user_id}:{r.target_user_id}"] = r.breakdown or {}
 
-    # Diagnose eligible members who didn't end up in a draft matching
+    # Diagnosis (no_candidate_users / unmatched_with_reasons) is deferred to
+    # /admin/drafts/diagnosis and loaded via AJAX after the page renders.
     unmatched_with_reasons = []
     no_candidate_users = []
-    if draft_matchings:
-        eligible_pool = get_eligible_matching_pool(session)
-        unmatched_with_reasons = _diagnose_unmatched(
-            eligible_pool, draft_matchings, all_matchings, session
-        )
-
-        # Find initiator-eligible users (weeks_unmatched >= 1) who had zero
-        # valid candidates after hard-rule and historical-pair exclusion.
-        draft_paired_ids = {uid for m in draft_matchings for uid in (m.subject_id, m.object_id)}
-        initiator_unmatched = [
-            m for m in eligible_pool
-            if m.id not in draft_paired_ids
-            and (weeks_unmatched_by_id.get(m.id) or 0) >= 1
-        ]
-        if initiator_unmatched:
-            from sqlalchemy import tuple_
-            pool_ids = [m.id for m in eligible_pool]
-            candidate_scores = session.query(
-                UserMatchScore.source_user_id,
-                UserMatchScore.target_user_id,
-                UserMatchScore.score,
-            ).filter(
-                UserMatchScore.source_user_id.in_([m.id for m in initiator_unmatched]),
-                UserMatchScore.target_user_id.in_(pool_ids),
-            ).all()
-            score_fwd = {(r.source_user_id, r.target_user_id): r.score for r in candidate_scores}
-
-            reverse_scores = session.query(
-                UserMatchScore.source_user_id,
-                UserMatchScore.target_user_id,
-                UserMatchScore.score,
-            ).filter(
-                UserMatchScore.source_user_id.in_(pool_ids),
-                UserMatchScore.target_user_id.in_([m.id for m in initiator_unmatched]),
-            ).all()
-            score_rev = {(r.source_user_id, r.target_user_id): r.score for r in reverse_scores}
-
-            for user in initiator_unmatched:
-                opposite = [m for m in eligible_pool if m.gender != user.gender]
-                has_valid = any(
-                    score_fwd.get((user.id, c.id), 0) > 0
-                    and score_rev.get((c.id, user.id), 0) > 0
-                    and (user.id, c.id) not in matched_pairs_set
-                    for c in opposite
-                )
-                if not has_valid:
-                    no_candidate_users.append(user)
-
-        # Deduplicate by id (safety net)
-        seen_ids: set[int] = set()
-        no_candidate_users = [u for u in no_candidate_users if not (u.id in seen_ids or seen_ids.add(u.id))]
 
     response = render_template(
         'admin_dashboard.html',
@@ -439,6 +389,66 @@ def admin_dashboard():
     if cache and not has_flash:
         cache.setex(_DASHBOARD_CACHE_KEY, _DASHBOARD_CACHE_TTL, response)
     return response
+
+
+@bp.route('/drafts/diagnosis')
+@login_required
+@admin_required
+def drafts_diagnosis():
+    """
+    Heavy diagnosis block — deferred from the main page load and fetched via
+    AJAX so it doesn't block the initial dashboard render.
+    """
+    session = get_db()
+
+    draft_matchings = session.query(Matching).filter(
+        Matching.status == MatchingStatus.DRAFT
+    ).all()
+    if not draft_matchings:
+        return '', 204
+
+    all_matchings = session.query(Matching).filter(
+        Matching.status != MatchingStatus.DRAFT
+    ).all()
+
+    _today = date.today()
+    weeks_unmatched_by_id: dict = {}
+    for m in all_matchings:
+        dt = m.created_at.date() if hasattr(m.created_at, 'date') else m.created_at
+        for uid in (m.subject_id, m.object_id):
+            prev = weeks_unmatched_by_id.get(uid)
+            if prev is None or dt > prev:
+                weeks_unmatched_by_id[uid] = dt
+    weeks_unmatched_by_id = {
+        uid: max(0, (_today - dt).days // 7)
+        for uid, dt in weeks_unmatched_by_id.items()
+    }
+
+    eligible_pool = get_eligible_matching_pool(session, defer_user_info=True)
+
+    unmatched_with_reasons = _diagnose_unmatched(
+        eligible_pool, draft_matchings, all_matchings, session
+    )
+
+    # Users who are overdue (≥1 week unmatched) AND have no mutually compatible
+    # candidate at all — combined score > 0 means both directions are positive
+    # (neither side has a hard exclude), so any such candidate means the user
+    # was simply not reached by the greedy algorithm this cycle, not structurally blocked.
+    draft_paired_ids = {uid for m in draft_matchings for uid in (m.subject_id, m.object_id)}
+    no_candidate_users = [
+        m for m, _, candidates in unmatched_with_reasons
+        if m.id not in draft_paired_ids
+        and (weeks_unmatched_by_id.get(m.id) or 0) >= 1
+        and not any(score > 0 for _, score in candidates)
+    ]
+    no_candidate_candidates = {m.id: candidates for m, _, candidates in unmatched_with_reasons}
+
+    return render_template(
+        'admin_drafts_diagnosis.html',
+        no_candidate_users=no_candidate_users,
+        no_candidate_candidates=no_candidate_candidates,
+        weeks_unmatched_by_id=weeks_unmatched_by_id,
+    )
 
 
 @bp.route('/users/new', methods=['GET', 'POST'])

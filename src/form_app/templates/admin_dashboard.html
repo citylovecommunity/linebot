@@ -252,54 +252,13 @@
         <p class="mt-2">目前沒有草稿配對。點選右上角「生成草稿配對」來預覽本週配對結果。</p>
       </div>
       {% else %}
-      {% if no_candidate_users %}
-      <div class="card border-danger mb-3">
-        <div class="card-header bg-danger text-white py-2">
-          <i class="bi bi-exclamation-triangle-fill me-1"></i>
-          <strong>以下會員因硬排除條件無法自動配對，請人工處理後再發送通知（{{ no_candidate_users|length }} 人）</strong>
+      <div id="diagnosis-panel">
+        {% if draft_matchings %}
+        <div class="text-muted small py-2">
+          <span class="spinner-border spinner-border-sm me-1"></span>分析配對狀態…
         </div>
-        <div class="card-body p-2">
-          {% for u in no_candidate_users %}
-          {% set w = weeks_unmatched_by_id.get(u.id) %}
-          {% set candidates = no_candidate_candidates.get(u.id, []) %}
-          <div class="d-flex align-items-center gap-2 flex-wrap py-2 {% if not loop.last %}border-bottom{% endif %}">
-            <div style="min-width:120px">
-              <span class="fw-semibold">{{ u.name }}</span>
-              <span class="text-muted small ms-1">{{ '男' if u.gender == 'M' else '女' }}</span>
-              <div>
-                {% if w is none %}<span class="badge bg-secondary">從未配對</span>
-                {% else %}<span class="badge bg-danger">{{ w }}w 未配對</span>{% endif %}
-              </div>
-            </div>
-            <button type="button" class="btn btn-sm btn-outline-secondary"
-              onclick="showMemberInfo({{ u.id }})"><i class="bi bi-person-lines-fill me-1"></i>會員資料</button>
-            <button type="button" class="btn btn-sm btn-outline-secondary"
-              onclick="showMatchHistory({{ u.id }}, '{{ u.name }}')">查看配對記錄</button>
-            {% if candidates %}
-            <form method="POST" action="{{ url_for('admin_bp.create_draft_pair') }}"
-                  class="d-flex gap-1 align-items-center"
-                  onsubmit="return confirm('確定要手動建立此草稿配對嗎？')">
-              <input type="hidden" name="subject_id" value="{{ u.id }}">
-              <select name="object_id" class="form-select form-select-sm" style="min-width:160px" required>
-                <option value="">選擇對象…</option>
-                {% for candidate, score in candidates %}
-                <option value="{{ candidate.id }}">
-                  {{ candidate.name }}{% if score %} ({{ score|int }}){% endif %}
-                </option>
-                {% endfor %}
-              </select>
-              <button type="submit" class="btn btn-sm btn-danger text-nowrap">
-                <i class="bi bi-plus-circle me-1"></i>手動配對
-              </button>
-            </form>
-            {% else %}
-            <span class="text-muted small">無可選對象</span>
-            {% endif %}
-          </div>
-          {% endfor %}
-        </div>
+        {% endif %}
       </div>
-      {% endif %}
       <p class="text-muted small mb-2">
         <i class="bi bi-clock me-1"></i>
         配對清單生成時間：<strong>{{ draft_matchings[0].created_at.strftime('%Y-%m-%d %H:%M') }}</strong>
@@ -761,6 +720,14 @@
     const tabEl = document.getElementById(tabName + '-tab');
     if (tabEl) new bootstrap.Tab(tabEl).show();
   }
+
+  // ── 草稿診斷（lazy load） ──
+  {% if draft_matchings %}
+  fetch('{{ url_for("admin_bp.drafts_diagnosis") }}')
+    .then(r => r.status === 204 ? '' : r.text())
+    .then(html => { if (html) document.getElementById('diagnosis-panel').innerHTML = html; })
+    .catch(() => { document.getElementById('diagnosis-panel').innerHTML = ''; });
+  {% endif %}
 
   // Keep ?tab= in sync so refresh lands on the tab the user is actually on.
   document.querySelectorAll('[data-bs-toggle="tab"]').forEach(tabEl => {

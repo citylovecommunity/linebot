@@ -10,19 +10,22 @@ from form_app.services.cool_name import generate_funny_name
 
 def generate_weekly_matches(users, session: Session):
     """
-    Priority greedy matching.
+    Maximum-cardinality weighted matching.
 
-    1. Compute weeks since last match for every eligible user from DB history.
-    2. Iterate users with >= 1 week unmatched, longest-waiting first.
-       Never-matched users sort to the top.
-    3. For each such user A (skip if already paired this session):
-       - Candidates = opposite gender, in eligible pool, not yet paired this session,
-         with a positive score from A.
-       - Pick the candidate with the fewest total historical matchings.
-         Tiebreak: highest score from A to that candidate.
-       - Pair them; mark both as paired for the rest of this session.
-    4. Users not reached as A, or never chosen as a candidate, go unmatched.
+    Guarantees that every eligible user who has been unmatched for ≥1 week gets
+    paired if a valid partner exists (no hard excludes either way, never
+    previously matched together).  Within that constraint, longer-waiting users
+    still tend to get higher-quality matches because the edge weight encodes
+    both combined score and wait-time, and NetworkX maximises weight when
+    multiple maximum-cardinality matchings exist.
+
+    Edge weight = combined_score + (weeks_A + weeks_B) * 10
+    The wait-time bonus is large enough that pairing two long-waiting users is
+    always preferred over pairing one long-waiting user with a fresh one at the
+    cost of leaving the other long-waiting user unmatched.
     """
+    import networkx as nx
+
     user_ids = [u.id for u in users]
     if not user_ids:
         return []
@@ -38,20 +41,11 @@ def generate_weekly_matches(users, session: Session):
         )
     ).all()
 
-    # Historical match count per user + set of previously matched pairs
-    match_count: dict[int, int] = {u.id: 0 for u in users}
     historical_pairs: set[tuple[int, int]] = set()
-    for sub, obj, _ in existing:
-        if sub in match_count:
-            match_count[sub] += 1
-        if obj in match_count:
-            match_count[obj] += 1
-        historical_pairs.add((sub, obj))
-        historical_pairs.add((obj, sub))
-
-    # Most recent matching date per user → weeks unmatched
     last_match_date: dict[int, date | None] = {u.id: None for u in users}
     for sub, obj, created_at in existing:
+        historical_pairs.add((sub, obj))
+        historical_pairs.add((obj, sub))
         dt = created_at.date() if hasattr(created_at, 'date') else created_at
         for uid in (sub, obj):
             if uid in last_match_date:
@@ -60,11 +54,11 @@ def generate_weekly_matches(users, session: Session):
                     last_match_date[uid] = dt
 
     today = date.today()
-    weeks_unmatched: dict[int, int] = {}
-    for uid in user_ids:
-        ld = last_match_date[uid]
-        # Never-matched users get a large sentinel so they sort to the top
-        weeks_unmatched[uid] = 9999 if ld is None else max(0, (today - ld).days // 7)
+    weeks_unmatched: dict[int, int] = {
+        uid: (9999 if last_match_date[uid] is None
+              else max(0, (today - last_match_date[uid]).days // 7))
+        for uid in user_ids
+    }
 
     # Batch-fetch scores between all eligible users
     scores = session.query(
@@ -83,47 +77,39 @@ def generate_weekly_matches(users, session: Session):
     male_users = [u for u in users if u.gender == 'M']
     female_users = [u for u in users if u.gender == 'F']
 
-    # Only users unmatched for at least one week are initiators
-    initiators = sorted(
-        [u for u in users if weeks_unmatched[u.id] >= 1],
-        key=lambda u: weeks_unmatched[u.id],
-        reverse=True,
-    )
+    # Build a bipartite graph.  Only add edges where:
+    #   - both mutual scores are positive (no hard excludes either way)
+    #   - the pair has never been matched before
+    #   - at least one side has been unmatched for ≥1 week (otherwise neither
+    #     wants to be matched this cycle)
+    G = nx.Graph()
+    for male in male_users:
+        for female in female_users:
+            if (male.id, female.id) in historical_pairs:
+                continue
+            s_mf = score_map.get((male.id, female.id), 0)
+            s_fm = score_map.get((female.id, male.id), 0)
+            if s_mf <= 0 or s_fm <= 0:
+                continue
+            w_m = weeks_unmatched[male.id]
+            w_f = weeks_unmatched[female.id]
+            if w_m < 1 and w_f < 1:
+                continue  # both matched recently — skip this cycle
+            combined = (s_mf + s_fm) / 2
+            weight = combined + (w_m + w_f) * 10
+            G.add_edge(f'm_{male.id}', f'f_{female.id}', weight=weight)
 
-    paired: set[int] = set()
+    # maxcardinality=True: maximise number of pairs first, then maximise weight.
+    matched = nx.max_weight_matching(G, maxcardinality=True)
+
     final_edges: list[tuple[int, int]] = []
-
-    for user in initiators:
-        if user.id in paired:
-            continue
-
-        opposite = female_users if user.gender == 'M' else male_users
-
-        candidates = []
-        for candidate in opposite:
-            if candidate.id in paired:
-                continue
-            if (user.id, candidate.id) in historical_pairs:
-                continue
-            s_forward = score_map.get((user.id, candidate.id), 0)
-            s_reverse = score_map.get((candidate.id, user.id), 0)
-            if s_forward <= 0 or s_reverse <= 0:
-                continue
-            candidates.append((candidate, match_count[candidate.id], s_forward))
-
-        if not candidates:
-            continue
-
-        # Primary sort: fewest historical matchings. Tiebreak: highest score from user → candidate.
-        best_candidate, _, _ = min(candidates, key=lambda x: (x[1], -x[2]))
-
-        male_id, female_id = (
-            (user.id, best_candidate.id) if user.gender == 'M'
-            else (best_candidate.id, user.id)
-        )
+    for a, b in matched:
+        # Nodes are labelled 'm_<id>' / 'f_<id>'
+        male_node  = a if a.startswith('m_') else b
+        female_node = b if b.startswith('f_') else a
+        male_id   = int(male_node[2:])
+        female_id = int(female_node[2:])
         final_edges.append((male_id, female_id))
-        paired.add(user.id)
-        paired.add(best_candidate.id)
 
     return final_edges
 

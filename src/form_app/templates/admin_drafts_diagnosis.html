@@ -1,0 +1,48 @@
+{% if no_candidate_users %}
+<div class="card border-danger mb-3">
+  <div class="card-header bg-danger text-white py-2">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+    <strong>以下會員因硬排除條件無法自動配對，請人工處理後再發送通知（{{ no_candidate_users|length }} 人）</strong>
+  </div>
+  <div class="card-body p-2">
+    {% for u in no_candidate_users %}
+    {% set w = weeks_unmatched_by_id.get(u.id) %}
+    {% set candidates = no_candidate_candidates.get(u.id, []) %}
+    <div class="d-flex align-items-center gap-2 flex-wrap py-2 {% if not loop.last %}border-bottom{% endif %}">
+      <div style="min-width:120px">
+        <span class="fw-semibold">{{ u.name }}</span>
+        <span class="text-muted small ms-1">{{ '男' if u.gender == 'M' else '女' }}</span>
+        <div>
+          {% if w is none %}<span class="badge bg-secondary">從未配對</span>
+          {% else %}<span class="badge bg-danger">{{ w }}w 未配對</span>{% endif %}
+        </div>
+      </div>
+      <button type="button" class="btn btn-sm btn-outline-secondary"
+        onclick="showMemberInfo({{ u.id }})"><i class="bi bi-person-lines-fill me-1"></i>會員資料</button>
+      <button type="button" class="btn btn-sm btn-outline-secondary"
+        onclick="showMatchHistory({{ u.id }}, '{{ u.name }}')">查看配對記錄</button>
+      {% if candidates %}
+      <form method="POST" action="{{ url_for('admin_bp.create_draft_pair') }}"
+            class="d-flex gap-1 align-items-center"
+            onsubmit="return confirm('確定要手動建立此草稿配對嗎？')">
+        <input type="hidden" name="subject_id" value="{{ u.id }}">
+        <select name="object_id" class="form-select form-select-sm" style="min-width:160px" required>
+          <option value="">選擇對象…</option>
+          {% for candidate, score in candidates %}
+          <option value="{{ candidate.id }}">
+            {{ candidate.name }}{% if score %} ({{ score|int }}){% endif %}
+          </option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-sm btn-danger text-nowrap">
+          <i class="bi bi-plus-circle me-1"></i>手動配對
+        </button>
+      </form>
+      {% else %}
+      <span class="text-muted small">無可選對象</span>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
