@@ -109,6 +109,10 @@
                         <small class="text-muted text-truncate" style="max-width: 80%;">
                             {% if matching.last_message %}
                             <i class="bi bi-chat-left-text me-1"></i> {{ matching.last_message.content[:20] }}
+                            {% elif match_intros and match_intros.get(matching.id) %}
+                            <span class="text-primary fst-italic" style="font-size:.8rem;">
+                                <i class="bi bi-stars me-1"></i>{{ match_intros[matching.id] }}
+                            </span>
                             {% else %}
                             <span class="text-primary fst-italic">
                                 <i class="bi bi-chat-dots"></i> 開始對話...

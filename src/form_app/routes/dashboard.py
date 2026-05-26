@@ -65,10 +65,18 @@ def dashboard():
         .order_by(GroupMatching.id.desc())
         .all()
     )
+
+    from form_app.services.match_intro import generate_match_intro
+    match_intros = {
+        m.id: generate_match_intro(current_user, m.get_partner(current_user.id))
+        for m in current_user.all_matches
+    }
+
     return render_template('dashboard.html',
                            current_user=current_user,
                            missing_items=missing_items,
-                           group_matchings=group_matchings)
+                           group_matchings=group_matchings,
+                           match_intros=match_intros)
 
 
 @bp.route('/<int:matching_id>', methods=['GET', 'POST'])
@@ -95,6 +103,9 @@ def matching_detail(matching_id):
     proposal = matching.ui_proposal
     messages = matching.messages
 
+    from form_app.services.match_intro import generate_match_intro
+    match_intro = generate_match_intro(current_user, partner)
+
     status_step = 1
     if proposal:
         if proposal.is_pending:
@@ -111,6 +122,7 @@ def matching_detail(matching_id):
                            partner=partner,
                            proposal=proposal,
                            messages=messages,
+                           match_intro=match_intro,
                            is_dev=settings.is_dev,
                            )
 

@@ -53,7 +53,13 @@
                         {{ matching.cool_name }}
                     </div>
 
-                    <p class="text-muted small mb-3">Matched on {{ matching.created_at.strftime('%b %d') }}</p>
+                    <p class="text-muted small mb-2">Matched on {{ matching.created_at.strftime('%b %d') }}</p>
+
+                    {% if match_intro %}
+                    <div class="alert alert-primary alert-sm py-2 px-3 mb-3 text-start" style="font-size:.85rem;">
+                        <i class="bi bi-stars me-1"></i>{{ match_intro }}
+                    </div>
+                    {% endif %}
 
                     <a href="{{ partner.introduction_link }}" target="_blank"
                         class="text-decoration-none text-primary fw-bold small hover-lift mb-3 d-block">
