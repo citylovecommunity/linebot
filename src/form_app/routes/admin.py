@@ -1,6 +1,7 @@
-from datetime import datetime, date
+import uuid
+from datetime import datetime, date, timedelta, timezone
 
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session as flask_session
+from flask import Blueprint, jsonify, render_template, redirect, url_for, flash, request, session as flask_session
 from flask_login import login_required, current_user
 from sqlalchemy.orm import joinedload, defer
 from sqlalchemy.orm.attributes import flag_modified
@@ -33,7 +34,7 @@ def _invalidate_dashboard_cache():
     if r:
         r.delete(_DASHBOARD_CACHE_KEY)
 
-from form_app.models import Member, Matching, MatchingStatus, UserMatchScore, DateProposal, ProposalStatus, Line_Info
+from form_app.models import Invite, Member, Matching, MatchingStatus, UserMatchScore, DateProposal, ProposalStatus, Line_Info
 from collections import defaultdict
 from form_app.decorators import admin_required, developer_required
 from form_app.database import get_db
@@ -652,6 +653,23 @@ def delete_user(user_id):
     _invalidate_dashboard_cache()
     flash(f'已刪除會員「{name}」', 'success')
     return redirect(url_for('admin_bp.admin_dashboard'))
+
+
+@bp.route('/invites/create', methods=['POST'])
+@login_required
+@admin_required
+def create_invite():
+    session = get_db()
+    invite = Invite(
+        token=str(uuid.uuid4()),
+        expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+        created_by_id=current_user.id,
+    )
+    session.add(invite)
+    session.commit()
+
+    link = url_for('profile_bp.register', token=invite.token, _external=True)
+    return jsonify({'url': link, 'expires_at': invite.expires_at.strftime('%Y-%m-%d %H:%M UTC')})
 
 
 @bp.route('/users/<int:user_id>/reset-password', methods=['POST'])

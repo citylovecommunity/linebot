@@ -589,6 +589,24 @@
         </div>
       </div>
 
+      <div class="card mb-3 border-info">
+        <div class="card-body">
+          <h6 class="card-title"><i class="bi bi-person-plus-fill me-1 text-info"></i> 邀請新會員填寫資料</h6>
+          <p class="text-muted small">產生一個 7 天有效的單次邀請連結，將連結傳給對方，對方即可自行填寫所有配對資料並建立帳號。</p>
+          <div class="d-flex gap-2 align-items-center flex-wrap">
+            <button type="button" class="btn btn-info text-white" id="genInviteBtn" onclick="generateInvite()">
+              <i class="bi bi-link-45deg"></i> 產生邀請連結
+            </button>
+            <input type="text" class="form-control font-monospace" id="inviteLinkInput"
+              style="max-width:520px;" readonly placeholder="點擊「產生邀請連結」後顯示於此">
+            <button type="button" class="btn btn-outline-secondary d-none" id="copyInviteBtn" onclick="copyInviteLink()">
+              <i class="bi bi-clipboard"></i> 複製
+            </button>
+          </div>
+          <div id="inviteExpiry" class="text-muted small mt-2"></div>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-body">
           <h6 class="card-title">直接執行自動配對</h6>
@@ -1058,4 +1076,34 @@
     </div>
   </div>
 </div>
+
+<script>
+async function generateInvite() {
+  const btn = document.getElementById('genInviteBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 產生中...';
+  try {
+    const resp = await fetch('/admin/invites/create', { method: 'POST' });
+    const data = await resp.json();
+    if (!resp.ok) { alert(data.error || '錯誤'); return; }
+    document.getElementById('inviteLinkInput').value = data.url;
+    document.getElementById('copyInviteBtn').classList.remove('d-none');
+    document.getElementById('inviteExpiry').textContent = `有效期限：${data.expires_at}`;
+  } catch (e) {
+    alert('產生連結失敗，請重試');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-link-45deg"></i> 重新產生';
+  }
+}
+
+function copyInviteLink() {
+  const val = document.getElementById('inviteLinkInput').value;
+  navigator.clipboard.writeText(val).then(() => {
+    const btn = document.getElementById('copyInviteBtn');
+    btn.innerHTML = '<i class="bi bi-check"></i> 已複製';
+    setTimeout(() => { btn.innerHTML = '<i class="bi bi-clipboard"></i> 複製'; }, 2000);
+  });
+}
+</script>
 {% endblock %}

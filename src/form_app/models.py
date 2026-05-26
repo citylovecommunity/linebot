@@ -460,6 +460,26 @@ class DateProposal(Base):
             return None
 
 
+class Invite(Base):
+    __tablename__ = "invite"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    token: Mapped[str] = mapped_column(unique=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.now)
+    expires_at: Mapped[datetime]
+    used_at: Mapped[Optional[datetime]]
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("member.id"), nullable=True)
+
+    @property
+    def is_valid(self) -> bool:
+        if self.used_at is not None:
+            return False
+        exp = self.expires_at
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        return datetime.now(timezone.utc) <= exp
+
+
 class UserMatchScore(Base):
     __tablename__ = 'user_match_scores'
 
