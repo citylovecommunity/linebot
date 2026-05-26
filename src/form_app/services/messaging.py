@@ -155,14 +155,18 @@ def collect_new_match_texts(session):
     )
 
     for matching in new_matchings:
-        for member in (matching.subject, matching.object):
-            if not member:
+        pairs = [
+            (matching.subject, matching.object),
+            (matching.object, matching.subject),
+        ]
+        for member, partner in pairs:
+            if not member or not partner:
                 continue
+            from form_app.services.match_intro import generate_match_intro_long
+            intro = generate_match_intro_long(member, partner, matching.cool_name)
             text = (
-                f"🎉 恭喜！你有一個新的配對！\n\n"
-                f"你的新夥伴正在等你 👀\n"
-                f"代號：{matching.cool_name}\n\n"
-                f"👇 登入查看：\n{APP_URL}/dashboard/{matching.id}"
+                f"🎉 {member.proper_name}，{intro}\n"
+                f"{APP_URL}/dashboard/{matching.id}"
             )
             updates[member.id].append(text)
         matching.is_match_notified = True
