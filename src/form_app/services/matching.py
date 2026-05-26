@@ -53,24 +53,6 @@ def generate_weekly_matches(users, session: Session):
                 if prev is None or dt > prev:
                     last_match_date[uid] = dt
 
-    # Members whose ACTIVE matching was created within the last 7 days should
-    # not be re-drafted in the same cycle.  Old stale ACTIVE rows (matchings
-    # that were never explicitly completed) are intentionally ignored here so
-    # they don't block the eligible pool.
-    from datetime import timedelta
-    one_week_ago = date.today() - timedelta(days=7)
-    active_rows = session.query(
-        Matching.subject_id, Matching.object_id
-    ).filter(
-        Matching.status == MatchingStatus.ACTIVE,
-        Matching.created_at >= one_week_ago,
-        or_(
-            Matching.subject_id.in_(user_ids),
-            Matching.object_id.in_(user_ids),
-        )
-    ).all()
-    active_member_ids: set[int] = {uid for sub, obj in active_rows for uid in (sub, obj)}
-
     today = date.today()
     weeks_unmatched: dict[int, int] = {
         uid: (9999 if last_match_date[uid] is None
@@ -103,8 +85,6 @@ def generate_weekly_matches(users, session: Session):
     G = nx.Graph()
     for male in male_users:
         for female in female_users:
-            if male.id in active_member_ids or female.id in active_member_ids:
-                continue
             if (male.id, female.id) in historical_pairs:
                 continue
             s_mf = score_map.get((male.id, female.id), 0)
