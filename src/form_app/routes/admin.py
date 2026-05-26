@@ -439,7 +439,7 @@ def drafts_diagnosis():
     no_candidate_users = [
         m for m, _, candidates in unmatched_with_reasons
         if m.id not in draft_paired_ids
-        and (weeks_unmatched_by_id.get(m.id) or 0) >= 1
+        and (weeks_unmatched_by_id.get(m.id) is None or weeks_unmatched_by_id.get(m.id) >= 1)
         and not any(score > 0 for _, score in candidates)
     ]
     no_candidate_candidates = {m.id: candidates for m, _, candidates in unmatched_with_reasons}

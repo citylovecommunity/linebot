@@ -93,8 +93,8 @@ def generate_weekly_matches(users, session: Session):
                 continue
             w_m = weeks_unmatched[male.id]
             w_f = weeks_unmatched[female.id]
-            if w_m < 1 and w_f < 1:
-                continue  # both matched recently — skip this cycle
+            if w_m < 1 or w_f < 1:
+                continue  # either side matched recently — skip this cycle
             combined = (s_mf + s_fm) / 2
             weight = combined + (w_m + w_f) * 10
             G.add_edge(f'm_{male.id}', f'f_{female.id}', weight=weight)
