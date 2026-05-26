@@ -6,7 +6,10 @@ from flask import (Blueprint, abort, flash, jsonify, redirect, render_template,
 from flask_login import current_user, login_required
 
 from form_app.database import get_db
-from form_app.models import DateProposal, Matching, Member, Message
+from form_app.models import (
+    DateProposal, Matching, Member, Message,
+    GroupMatching, GroupMessage, GroupDateProposal,
+)
 from form_app.services.security import verify_password, hash_password
 from form_app.config import settings
 
@@ -55,10 +58,17 @@ def debug_user():
 @login_required
 def dashboard():
     missing_items = current_user.missing_requirements
-
+    db = get_db()
+    group_matchings = (
+        db.query(GroupMatching)
+        .filter(GroupMatching.members.any(Member.id == current_user.id))
+        .order_by(GroupMatching.id.desc())
+        .all()
+    )
     return render_template('dashboard.html',
                            current_user=current_user,
-                           missing_items=missing_items)
+                           missing_items=missing_items,
+                           group_matchings=group_matchings)
 
 
 @bp.route('/<int:matching_id>', methods=['GET', 'POST'])
@@ -258,6 +268,139 @@ def handle_proposal(matching_id, proposal_id):
     db.commit()
 
     return redirect(url_for('.matching_detail', matching_id=matching_id))
+
+
+def get_group_or_abort(group_id):
+    db = get_db()
+    group = db.get(GroupMatching, group_id)
+    if not group:
+        return None
+    if not any(m.id == current_user.id for m in group.members):
+        return None
+    return group
+
+
+@bp.route('/group/<int:group_id>', methods=['GET'])
+@login_required
+def group_detail(group_id):
+    group = get_group_or_abort(group_id)
+    if group is None:
+        flash('群組不存在或您不是成員', 'danger')
+        return redirect(url_for('dashboard_bp.dashboard'))
+
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    current_user.last_seen_at = now
+    db = get_db()
+    db.commit()
+
+    return render_template('group_chat.html',
+                           group=group,
+                           messages=group.messages,
+                           proposals=group.active_proposals,
+                           current_user=current_user,
+                           is_dev=settings.is_dev)
+
+
+@bp.route('/group/<int:group_id>/send', methods=['POST'])
+@login_required
+def group_send_message(group_id):
+    db = get_db()
+    group = get_group_or_abort(group_id)
+    if group is None:
+        return jsonify({'error': 'forbidden'}), 403
+
+    content = (request.json or {}).get('content', '') or request.form.get('message_content', '')
+    if not content:
+        return jsonify({'error': 'empty message'}), 400
+
+    msg = GroupMessage(content=content, sender_id=current_user.id, group_id=group.id)
+    db.add(msg)
+    db.flush()
+    group.last_message_id = msg.id
+    db.commit()
+
+    return jsonify({
+        'id': msg.id,
+        'content': msg.content,
+        'is_me': True,
+        'sender_name': current_user.proper_name,
+        'timestamp': msg.timestamp.strftime('%Y-%m-%d %H:%M'),
+        'is_system_notification': False,
+    })
+
+
+@bp.route('/group/<int:group_id>/messages', methods=['GET'])
+@login_required
+def group_get_messages(group_id):
+    group = get_group_or_abort(group_id)
+    if group is None:
+        return jsonify([]), 403
+
+    after_id = request.args.get('after_id', 0, type=int)
+    db = get_db()
+    msgs = (
+        db.query(GroupMessage)
+        .filter(GroupMessage.group_id == group_id, GroupMessage.id > after_id)
+        .order_by(GroupMessage.id)
+        .all()
+    )
+    return jsonify([{
+        'id': m.id,
+        'content': m.content,
+        'is_me': m.sender_id == current_user.id,
+        'sender_name': m.sender.proper_name,
+        'timestamp': m.timestamp.strftime('%Y-%m-%d %H:%M'),
+        'is_system_notification': m.is_system_notification,
+    } for m in msgs])
+
+
+@bp.route('/group/<int:group_id>/proposal', methods=['POST'])
+@login_required
+def group_submit_proposal(group_id):
+    db = get_db()
+    group = get_group_or_abort(group_id)
+    if group is None or group.is_cancelled:
+        flash('無法提出任務', 'danger')
+        return redirect(url_for('dashboard_bp.dashboard'))
+
+    restaurant = request.form.get('restaurant', '').strip()
+    date_str = request.form.get('date_time', '').strip()
+    if not restaurant or not date_str:
+        flash('請填寫所有欄位', 'danger')
+        return redirect(url_for('dashboard_bp.group_detail', group_id=group_id))
+
+    from datetime import datetime
+    proposal = GroupDateProposal(
+        group_id=group_id,
+        proposer_id=current_user.id,
+        restaurant_name=restaurant,
+        proposed_datetime=datetime.strptime(date_str, '%Y-%m-%dT%H:%M'),
+    )
+    db.add(proposal)
+    db.commit()
+    flash('任務提議已送出', 'success')
+    return redirect(url_for('dashboard_bp.group_detail', group_id=group_id))
+
+
+@bp.route('/group/<int:group_id>/proposal/<int:proposal_id>/delete', methods=['POST'])
+@login_required
+def group_delete_proposal(group_id, proposal_id):
+    db = get_db()
+    group = get_group_or_abort(group_id)
+    proposal = db.get(GroupDateProposal, proposal_id)
+    if group is None or proposal is None or proposal.group_id != group_id:
+        flash('找不到該提議', 'danger')
+        return redirect(url_for('dashboard_bp.group_detail', group_id=group_id))
+
+    if proposal.proposer_id != current_user.id:
+        flash('只有提議人可以刪除', 'danger')
+        return redirect(url_for('dashboard_bp.group_detail', group_id=group_id))
+
+    proposal.is_deleted = True
+    db.commit()
+    flash('提議已刪除', 'info')
+    return redirect(url_for('dashboard_bp.group_detail', group_id=group_id))
 
 
 @bp.route('/profile')

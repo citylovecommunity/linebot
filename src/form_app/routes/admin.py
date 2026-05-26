@@ -34,7 +34,11 @@ def _invalidate_dashboard_cache():
     if r:
         r.delete(_DASHBOARD_CACHE_KEY)
 
-from form_app.models import Invite, Member, Matching, MatchingStatus, UserMatchScore, DateProposal, ProposalStatus, Line_Info
+from form_app.models import (
+    Invite, Member, Matching, MatchingStatus, UserMatchScore,
+    DateProposal, ProposalStatus, Line_Info,
+    GroupMatching, GroupMatchingStatus, GroupMessage, GroupDateProposal, group_members,
+)
 from collections import defaultdict
 from form_app.decorators import admin_required, developer_required
 from form_app.database import get_db
@@ -255,6 +259,12 @@ def admin_dashboard():
         .all()
     )
 
+    all_group_matchings = (
+        session.query(GroupMatching)
+        .order_by(GroupMatching.id.desc())
+        .all()
+    )
+
     member_match_counts = defaultdict(int)
     for m in all_matchings:
         member_match_counts[m.subject_id] += 1
@@ -384,6 +394,7 @@ def admin_dashboard():
         no_candidate_users=no_candidate_users,
         no_candidate_candidates={m.id: candidates for m, _, candidates in unmatched_with_reasons},
         weeks_unmatched_by_id=weeks_unmatched_by_id,
+        group_matchings=all_group_matchings,
     )
     if cache and not has_flash:
         cache.setex(_DASHBOARD_CACHE_KEY, _DASHBOARD_CACHE_TTL, response)
@@ -781,6 +792,53 @@ def reactivate_matching(matching_id):
     _invalidate_dashboard_cache()
     flash(f'已重新啟用配對「{matching.cool_name}」', 'success')
     return redirect(url_for('admin_bp.admin_dashboard', tab='matchings'))
+
+
+@bp.route('/groups/create', methods=['POST'])
+@login_required
+@admin_required
+def create_group():
+    session = get_db()
+    male_ids = request.form.getlist('male_ids', type=int)
+    female_ids = request.form.getlist('female_ids', type=int)
+
+    if len(male_ids) != 2 or len(female_ids) != 2:
+        flash('請選擇恰好 2 位男性與 2 位女性', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+
+    all_ids = male_ids + female_ids
+    if len(set(all_ids)) != 4:
+        flash('不能重複選擇同一位會員', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+
+    members = session.query(Member).filter(Member.id.in_(all_ids)).all()
+    if len(members) != 4:
+        flash('找不到部分會員', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+
+    from form_app.services.cool_name import generate_funny_name
+    group = GroupMatching(cool_name=generate_funny_name(), members=members)
+    session.add(group)
+    session.commit()
+    _invalidate_dashboard_cache()
+    flash(f'群組「{group.cool_name}」已建立', 'success')
+    return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+
+
+@bp.route('/groups/<int:group_id>/cancel', methods=['POST'])
+@login_required
+@admin_required
+def cancel_group(group_id):
+    session = get_db()
+    group = session.get(GroupMatching, group_id)
+    if group is None:
+        flash('找不到該群組', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+    group.status = GroupMatchingStatus.CANCELLED
+    session.commit()
+    _invalidate_dashboard_cache()
+    flash(f'群組「{group.cool_name}」已取消', 'success')
+    return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
 
 
 def _compute_and_save_score(session, source: Member, target: Member) -> UserMatchScore:

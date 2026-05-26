@@ -35,6 +35,12 @@
       </button>
     </li>
     <li class="nav-item" role="presentation">
+      <button class="nav-link" id="groups-tab" data-bs-toggle="tab" data-bs-target="#groups"
+        type="button" role="tab">
+        群組 <span class="badge bg-primary ms-1">{{ group_matchings|length }}</span>
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
       <button class="nav-link" id="dates-tab" data-bs-toggle="tab" data-bs-target="#dates"
         type="button" role="tab">
         約會
@@ -451,6 +457,77 @@
           </tbody>
         </table>
       </div>
+    </div>
+
+    <!-- 群組頁籤 -->
+    <div class="tab-pane fade" id="groups" role="tabpanel">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">群組配對</h5>
+        <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#createGroupModal">
+          <i class="bi bi-people-fill me-1"></i> 建立群組
+        </button>
+      </div>
+
+      {% if group_matchings %}
+      <div class="table-responsive">
+        <table class="table table-hover table-sm align-middle">
+          <thead class="table-dark">
+            <tr>
+              <th>編號</th>
+              <th>代號</th>
+              <th>成員</th>
+              <th>狀態</th>
+              <th>建立日期</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for g in group_matchings %}
+            <tr>
+              <td class="text-muted small">{{ g.id }}</td>
+              <td>{{ g.cool_name }}</td>
+              <td>
+                {% for m in g.members %}
+                <span class="badge {{ 'bg-primary' if m.gender == 'M' else 'bg-danger' }} bg-opacity-75 me-1">
+                  {{ m.name }}
+                </span>
+                {% endfor %}
+              </td>
+              <td>
+                {% if g.status.value == 'ACTIVE' %}
+                <span class="badge bg-success">進行中</span>
+                {% else %}
+                <span class="badge bg-secondary">已取消</span>
+                {% endif %}
+              </td>
+              <td class="small">{{ g.created_at.strftime('%Y-%m-%d') }}</td>
+              <td>
+                {% if current_user.is_developer %}
+                <a href="{{ url_for('dashboard_bp.group_detail', group_id=g.id) }}"
+                  class="btn btn-sm btn-outline-secondary me-1" target="_blank">
+                  <i class="bi bi-chat-dots"></i>
+                </a>
+                {% endif %}
+                {% if g.status.value == 'ACTIVE' %}
+                <form method="POST"
+                  action="{{ url_for('admin_bp.cancel_group', group_id=g.id) }}"
+                  class="d-inline"
+                  onsubmit="return confirm('確定取消群組「{{ g.cool_name }}」？')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">取消</button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center py-5 text-muted">
+        <i class="bi bi-people display-1 opacity-25"></i>
+        <p class="mt-2">尚無群組配對。點選右上角「建立群組」新增。</p>
+      </div>
+      {% endif %}
     </div>
 
     <!-- 約會頁籤 -->
@@ -988,6 +1065,64 @@
 </script>
 
 <!-- 草稿編輯 Modal -->
+<!-- 建立群組 Modal -->
+<div class="modal fade" id="createGroupModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-people-fill me-2"></i>建立群組配對</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('admin_bp.create_group') }}">
+        <div class="modal-body">
+          <p class="text-muted small mb-3">請選擇 2 位男性與 2 位女性組成群組。</p>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">男性成員 1</label>
+            <select name="male_ids" class="form-select" required>
+              <option value="">請選擇…</option>
+              {% for m in members %}{% if m.gender == 'M' and m.is_member_active and not m.is_test %}
+              <option value="{{ m.id }}">{{ m.name }}</option>
+              {% endif %}{% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">男性成員 2</label>
+            <select name="male_ids" class="form-select" required>
+              <option value="">請選擇…</option>
+              {% for m in members %}{% if m.gender == 'M' and m.is_member_active and not m.is_test %}
+              <option value="{{ m.id }}">{{ m.name }}</option>
+              {% endif %}{% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">女性成員 1</label>
+            <select name="female_ids" class="form-select" required>
+              <option value="">請選擇…</option>
+              {% for m in members %}{% if m.gender == 'F' and m.is_member_active and not m.is_test %}
+              <option value="{{ m.id }}">{{ m.name }}</option>
+              {% endif %}{% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">女性成員 2</label>
+            <select name="female_ids" class="form-select" required>
+              <option value="">請選擇…</option>
+              {% for m in members %}{% if m.gender == 'F' and m.is_member_active and not m.is_test %}
+              <option value="{{ m.id }}">{{ m.name }}</option>
+              {% endif %}{% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-success">建立群組</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="editDraftModal" tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">

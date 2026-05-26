@@ -3,7 +3,7 @@ import enum
 from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import DateTime
+from sqlalchemy import Column, DateTime, Integer, Table
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy import ForeignKey, func
 from sqlalchemy.dialects.postgresql.json import JSONB
@@ -28,6 +28,21 @@ class MatchingStatus(enum.Enum):
 
 class Base(DeclarativeBase):
     pass
+
+
+class GroupMatchingStatus(enum.Enum):
+    ACTIVE = "ACTIVE"
+    CANCELLED = "CANCELLED"
+
+
+# Association table for the M2M between GroupMatching and Member.
+# Defined early so both Member and GroupMatching can reference it.
+group_members = Table(
+    'group_members',
+    Base.metadata,
+    Column('group_id', Integer, ForeignKey('group_matching.id'), primary_key=True),
+    Column('member_id', Integer, ForeignKey('member.id'), primary_key=True),
+)
 
 
 class Member(Base):
@@ -154,6 +169,10 @@ class Member(Base):
     # Reset to 0 each time they are successfully paired.
     # Used to give priority boosts and unlock re-matching with historical partners.
     consecutive_unmatched_weeks: Mapped[int] = mapped_column(default=0)
+
+    group_matchings: Mapped[list["GroupMatching"]] = relationship(
+        "GroupMatching", secondary=group_members, back_populates="members"
+    )
 
     @property
     def membership_months(self) -> Optional[int]:
@@ -478,6 +497,90 @@ class Invite(Base):
         if exp.tzinfo is None:
             exp = exp.replace(tzinfo=timezone.utc)
         return datetime.now(timezone.utc) <= exp
+
+
+class GroupMatching(Base):
+    __tablename__ = "group_matching"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    cool_name: Mapped[Optional[str]]
+    status: Mapped[GroupMatchingStatus] = mapped_column(
+        SAEnum(
+            GroupMatchingStatus,
+            native_enum=False,
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        default=GroupMatchingStatus.ACTIVE,
+    )
+    created_at: Mapped[datetime] = mapped_column(default=datetime.now)
+    is_notified: Mapped[bool] = mapped_column(default=False)
+
+    last_message_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("group_message.id", use_alter=True, name="fk_group_matching_last_message")
+    )
+    last_message: Mapped[Optional["GroupMessage"]] = relationship(
+        foreign_keys="GroupMatching.last_message_id", post_update=True
+    )
+
+    members: Mapped[list["Member"]] = relationship(
+        "Member", secondary=group_members, back_populates="group_matchings"
+    )
+    messages: Mapped[list["GroupMessage"]] = relationship(
+        "GroupMessage",
+        back_populates="group",
+        foreign_keys="GroupMessage.group_id",
+        order_by="GroupMessage.timestamp",
+    )
+    proposals: Mapped[list["GroupDateProposal"]] = relationship(
+        "GroupDateProposal",
+        back_populates="group",
+        order_by="desc(GroupDateProposal.created_at)",
+    )
+
+    @property
+    def is_active(self):
+        return self.status is GroupMatchingStatus.ACTIVE
+
+    @property
+    def is_cancelled(self):
+        return self.status is GroupMatchingStatus.CANCELLED
+
+    @property
+    def active_proposals(self):
+        return [p for p in self.proposals if not p.is_deleted]
+
+
+class GroupMessage(Base):
+    __tablename__ = "group_message"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("group_matching.id"))
+    sender_id: Mapped[int] = mapped_column(ForeignKey("member.id"))
+    content: Mapped[str]
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+    is_notified: Mapped[Optional[bool]]
+    is_system_notification: Mapped[bool] = mapped_column(default=False)
+
+    sender: Mapped["Member"] = relationship(foreign_keys=[sender_id])
+    group: Mapped["GroupMatching"] = relationship(
+        "GroupMatching", back_populates="messages", foreign_keys=[group_id]
+    )
+
+
+class GroupDateProposal(Base):
+    __tablename__ = "group_date_proposal"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("group_matching.id"))
+    proposer_id: Mapped[int] = mapped_column(ForeignKey("member.id"))
+    restaurant_name: Mapped[str]
+    proposed_datetime: Mapped[datetime]
+    created_at: Mapped[datetime] = mapped_column(default=datetime.now)
+    is_deleted: Mapped[bool] = mapped_column(default=False)
+    is_notified: Mapped[Optional[bool]]
+
+    group: Mapped["GroupMatching"] = relationship(back_populates="proposals")
+    proposer: Mapped["Member"] = relationship(foreign_keys=[proposer_id])
 
 
 class UserMatchScore(Base):

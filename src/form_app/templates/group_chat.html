@@ -1,0 +1,295 @@
+{% set zh_months = {
+1: '一月', 2: '二月', 3: '三月', 4: '四月',
+5: '五月', 6: '六月', 7: '七月', 8: '八月',
+9: '九月', 10: '十月', 11: '十一月', 12: '十二月'
+} %}
+
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row g-4">
+
+    <!-- Left column: group info + proposals -->
+    <div class="col-lg-4 d-flex flex-column">
+
+      <!-- Group info card -->
+      <div class="card border-0 shadow-sm rounded-4 mb-4">
+        <div class="card-body p-4 text-center">
+          <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3 py-1 fw-normal mb-3 d-inline-block">
+            <i class="bi bi-people-fill me-1"></i> 群組配對
+          </span>
+
+          <!-- Member avatars -->
+          <div class="d-flex justify-content-center gap-2 mb-3">
+            {% for member in group.members %}
+            <div class="d-flex flex-column align-items-center">
+              <div class="rounded-circle d-flex align-items-center justify-content-center shadow-sm text-white fw-bold"
+                style="width:44px;height:44px;font-size:1.1rem;
+                  background: linear-gradient(135deg,
+                    {{ '#667eea' if member.gender == 'M' else '#f093fb' }} 0%,
+                    {{ '#764ba2' if member.gender == 'M' else '#f5576c' }} 100%);
+                  {{ 'border:2px solid #0d6efd;' if member.id == current_user.id else '' }}">
+                {{ member.name[0] }}
+              </div>
+              <div class="small text-muted mt-1" style="font-size:.7rem;">{{ member.proper_name }}</div>
+            </div>
+            {% endfor %}
+          </div>
+
+          <div class="location-tag small text-muted mb-1">
+            <i class="bi bi-hash text-warning opacity-75 fw-bold"></i>
+            {{ group.cool_name }}
+          </div>
+          <p class="text-muted small mb-3">建立於 {{ group.created_at.strftime('%Y-%m-%d') }}</p>
+
+          {% if group.is_cancelled %}
+          <span class="badge bg-secondary">已取消</span>
+          {% else %}
+          <!-- intro links -->
+          <div class="border-top pt-3">
+            <div class="text-muted small mb-2 fw-semibold">成員介紹卡</div>
+            {% for member in group.members %}
+            {% if member.id != current_user.id and member.introduction_link %}
+            <a href="{{ member.introduction_link }}" target="_blank"
+              class="text-decoration-none text-primary small d-block mb-1">
+              {{ member.proper_name }} <i class="bi bi-box-arrow-up-right ms-1"></i>
+            </a>
+            {% endif %}
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Proposals panel -->
+      {% if not group.is_cancelled %}
+      <div class="modern-card flex-grow-1">
+        <div class="card-header-clean d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-calendar-event me-2 text-primary"></i> 任務提議</span>
+          <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#proposalModal">
+            <i class="bi bi-plus-lg"></i> 提議
+          </button>
+        </div>
+        <div class="card-body">
+          {% if proposals %}
+          {% for p in proposals %}
+          <div class="border rounded-3 p-3 mb-2 {% if loop.last %}mb-0{% endif %}">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <div class="fw-semibold small">{{ p.restaurant_name }}</div>
+                <div class="text-muted small">
+                  <i class="bi bi-clock me-1"></i>
+                  {{ p.proposed_datetime.strftime('%Y-%m-%d %H:%M') }}
+                </div>
+                <div class="text-muted small mt-1">
+                  提議人：{{ p.proposer.proper_name }}
+                </div>
+              </div>
+              {% if p.proposer_id == current_user.id %}
+              <form method="POST"
+                action="{{ url_for('dashboard_bp.group_delete_proposal', group_id=group.id, proposal_id=p.id) }}"
+                onsubmit="return confirm('確定刪除此提議？')">
+                <button type="submit" class="btn btn-sm btn-outline-danger">
+                  <i class="bi bi-trash3"></i>
+                </button>
+              </form>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+          {% else %}
+          <div class="text-center py-4 text-muted">
+            <i class="bi bi-rocket-takeoff-fill fs-2 mb-2 d-block opacity-40"></i>
+            <p class="small mb-2">尚無任務提議</p>
+            <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#proposalModal">
+              提議任務！
+            </button>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% else %}
+      <div class="modern-card flex-grow-1 border-0 bg-light d-flex align-items-center justify-content-center text-muted">
+        <div class="text-center p-4">
+          <i class="bi bi-slash-circle fs-1 mb-2"></i>
+          <p class="mb-0">群組已取消，無法安排任務。</p>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Right column: chat -->
+    <div class="col-lg-8">
+      <div class="modern-card h-100">
+        <div class="card-header-clean d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-chat-dots me-2 text-primary"></i> 群組對話</span>
+          <span id="pollIndicator" class="text-success small" style="display:none!important;">
+            <i class="bi bi-circle-fill" style="font-size:.5rem;vertical-align:middle;"></i> 即時更新中
+          </span>
+        </div>
+
+        <div class="chat-container" id="messageBox">
+          {% for msg in messages %}
+          {% set is_me = (msg.sender_id == current_user.id) %}
+          {% if msg.is_system_notification %}
+          <div class="text-center my-3">
+            <span class="badge bg-light text-muted fw-normal border px-3 py-2">{{ msg.content }}</span>
+          </div>
+          {% else %}
+          <div class="chat-bubble {{ 'msg-outgoing' if is_me else 'msg-incoming' }}">
+            {% if not is_me %}
+            <div class="fw-bold small mb-1">{{ msg.sender.proper_name }}</div>
+            {% endif %}
+            {{ msg.content }}
+            <span class="msg-time">{{ msg.timestamp.strftime('%Y-%m-%d %H:%M') }}</span>
+          </div>
+          {% endif %}
+          {% endfor %}
+        </div>
+
+        <div class="p-3 border-top bg-white">
+          {% if group.is_cancelled %}
+          <div class="alert alert-secondary mb-0 text-center py-2">
+            <i class="bi bi-lock-fill me-2"></i>群組已取消，對話功能關閉。
+          </div>
+          {% else %}
+          <div class="input-group" id="chatInputGroup">
+            <input type="text" id="chatInput" class="form-control border-0 bg-light"
+              placeholder="輸入訊息..." style="padding:12px;">
+            <button class="btn btn-primary px-4" id="chatSendBtn">
+              <i class="bi bi-send-fill"></i>
+            </button>
+          </div>
+          <div id="chatError" class="text-danger small mt-1" style="display:none;">
+            <i class="bi bi-exclamation-circle me-1"></i>傳送失敗，請稍後再試。
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Proposal modal -->
+{% if not group.is_cancelled %}
+<div class="modal fade" id="proposalModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">任務排程 🕵️</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form action="{{ url_for('dashboard_bp.group_submit_proposal', group_id=group.id) }}" method="POST">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">餐廳/地點</label>
+            <input type="text" name="restaurant" class="form-control" placeholder="例：北車饗食天堂" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">日期/時間</label>
+            <input type="datetime-local" name="date_time" class="form-control" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary">提出任務</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<script>
+  const messageBox = document.getElementById('messageBox');
+  const chatInput  = document.getElementById('chatInput');
+  const chatSendBtn = document.getElementById('chatSendBtn');
+  const chatError  = document.getElementById('chatError');
+  const pollIndicator = document.getElementById('pollIndicator');
+  const submitUrl = "{{ url_for('dashboard_bp.group_send_message', group_id=group.id) }}";
+  const pollUrl   = "{{ url_for('dashboard_bp.group_get_messages', group_id=group.id) }}";
+
+  let lastMsgId = {{ messages[-1].id if messages else 0 }};
+
+  function scrollToBottom() { messageBox.scrollTop = messageBox.scrollHeight; }
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function appendMessage(msg) {
+    let el = document.createElement('div');
+    if (msg.is_system_notification) {
+      el.className = 'text-center my-3';
+      el.innerHTML = `<span class="badge bg-light text-muted fw-normal border px-3 py-2">${escapeHtml(msg.content)}</span>`;
+    } else {
+      el.className = `chat-bubble ${msg.is_me ? 'msg-outgoing' : 'msg-incoming'}`;
+      let inner = '';
+      if (!msg.is_me) inner += `<div class="fw-bold small mb-1">${escapeHtml(msg.sender_name)}</div>`;
+      inner += escapeHtml(msg.content);
+      inner += `<span class="msg-time">${escapeHtml(msg.timestamp)}</span>`;
+      el.innerHTML = inner;
+    }
+    messageBox.appendChild(el);
+    if (msg.id > lastMsgId) lastMsgId = msg.id;
+  }
+
+  async function sendMessage() {
+    const content = chatInput.value.trim();
+    if (!content) return;
+    chatInput.value = '';
+    chatSendBtn.disabled = true;
+    chatError.style.display = 'none';
+    try {
+      const res = await fetch(submitUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      });
+      if (res.ok) {
+        const msg = await res.json();
+        appendMessage(msg);
+        scrollToBottom();
+      } else {
+        chatInput.value = content;
+        chatError.style.display = 'block';
+      }
+    } catch (e) {
+      chatInput.value = content;
+      chatError.style.display = 'block';
+    } finally {
+      chatSendBtn.disabled = false;
+      chatInput.focus();
+    }
+  }
+
+  async function pollMessages() {
+    try {
+      const res = await fetch(`${pollUrl}?after_id=${lastMsgId}`);
+      if (res.ok) {
+        const msgs = await res.json();
+        msgs.forEach(msg => {
+          if (!msg.is_me) appendMessage(msg);
+          else if (msg.id > lastMsgId) lastMsgId = msg.id;
+        });
+        if (msgs.length > 0) scrollToBottom();
+      }
+    } catch (e) {}
+  }
+
+  if (chatSendBtn) {
+    chatSendBtn.addEventListener('click', sendMessage);
+    chatInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    });
+    chatInput.addEventListener('input', () => { chatError.style.display = 'none'; });
+    pollIndicator.style.setProperty('display', 'inline-flex', 'important');
+    setInterval(pollMessages, 5000);
+  }
+
+  scrollToBottom();
+</script>
+{% endblock %}

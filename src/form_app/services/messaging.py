@@ -8,7 +8,10 @@ from sqlalchemy.orm import joinedload
 
 from form_app.config import settings
 from form_app.extensions import line_bot_helper
-from form_app.models import DateProposal, Matching, Member, Message
+from form_app.models import (
+    DateProposal, Matching, Member, Message,
+    GroupMatching, GroupMessage, GroupDateProposal,
+)
 
 APP_URL = settings.APP_URL
 
@@ -167,6 +170,92 @@ def collect_new_match_texts(session):
     return updates
 
 
+def collect_new_group_match_texts(session):
+    updates = defaultdict(list)
+    new_groups = (
+        session.query(GroupMatching)
+        .filter(GroupMatching.is_notified.is_(False))
+        .all()
+    )
+    for group in new_groups:
+        partner_names = ', '.join(m.proper_name for m in group.members)
+        for member in group.members:
+            others = [m.proper_name for m in group.members if m.id != member.id]
+            text = (
+                f"🎉 您有一個新的群組配對！\n\n"
+                f"代號：{group.cool_name}\n"
+                f"成員：{'、'.join(others)}\n\n"
+                f"👇 進入群組對話：\n{APP_URL}/dashboard/group/{group.id}"
+            )
+            updates[member.id].append(text)
+        group.is_notified = True
+    return updates
+
+
+def collect_group_message_texts(session):
+    updates = defaultdict(list)
+    unnotified = (
+        session.query(GroupMessage)
+        .filter(GroupMessage.is_notified.is_not(True))
+        .options(joinedload(GroupMessage.group), joinedload(GroupMessage.sender))
+        .all()
+    )
+    by_group = defaultdict(list)
+    for msg in unnotified:
+        by_group[msg.group_id].append(msg)
+
+    for group_id, msgs in by_group.items():
+        group = msgs[0].group
+        sender_ids = {m.sender_id for m in msgs}
+        for member in group.members:
+            if member.id in sender_ids:
+                continue
+            count = len(msgs)
+            if count <= 3:
+                lines = "\n".join(
+                    f"  {m.sender.proper_name}: {_trim(m.content)}" for m in msgs
+                )
+                text = (
+                    f"📩 群組 {group.cool_name} — {count} 則未讀\n"
+                    f"{lines}\n\n"
+                    f"🔗 馬上回覆: {APP_URL}/dashboard/group/{group_id}"
+                )
+            else:
+                text = (
+                    f"📩 群組 {group.cool_name} — 您有 {count} 則未讀訊息\n\n"
+                    f"🔗 馬上回覆: {APP_URL}/dashboard/group/{group_id}"
+                )
+            updates[member.id].append(text)
+        for msg in msgs:
+            msg.is_notified = True
+    return updates
+
+
+def collect_group_proposal_texts(session):
+    updates = defaultdict(list)
+    proposals = (
+        session.query(GroupDateProposal)
+        .filter(
+            GroupDateProposal.is_notified.is_not(True),
+            GroupDateProposal.is_deleted.is_(False),
+        )
+        .options(joinedload(GroupDateProposal.group), joinedload(GroupDateProposal.proposer))
+        .all()
+    )
+    for proposal in proposals:
+        group = proposal.group
+        date_str = proposal.proposed_datetime.strftime('%m/%d %H:%M')
+        text = (
+            f"📅 群組 {group.cool_name}\n\n"
+            f"{proposal.proposer.proper_name} 提議在 {date_str} 前往「{proposal.restaurant_name}」！\n\n"
+            f"🔗 查看詳情: {APP_URL}/dashboard/group/{group.id}"
+        )
+        for member in group.members:
+            updates[member.id].append(text)
+        proposal.is_notified = True
+    return updates
+
+
 def process_all_notifications(session):
     # 1. Initialize Aggregator
     # This will hold all messages for all users: { user_id: [msg1, msg2] }
@@ -191,6 +280,18 @@ def process_all_notifications(session):
 
     date_confirmed_updates = collect_confirmed_date_proposal_texts(session)
     for uid, texts in date_confirmed_updates.items():
+        all_notifications[uid].extend(texts)
+
+    group_match_updates = collect_new_group_match_texts(session)
+    for uid, texts in group_match_updates.items():
+        all_notifications[uid].extend(texts)
+
+    group_msg_updates = collect_group_message_texts(session)
+    for uid, texts in group_msg_updates.items():
+        all_notifications[uid].extend(texts)
+
+    group_proposal_updates = collect_group_proposal_texts(session)
+    for uid, texts in group_proposal_updates.items():
         all_notifications[uid].extend(texts)
 
     # If nothing to do, exit
