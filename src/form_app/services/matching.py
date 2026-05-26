@@ -53,6 +53,18 @@ def generate_weekly_matches(users, session: Session):
                 if prev is None or dt > prev:
                     last_match_date[uid] = dt
 
+    # Members with a current ACTIVE matching must not receive a new draft pair
+    active_rows = session.query(
+        Matching.subject_id, Matching.object_id
+    ).filter(
+        Matching.status == MatchingStatus.ACTIVE,
+        or_(
+            Matching.subject_id.in_(user_ids),
+            Matching.object_id.in_(user_ids),
+        )
+    ).all()
+    active_member_ids: set[int] = {uid for sub, obj in active_rows for uid in (sub, obj)}
+
     today = date.today()
     weeks_unmatched: dict[int, int] = {
         uid: (9999 if last_match_date[uid] is None
@@ -85,6 +97,8 @@ def generate_weekly_matches(users, session: Session):
     G = nx.Graph()
     for male in male_users:
         for female in female_users:
+            if male.id in active_member_ids or female.id in active_member_ids:
+                continue
             if (male.id, female.id) in historical_pairs:
                 continue
             s_mf = score_map.get((male.id, female.id), 0)
@@ -93,8 +107,8 @@ def generate_weekly_matches(users, session: Session):
                 continue
             w_m = weeks_unmatched[male.id]
             w_f = weeks_unmatched[female.id]
-            if w_m < 1 or w_f < 1:
-                continue  # either side matched recently — skip this cycle
+            if w_m < 1 and w_f < 1:
+                continue  # both matched recently — skip this cycle
             combined = (s_mf + s_fm) / 2
             weight = combined + (w_m + w_f) * 10
             G.add_edge(f'm_{male.id}', f'f_{female.id}', weight=weight)
