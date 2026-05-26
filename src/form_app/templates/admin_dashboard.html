@@ -220,8 +220,9 @@
             </button>
           </form>
           <form method="POST" action="{{ url_for('admin_bp.approve_all_drafts') }}"
-            onsubmit="return confirm('確認全部配對並立即發送 LINE 通知給所有會員？')">
-            <button type="submit" class="btn btn-sm btn-success">
+            id="approve-all-form"
+            onsubmit="return confirmAndLockApprove(this)">
+            <button type="submit" id="approve-all-btn" class="btn btn-sm btn-success">
               <i class="bi bi-check-all"></i> 確認全部並發送通知
             </button>
           </form>
@@ -1104,6 +1105,19 @@ function copyInviteLink() {
     btn.innerHTML = '<i class="bi bi-check"></i> 已複製';
     setTimeout(() => { btn.innerHTML = '<i class="bi bi-clipboard"></i> 複製'; }, 2000);
   });
+}
+
+function confirmAndLockApprove(form) {
+  if (!confirm('確認全部配對並立即發送 LINE 通知給所有會員？')) return false;
+
+  const btn = document.getElementById('approve-all-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> 發送中，請稍候…';
+
+  // Disable sibling buttons so nothing else can be clicked while processing
+  form.closest('.d-flex').querySelectorAll('button').forEach(b => { b.disabled = true; });
+
+  return true;
 }
 </script>
 {% endblock %}
