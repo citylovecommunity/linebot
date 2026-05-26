@@ -53,11 +53,17 @@ def generate_weekly_matches(users, session: Session):
                 if prev is None or dt > prev:
                     last_match_date[uid] = dt
 
-    # Members with a current ACTIVE matching must not receive a new draft pair
+    # Members whose ACTIVE matching was created within the last 7 days should
+    # not be re-drafted in the same cycle.  Old stale ACTIVE rows (matchings
+    # that were never explicitly completed) are intentionally ignored here so
+    # they don't block the eligible pool.
+    from datetime import timedelta
+    one_week_ago = date.today() - timedelta(days=7)
     active_rows = session.query(
         Matching.subject_id, Matching.object_id
     ).filter(
         Matching.status == MatchingStatus.ACTIVE,
+        Matching.created_at >= one_week_ago,
         or_(
             Matching.subject_id.in_(user_ids),
             Matching.object_id.in_(user_ids),
