@@ -90,9 +90,6 @@ def _diagnose_unmatched(eligible_pool, draft_matchings, all_matchings, session):
     """
     from sqlalchemy import or_, and_
 
-    if not draft_matchings:
-        return []
-
     draft_matched_ids = set()
     for dm in draft_matchings:
         draft_matched_ids.add(dm.subject_id)
@@ -200,7 +197,8 @@ def _diagnose_unmatched(eligible_pool, draft_matchings, all_matchings, session):
 def admin_dashboard():
     cache = _get_redis()
     has_flash = bool(flask_session.get('_flashes'))
-    if not has_flash and cache:
+    bypass_cache = request.args.get('generated') == '1'
+    if not has_flash and not bypass_cache and cache:
         cached = cache.get(_DASHBOARD_CACHE_KEY)
         if cached:
             return cached
@@ -405,8 +403,6 @@ def drafts_diagnosis():
     draft_matchings = session.query(Matching).filter(
         Matching.status == MatchingStatus.DRAFT
     ).all()
-    if not draft_matchings:
-        return '', 204
 
     all_matchings = session.query(Matching).filter(
         Matching.status != MatchingStatus.DRAFT
@@ -449,6 +445,7 @@ def drafts_diagnosis():
         no_candidate_users=no_candidate_users,
         no_candidate_candidates=no_candidate_candidates,
         weeks_unmatched_by_id=weeks_unmatched_by_id,
+        draft_count=len(draft_matchings),
     )
 
 

@@ -54,12 +54,7 @@ def task_match_all_users():
 
     eligible_members = get_eligible_matching_pool(session)
 
-    # Re-scoring is expensive (O(M×F) pairs). For draft generation, reuse
-    # existing UserMatchScore rows unless the caller explicitly requests a rescore.
-    # Direct live runs always rescore so they pick up any profile changes.
-    force_rescore = request.args.get('force_rescore', 'false').lower() == 'true'
-    if not save_as_draft or force_rescore:
-        run_matching_score_optimized(eligible_members, session)
+    run_matching_score_optimized(eligible_members, session)
 
     process_matches_bulk(eligible_members, session, is_draft=save_as_draft)
     session.commit()

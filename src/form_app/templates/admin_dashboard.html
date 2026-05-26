@@ -247,18 +247,17 @@
         標紅的配對存在硬排除條件（如年齡、飲食、宗教等），請在發送通知前人工確認是否刪除。
       </p>
 
-      {% if not draft_matchings %}
+      {% set generated = request.args.get('generated') == '1' %}
+      {% if not draft_matchings and not generated %}
       <div class="text-center py-5 text-muted">
         <i class="bi bi-inbox fs-1"></i>
         <p class="mt-2">目前沒有草稿配對。點選右上角「生成草稿配對」來預覽本週配對結果。</p>
       </div>
       {% else %}
       <div id="diagnosis-panel">
-        {% if draft_matchings %}
         <div class="text-muted small py-2">
           <span class="spinner-border spinner-border-sm me-1"></span>分析配對狀態…
         </div>
-        {% endif %}
       </div>
       <p class="text-muted small mb-2">
         <i class="bi bi-clock me-1"></i>
@@ -741,11 +740,17 @@
   }
 
   // ── 草稿診斷（lazy load） ──
-  {% if draft_matchings %}
+  {% if draft_matchings or request.args.get('generated') == '1' %}
   fetch('{{ url_for("admin_bp.drafts_diagnosis") }}')
-    .then(r => r.status === 204 ? '' : r.text())
-    .then(html => { if (html) document.getElementById('diagnosis-panel').innerHTML = html; })
-    .catch(() => { document.getElementById('diagnosis-panel').innerHTML = ''; });
+    .then(r => r.text())
+    .then(html => {
+      const panel = document.getElementById('diagnosis-panel');
+      if (panel) panel.innerHTML = html || '';
+    })
+    .catch(() => {
+      const panel = document.getElementById('diagnosis-panel');
+      if (panel) panel.innerHTML = '';
+    });
   {% endif %}
 
   // Keep ?tab= in sync so refresh lands on the tab the user is actually on.
@@ -829,7 +834,7 @@
         headers: { 'X-Task-Secret': '{{ config.get("TASK_SECRET", "") }}' }
       }).then(r => r.text().then(t => {
         sessionStorage.removeItem('draftGenerating');
-        if (r.ok) { window.location.href = window.location.pathname + '?tab=drafts'; }
+        if (r.ok) { window.location.href = window.location.pathname + '?tab=drafts&generated=1'; }
         else { alert('執行失敗：' + t); btn.disabled = false; btn.innerHTML = '<i class="bi bi-eye"></i> 生成草稿配對'; }
       })).catch(() => {
         sessionStorage.removeItem('draftGenerating');
