@@ -855,6 +855,36 @@
       if (panel) panel.innerHTML = '';
     });
 
+  // ── 診斷面板：無法配對會員的手動選擇器 ──
+  // These functions are defined here (not in the AJAX partial) because script
+  // tags inside innerHTML are silently ignored by browsers.
+  function toggleDiagPicker(uid) {
+    const picker = document.getElementById('diag-picker-' + uid);
+    if (picker) picker.style.display = picker.style.display === 'none' ? '' : 'none';
+  }
+
+  function diagSelectCard(uid, candidateId) {
+    const container = document.getElementById('diag-cards-' + uid);
+    const selClass = container.dataset.selClass;
+    container.querySelectorAll('.member-pick-card').forEach(c => {
+      c.classList.remove('selected-m', 'selected-f');
+    });
+    const card = container.querySelector('[data-id="' + candidateId + '"]');
+    if (card) {
+      card.classList.add(selClass);
+      document.getElementById('diag-sel-name-' + uid).textContent = card.dataset.name + ' 已選取';
+    }
+    document.getElementById('diag-obj-' + uid).value = candidateId;
+    document.getElementById('diag-submit-' + uid).disabled = false;
+  }
+
+  function filterDiagCards(input, containerId) {
+    const q = input.value.toLowerCase();
+    document.querySelectorAll('#' + containerId + ' .member-pick-card').forEach(card => {
+      card.style.display = q && !card.dataset.name.toLowerCase().includes(q) ? 'none' : '';
+    });
+  }
+
   // Keep ?tab= in sync so refresh lands on the tab the user is actually on.
   document.querySelectorAll('[data-bs-toggle="tab"]').forEach(tabEl => {
     tabEl.addEventListener('shown.bs.tab', function(e) {
