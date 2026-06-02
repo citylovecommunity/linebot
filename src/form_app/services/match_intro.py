@@ -31,7 +31,7 @@ def _shared_reasons(v: UserProfileAdapter, p: UserProfileAdapter) -> list[str]:
 
     if (v.pref_min_height and p.height and p.height >= v.pref_min_height
             and not any('身高' in r for r in reasons)):
-        reasons.append("對方身高符合你的偏好")
+        reasons.append("對方身高是你喜歡的類型")
 
     return reasons
 

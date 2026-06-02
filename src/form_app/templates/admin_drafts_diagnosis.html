@@ -1,4 +1,4 @@
-{% if draft_count == 0 %}
+{% if draft_count == 0 and not no_candidate_users %}
 <div class="alert alert-warning py-2 mb-3">
   <i class="bi bi-exclamation-circle me-1"></i>
   算法未能生成任何配對。可能原因：合格會員分數尚未計算，或所有超過一週未配對的會員均已無可匹配對象。

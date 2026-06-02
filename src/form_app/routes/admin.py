@@ -361,6 +361,13 @@ def admin_dashboard():
         for r in _draft_score_rows:
             breakdowns_by_pair[f"{r.source_user_id}:{r.target_user_id}"] = r.breakdown or {}
 
+    # Lightweight JSONB extract for job — avoids removing the user_info defer.
+    from sqlalchemy import text as _sql_text
+    _job_rows = session.execute(
+        _sql_text("SELECT id, user_info->>'會員之職業類別' FROM member")
+    ).all()
+    job_by_id = {r[0]: (r[1] or '') for r in _job_rows}
+
     # Diagnosis (no_candidate_users / unmatched_with_reasons) is deferred to
     # /admin/drafts/diagnosis and loaded via AJAX after the page renders.
     unmatched_with_reasons = []
@@ -395,6 +402,7 @@ def admin_dashboard():
         no_candidate_candidates={m.id: candidates for m, _, candidates in unmatched_with_reasons},
         weeks_unmatched_by_id=weeks_unmatched_by_id,
         group_matchings=all_group_matchings,
+        job_by_id=job_by_id,
     )
     if cache and not has_flash:
         cache.setex(_DASHBOARD_CACHE_KEY, _DASHBOARD_CACHE_TTL, response)

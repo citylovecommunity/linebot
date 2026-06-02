@@ -4,6 +4,33 @@
 
 {% block extra_css %}
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
+<style>
+  .member-pick-list {
+    max-height: 240px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: .375rem;
+  }
+  .member-pick-card {
+    padding: 6px 10px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+  }
+  .member-pick-card:last-child { border-bottom: none; }
+  .member-pick-card:hover { background: #f8f9fa; }
+  .member-pick-card.selected-m { background: #e8f0ff; border-left: 3px solid #0d6efd; }
+  .member-pick-card.selected-f { background: #fff0f7; border-left: 3px solid #d63384; }
+  .member-pick-divider {
+    padding: 4px 10px;
+    font-size: .75rem;
+    color: #6c757d;
+    background: #f8f9fa;
+    border-top: 1px solid #dee2e6;
+  }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -254,17 +281,17 @@
       </p>
 
       {% set generated = request.args.get('generated') == '1' %}
+      <div id="diagnosis-panel">
+        <div class="text-muted small py-2">
+          <span class="spinner-border spinner-border-sm me-1"></span>分析配對狀態…
+        </div>
+      </div>
       {% if not draft_matchings and not generated %}
       <div class="text-center py-5 text-muted">
         <i class="bi bi-inbox fs-1"></i>
         <p class="mt-2">目前沒有草稿配對。點選右上角「生成草稿配對」來預覽本週配對結果。</p>
       </div>
       {% else %}
-      <div id="diagnosis-panel">
-        <div class="text-muted small py-2">
-          <span class="spinner-border spinner-border-sm me-1"></span>分析配對狀態…
-        </div>
-      </div>
       <p class="text-muted small mb-2">
         <i class="bi bi-clock me-1"></i>
         配對清單生成時間：<strong>{{ draft_matchings[0].created_at.strftime('%Y-%m-%d %H:%M') }}</strong>
@@ -816,8 +843,7 @@
     if (tabEl) new bootstrap.Tab(tabEl).show();
   }
 
-  // ── 草稿診斷（lazy load） ──
-  {% if draft_matchings or request.args.get('generated') == '1' %}
+  // ── 草稿診斷（lazy load，永遠執行以顯示無法配對會員） ──
   fetch('{{ url_for("admin_bp.drafts_diagnosis") }}')
     .then(r => r.text())
     .then(html => {
@@ -828,7 +854,6 @@
       const panel = document.getElementById('diagnosis-panel');
       if (panel) panel.innerHTML = '';
     });
-  {% endif %}
 
   // Keep ?tab= in sync so refresh lands on the tab the user is actually on.
   document.querySelectorAll('[data-bs-toggle="tab"]').forEach(tabEl => {
@@ -928,8 +953,10 @@
     {% for m in members %}
     {% if m.is_member_active and not m.is_test %}
     { id: {{ m.id }}, name: {{ m.name | tojson }}, gender: {{ m.gender | tojson }},
-      age: {% if m.birthday %}{{ 2026 - m.birthday.year }}{% else %}null{% endif %},
-      height: {{ m.height or 'null' }} },
+      age: {% if m.birthday %}{{ today.year - m.birthday.year }}{% else %}null{% endif %},
+      height: {{ m.height or 'null' }},
+      marital: {{ (m.marital_status or '') | tojson }},
+      job: {{ (job_by_id.get(m.id, '') or '') | tojson }} },
     {% endif %}
     {% endfor %}
   ];
@@ -944,27 +971,52 @@
     {% endfor %}
   };
 
-  // excludeFromWarning: current draft's member ids (don't show ⚠ for themselves)
-  // historicalPartnersOf: hide members who were already paired with this id
-  function buildMemberOptions(list, selectedId, historicalPartnersOf = null) {
+  function buildPickCards(list, selectedId, historicalPartnersOf, containerId, gender) {
     const historical = historicalPartnersOf ? (historicalPartners[historicalPartnersOf] || new Set()) : new Set();
+    const selClass = gender === 'M' ? 'selected-m' : 'selected-f';
+    const container = document.getElementById(containerId);
     let hiddenCount = 0;
-    const options = list.map(m => {
-      if (m.id !== selectedId && historical.has(m.id)) { hiddenCount++; return ''; }
-      const info = [m.age ? m.age + '歲' : null, m.height ? m.height + 'cm' : null].filter(Boolean).join('·');
-      const label = m.name + (info ? ' (' + info + ')' : '');
-      return `<option value="${m.id}" ${m.id === selectedId ? 'selected' : ''}>${label}</option>`;
-    }).join('');
-    const note = hiddenCount > 0
-      ? `<option disabled>── 已隱藏 ${hiddenCount} 位曾配對過的會員 ──</option>`
-      : '';
-    return options + note;
+    let html = '';
+    list.forEach(m => {
+      const isPrev = m.id !== selectedId && historical.has(m.id);
+      if (isPrev) { hiddenCount++; return; }
+      const parts = [];
+      if (m.age)     parts.push(m.age + '歲');
+      if (m.height)  parts.push(m.height + 'cm');
+      if (m.marital) parts.push(m.marital);
+      if (m.job)     parts.push(m.job);
+      const info = parts.join(' · ');
+      const isSel = m.id === selectedId;
+      html += `<div class="member-pick-card${isSel ? ' ' + selClass : ''}"
+        data-id="${m.id}" data-name="${m.name}"
+        onclick="selectPickCard(${m.id}, '${m.name}', '${gender}', '${containerId}')">
+        <span class="fw-semibold">${m.name}</span>
+        <span class="text-muted small ms-2">${info}</span>
+      </div>`;
+    });
+    if (hiddenCount > 0) {
+      html += `<div class="member-pick-divider">已隱藏 ${hiddenCount} 位曾配對過的會員</div>`;
+    }
+    container.innerHTML = html;
+    const sel = container.querySelector('.' + selClass);
+    if (sel) sel.scrollIntoView({ block: 'nearest' });
   }
 
-  function filterSelect(inputEl, selectEl) {
+  function selectPickCard(memberId, memberName, gender, containerId) {
+    const hiddenEl = document.getElementById(gender === 'M' ? 'edit-male-id' : 'edit-female-id');
+    const selClass = gender === 'M' ? 'selected-m' : 'selected-f';
+    document.querySelectorAll('#' + containerId + ' .member-pick-card').forEach(c => {
+      c.classList.remove('selected-m', 'selected-f');
+    });
+    const card = document.querySelector('#' + containerId + ' [data-id="' + memberId + '"]');
+    if (card) card.classList.add(selClass);
+    hiddenEl.value = memberId;
+  }
+
+  function filterPickCards(inputEl, containerId) {
     const q = inputEl.value.toLowerCase();
-    Array.from(selectEl.options).forEach(opt => {
-      opt.hidden = q && !opt.textContent.toLowerCase().includes(q);
+    document.querySelectorAll('#' + containerId + ' .member-pick-card').forEach(card => {
+      card.style.display = q && !card.dataset.name.toLowerCase().includes(q) ? 'none' : '';
     });
   }
 
@@ -973,14 +1025,12 @@
     editDraftAction = `/admin/matchings/${matchingId}/edit-draft`;
     document.getElementById('edit-draft-form').action = editDraftAction;
     document.getElementById('edit-cool-name').value = coolName;
+    document.getElementById('edit-male-id').value   = maleId;
+    document.getElementById('edit-female-id').value = femaleId;
 
-    const maleSelect   = document.getElementById('edit-male-select');
-    const femaleSelect = document.getElementById('edit-female-select');
-    // Hide females already paired with this male (and vice versa).
-    maleSelect.innerHTML   = buildMemberOptions(males,   maleId,   femaleId);
-    femaleSelect.innerHTML = buildMemberOptions(females, femaleId, maleId);
+    buildPickCards(males,   maleId,   femaleId, 'edit-male-list',   'M');
+    buildPickCards(females, femaleId, maleId,   'edit-female-list', 'F');
 
-    // Clear search boxes
     document.getElementById('edit-male-search').value   = '';
     document.getElementById('edit-female-search').value = '';
 
@@ -1139,10 +1189,11 @@
               <label class="form-label fw-semibold text-primary">
                 <i class="bi bi-gender-male"></i> 男生
               </label>
+              <input type="hidden" name="male_id" id="edit-male-id">
               <input type="text" class="form-control form-control-sm mb-1" id="edit-male-search"
                 placeholder="搜尋姓名…"
-                oninput="filterSelect(this, document.getElementById('edit-male-select'))">
-              <select name="male_id" id="edit-male-select" class="form-select" size="6"></select>
+                oninput="filterPickCards(this, 'edit-male-list')">
+              <div id="edit-male-list" class="member-pick-list"></div>
             </div>
 
             <!-- Female -->
@@ -1150,10 +1201,11 @@
               <label class="form-label fw-semibold text-danger">
                 <i class="bi bi-gender-female"></i> 女生
               </label>
+              <input type="hidden" name="female_id" id="edit-female-id">
               <input type="text" class="form-control form-control-sm mb-1" id="edit-female-search"
                 placeholder="搜尋姓名…"
-                oninput="filterSelect(this, document.getElementById('edit-female-select'))">
-              <select name="female_id" id="edit-female-select" class="form-select" size="6"></select>
+                oninput="filterPickCards(this, 'edit-female-list')">
+              <div id="edit-female-list" class="member-pick-list"></div>
             </div>
 
             <!-- Cool name -->
