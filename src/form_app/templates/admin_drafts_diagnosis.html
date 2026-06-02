@@ -14,41 +14,106 @@
     {% for u in no_candidate_users %}
     {% set w = weeks_unmatched_by_id.get(u.id) %}
     {% set candidates = no_candidate_candidates.get(u.id, []) %}
-    <div class="d-flex align-items-center gap-2 flex-wrap py-2 {% if not loop.last %}border-bottom{% endif %}">
-      <div style="min-width:120px">
-        <span class="fw-semibold">{{ u.name }}</span>
-        <span class="text-muted small ms-1">{{ '男' if u.gender == 'M' else '女' }}</span>
-        <div>
-          {% if w is none %}<span class="badge bg-secondary">從未配對</span>
-          {% else %}<span class="badge bg-danger">{{ w }}w 未配對</span>{% endif %}
+    {% set cand_sel_class = 'selected-f' if u.gender == 'M' else 'selected-m' %}
+    <div class="py-2 {% if not loop.last %}border-bottom{% endif %}">
+
+      <!-- User info + action buttons row -->
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <div style="min-width:120px">
+          <span class="fw-semibold">{{ u.name }}</span>
+          <span class="text-muted small ms-1">{{ '男' if u.gender == 'M' else '女' }}</span>
+          <div>
+            {% if w is none %}<span class="badge bg-secondary">從未配對</span>
+            {% else %}<span class="badge bg-danger">{{ w }}w 未配對</span>{% endif %}
+          </div>
         </div>
-      </div>
-      <button type="button" class="btn btn-sm btn-outline-secondary"
-        onclick="showMemberInfo({{ u.id }})"><i class="bi bi-person-lines-fill me-1"></i>會員資料</button>
-      <button type="button" class="btn btn-sm btn-outline-secondary"
-        onclick="showMatchHistory({{ u.id }}, '{{ u.name }}')">查看配對記錄</button>
-      {% if candidates %}
-      <form method="POST" action="{{ url_for('admin_bp.create_draft_pair') }}"
-            class="d-flex gap-1 align-items-center"
-            onsubmit="return confirm('確定要手動建立此草稿配對嗎？')">
-        <input type="hidden" name="subject_id" value="{{ u.id }}">
-        <select name="object_id" class="form-select form-select-sm" style="min-width:160px" required>
-          <option value="">選擇對象…</option>
-          {% for candidate, score in candidates %}
-          <option value="{{ candidate.id }}">
-            {{ candidate.name }}{% if score %} ({{ score|int }}){% endif %}
-          </option>
-          {% endfor %}
-        </select>
-        <button type="submit" class="btn btn-sm btn-danger text-nowrap">
-          <i class="bi bi-plus-circle me-1"></i>手動配對
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+          onclick="showMemberInfo({{ u.id }})"><i class="bi bi-person-lines-fill me-1"></i>會員資料</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+          onclick="showMatchHistory({{ u.id }}, '{{ u.name }}')">查看配對記錄</button>
+        {% if candidates %}
+        <button type="button" class="btn btn-sm btn-outline-danger"
+          onclick="toggleDiagPicker({{ u.id }})">
+          <i class="bi bi-person-plus me-1"></i>選擇配對對象
         </button>
-      </form>
-      {% else %}
-      <span class="text-muted small">無可選對象</span>
+        {% else %}
+        <span class="text-muted small">無可選對象</span>
+        {% endif %}
+      </div>
+
+      <!-- Card picker (collapsed by default) -->
+      {% if candidates %}
+      <div id="diag-picker-{{ u.id }}" class="mt-2" style="display:none">
+        <input type="text" class="form-control form-control-sm mb-1"
+          placeholder="搜尋姓名…"
+          oninput="filterDiagCards(this, 'diag-cards-{{ u.id }}')">
+        <div id="diag-cards-{{ u.id }}" class="member-pick-list"
+             data-sel-class="{{ cand_sel_class }}" style="max-height:200px">
+          {% for candidate, score in candidates %}
+          {% set age = today_year - candidate.birthday.year if candidate.birthday else none %}
+          {% set job = (candidate.user_info or {}).get('會員之職業類別', '') %}
+          <div class="member-pick-card"
+               data-id="{{ candidate.id }}"
+               data-name="{{ candidate.name }}"
+               onclick="diagSelectCard({{ u.id }}, {{ candidate.id }})">
+            <div class="flex-grow-1">
+              <span class="fw-semibold">{{ candidate.name }}</span>
+              <span class="text-muted small ms-2">
+                {%- if age %}{{ age }}歲{% endif %}
+                {%- if candidate.height %} · {{ candidate.height }}cm{% endif %}
+                {%- if candidate.marital_status %} · {{ candidate.marital_status }}{% endif %}
+                {%- if job %} · {{ job }}{% endif %}
+              </span>
+            </div>
+            {% if score %}<span class="badge bg-secondary ms-2">{{ score|int }}</span>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        <form method="POST" action="{{ url_for('admin_bp.create_draft_pair') }}"
+              class="mt-2 d-flex gap-2 align-items-center"
+              onsubmit="return confirm('確定要手動建立此草稿配對嗎？')">
+          <input type="hidden" name="subject_id" value="{{ u.id }}">
+          <input type="hidden" name="object_id" id="diag-obj-{{ u.id }}" value="">
+          <button type="submit" class="btn btn-sm btn-danger"
+                  id="diag-submit-{{ u.id }}" disabled>
+            <i class="bi bi-plus-circle me-1"></i>手動配對
+          </button>
+          <span id="diag-sel-name-{{ u.id }}" class="text-muted small"></span>
+        </form>
+      </div>
       {% endif %}
+
     </div>
     {% endfor %}
   </div>
 </div>
 {% endif %}
+
+<script>
+function toggleDiagPicker(uid) {
+  const picker = document.getElementById('diag-picker-' + uid);
+  if (picker) picker.style.display = picker.style.display === 'none' ? '' : 'none';
+}
+
+function diagSelectCard(uid, candidateId) {
+  const container = document.getElementById('diag-cards-' + uid);
+  const selClass = container.dataset.selClass;
+  container.querySelectorAll('.member-pick-card').forEach(c => {
+    c.classList.remove('selected-m', 'selected-f');
+  });
+  const card = container.querySelector('[data-id="' + candidateId + '"]');
+  if (card) {
+    card.classList.add(selClass);
+    document.getElementById('diag-sel-name-' + uid).textContent = card.dataset.name + ' 已選取';
+  }
+  document.getElementById('diag-obj-' + uid).value = candidateId;
+  document.getElementById('diag-submit-' + uid).disabled = false;
+}
+
+function filterDiagCards(input, containerId) {
+  const q = input.value.toLowerCase();
+  document.querySelectorAll('#' + containerId + ' .member-pick-card').forEach(card => {
+    card.style.display = q && !card.dataset.name.toLowerCase().includes(q) ? 'none' : '';
+  });
+}
+</script>

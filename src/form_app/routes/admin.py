@@ -440,7 +440,7 @@ def drafts_diagnosis():
         for uid, dt in weeks_unmatched_by_id.items()
     }
 
-    eligible_pool = get_eligible_matching_pool(session, defer_user_info=True)
+    eligible_pool = get_eligible_matching_pool(session, defer_user_info=False)
 
     unmatched_with_reasons = _diagnose_unmatched(
         eligible_pool, draft_matchings, all_matchings, session
@@ -465,6 +465,7 @@ def drafts_diagnosis():
         no_candidate_candidates=no_candidate_candidates,
         weeks_unmatched_by_id=weeks_unmatched_by_id,
         draft_count=len(draft_matchings),
+        today_year=_today.year,
     )
 
 
