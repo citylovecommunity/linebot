@@ -113,14 +113,14 @@
         </div>
 
         <div class="btn-group btn-group-sm" role="group">
-          <button class="btn btn-outline-secondary" onclick="setFilter('status','all',this)">全部</button>
-          <button class="btn btn-outline-success active" onclick="setFilter('status','active',this)">啟用中</button>
+          <button class="btn btn-outline-secondary active" onclick="setFilter('status','all',this)">全部</button>
+          <button class="btn btn-outline-success" onclick="setFilter('status','active',this)">啟用中</button>
           <button class="btn btn-outline-secondary" onclick="setFilter('status','inactive',this)">已停用</button>
         </div>
 
         <div class="btn-group btn-group-sm" role="group">
-          <button class="btn btn-outline-secondary" onclick="setFilter('eligible','all',this)">全部</button>
-          <button class="btn btn-outline-success active" onclick="setFilter('eligible','ready',this)">合格</button>
+          <button class="btn btn-outline-secondary active" onclick="setFilter('eligible','all',this)">全部</button>
+          <button class="btn btn-outline-success" onclick="setFilter('eligible','ready',this)">合格</button>
           <button class="btn btn-outline-danger" onclick="setFilter('eligible','not-ready',this)">不合格</button>
         </div>
 
@@ -529,12 +529,10 @@
               </td>
               <td class="small">{{ g.created_at.strftime('%Y-%m-%d') }}</td>
               <td>
-                {% if current_user.is_developer %}
                 <a href="{{ url_for('dashboard_bp.group_detail', group_id=g.id) }}"
                   class="btn btn-sm btn-outline-secondary me-1" target="_blank">
                   <i class="bi bi-chat-dots"></i>
                 </a>
-                {% endif %}
                 {% if g.status.value == 'ACTIVE' %}
                 <form method="POST"
                   action="{{ url_for('admin_bp.cancel_group', group_id=g.id) }}"
@@ -783,7 +781,7 @@
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
 <script>
   // ── 會員篩選與排序 ──
-  const filters = { gender: 'all', status: 'active', eligible: 'ready', expiry: 'all' };
+  const filters = { gender: 'all', status: 'all', eligible: 'all', expiry: 'all' };
   let sortCol = null, sortAsc = true;
 
   function setFilter(key, val, btn) {
@@ -1161,8 +1159,8 @@
             <label class="form-label fw-semibold">男性成員 1</label>
             <select name="male_ids" class="form-select" required>
               <option value="">請選擇…</option>
-              {% for m in members %}{% if m.gender == 'M' and m.is_member_active and not m.is_test %}
-              <option value="{{ m.id }}">{{ m.name }}</option>
+              {% for m in members %}{% if m.gender == 'M' %}
+              <option value="{{ m.id }}">{{ m.name }}{% if m.is_test %} [測試]{% endif %}</option>
               {% endif %}{% endfor %}
             </select>
           </div>
@@ -1170,8 +1168,8 @@
             <label class="form-label fw-semibold">男性成員 2</label>
             <select name="male_ids" class="form-select" required>
               <option value="">請選擇…</option>
-              {% for m in members %}{% if m.gender == 'M' and m.is_member_active and not m.is_test %}
-              <option value="{{ m.id }}">{{ m.name }}</option>
+              {% for m in members %}{% if m.gender == 'M' %}
+              <option value="{{ m.id }}">{{ m.name }}{% if m.is_test %} [測試]{% endif %}</option>
               {% endif %}{% endfor %}
             </select>
           </div>
@@ -1179,8 +1177,8 @@
             <label class="form-label fw-semibold">女性成員 1</label>
             <select name="female_ids" class="form-select" required>
               <option value="">請選擇…</option>
-              {% for m in members %}{% if m.gender == 'F' and m.is_member_active and not m.is_test %}
-              <option value="{{ m.id }}">{{ m.name }}</option>
+              {% for m in members %}{% if m.gender == 'F' %}
+              <option value="{{ m.id }}">{{ m.name }}{% if m.is_test %} [測試]{% endif %}</option>
               {% endif %}{% endfor %}
             </select>
           </div>
@@ -1188,8 +1186,8 @@
             <label class="form-label fw-semibold">女性成員 2</label>
             <select name="female_ids" class="form-select" required>
               <option value="">請選擇…</option>
-              {% for m in members %}{% if m.gender == 'F' and m.is_member_active and not m.is_test %}
-              <option value="{{ m.id }}">{{ m.name }}</option>
+              {% for m in members %}{% if m.gender == 'F' %}
+              <option value="{{ m.id }}">{{ m.name }}{% if m.is_test %} [測試]{% endif %}</option>
               {% endif %}{% endfor %}
             </select>
           </div>
