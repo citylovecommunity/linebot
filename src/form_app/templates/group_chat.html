@@ -1,200 +1,437 @@
-{% set zh_months = {
-1: '一月', 2: '二月', 3: '三月', 4: '四月',
-5: '五月', 6: '六月', 7: '七月', 8: '八月',
-9: '九月', 10: '十月', 11: '十一月', 12: '十二月'
-} %}
-
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container py-5">
-  <div class="row g-4">
+<div class="container-fluid py-4 px-3 px-lg-4" style="max-width:1200px;">
 
-    <!-- Left column: group info + proposals -->
-    <div class="col-lg-4 d-flex flex-column">
+  <!-- Back button (mobile) -->
+  <a href="{{ url_for('dashboard_bp.dashboard') }}"
+     class="d-inline-flex align-items-center gap-1 text-muted text-decoration-none small mb-3">
+    <i class="bi bi-chevron-left"></i> 返回主頁
+  </a>
 
-      <!-- Group info card -->
-      <div class="card border-0 shadow-sm rounded-4 mb-4">
-        <div class="card-body p-4 text-center">
-          <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3 py-1 fw-normal mb-3 d-inline-block">
-            <i class="bi bi-people-fill me-1"></i> 群組配對
-          </span>
+  <div class="row g-3 align-items-start">
 
-          <!-- Member avatars -->
-          <div class="d-flex justify-content-center gap-2 mb-3">
-            {% for member in group.members %}
-            <div class="d-flex flex-column align-items-center">
-              <div class="rounded-circle d-flex align-items-center justify-content-center shadow-sm text-white fw-bold"
-                style="width:44px;height:44px;font-size:1.1rem;
-                  background: linear-gradient(135deg,
-                    {{ '#667eea' if member.gender == 'M' else '#f093fb' }} 0%,
-                    {{ '#764ba2' if member.gender == 'M' else '#f5576c' }} 100%);
-                  {{ 'border:2px solid #0d6efd;' if member.id == current_user.id else '' }}">
-                {{ member.name[0] }}
-              </div>
-              <div class="small text-muted mt-1" style="font-size:.7rem;">{{ member.proper_name }}</div>
-            </div>
-            {% endfor %}
-          </div>
+    {# ─────────────────── LEFT COLUMN ─────────────────── #}
+    <div class="col-lg-4 d-flex flex-column gap-3">
 
-          <div class="location-tag small text-muted mb-1">
-            <i class="bi bi-hash text-warning opacity-75 fw-bold"></i>
-            {{ group.cool_name }}
-          </div>
-          <p class="text-muted small mb-3">建立於 {{ group.created_at.strftime('%Y-%m-%d') }}</p>
+      {# ── Group header card ── #}
+      <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4">
 
-          {% if group.is_cancelled %}
-          <span class="badge bg-secondary">已取消</span>
-          {% else %}
-          <!-- intro links -->
-          <div class="border-top pt-3">
-            <div class="text-muted small mb-2 fw-semibold">成員介紹卡</div>
-            {% for member in group.members %}
-            {% if member.id != current_user.id and member.introduction_link %}
-            <a href="{{ member.introduction_link }}" target="_blank"
-              class="text-decoration-none text-primary small d-block mb-1">
-              {{ member.proper_name }} <i class="bi bi-box-arrow-up-right ms-1"></i>
-            </a>
+          {# Status + days badge row #}
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            {% if group.is_active %}
+              <span class="badge rounded-pill bg-light text-success fw-normal px-3 py-2 border border-success border-opacity-25">
+                <i class="bi bi-circle-fill me-1" style="font-size:.4rem;vertical-align:middle;"></i> 進行中
+              </span>
+            {% elif group.is_feedback %}
+              <span class="badge rounded-pill bg-warning bg-opacity-15 text-warning fw-normal px-3 py-2">
+                <i class="bi bi-star-fill me-1" style="font-size:.65rem;vertical-align:middle;"></i> 評分中
+              </span>
+            {% elif group.is_closed %}
+              <span class="badge rounded-pill bg-secondary bg-opacity-15 text-secondary fw-normal px-3 py-2">
+                <i class="bi bi-archive me-1"></i> 已封存
+              </span>
+            {% else %}
+              <span class="badge rounded-pill bg-secondary bg-opacity-15 text-secondary fw-normal px-3 py-2">
+                已取消
+              </span>
             {% endif %}
-            {% endfor %}
-          </div>
-          {% endif %}
-        </div>
-      </div>
 
-      <!-- Proposals panel -->
-      {% if not group.is_cancelled %}
-      <div class="modern-card flex-grow-1">
-        <div class="card-header-clean d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-calendar-event me-2 text-primary"></i> 任務提議</span>
-          <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#proposalModal">
-            <i class="bi bi-plus-lg"></i> 提議
-          </button>
-        </div>
-        <div class="card-body">
-          {% if proposals %}
-          {% for p in proposals %}
-          <div class="border rounded-3 p-3 mb-2 {% if loop.last %}mb-0{% endif %}">
-            <div class="d-flex justify-content-between align-items-start">
-              <div>
-                <div class="fw-semibold small">{{ p.restaurant_name }}</div>
-                <div class="text-muted small">
-                  <i class="bi bi-clock me-1"></i>
-                  {{ p.proposed_datetime.strftime('%Y-%m-%d %H:%M') }}
-                </div>
-                <div class="text-muted small mt-1">
-                  提議人：{{ p.proposer.proper_name }}
-                </div>
-              </div>
-              {% if p.proposer_id == current_user.id %}
-              <form method="POST"
-                action="{{ url_for('dashboard_bp.group_delete_proposal', group_id=group.id, proposal_id=p.id) }}"
-                onsubmit="return confirm('確定刪除此提議？')">
-                <button type="submit" class="btn btn-sm btn-outline-danger">
-                  <i class="bi bi-trash3"></i>
-                </button>
-              </form>
+            <div class="d-flex align-items-center gap-2">
+              {% if group.region %}
+                <span class="badge bg-light text-muted border small">📍 {{ group.region }}</span>
+              {% endif %}
+              {% if days_remaining is not none %}
+                {% if days_remaining <= 3 %}
+                  <span class="badge bg-danger bg-opacity-10 text-danger small">剩 {{ days_remaining }} 天</span>
+                {% else %}
+                  <span class="badge bg-light text-muted border small">剩 {{ days_remaining }} 天</span>
+                {% endif %}
               {% endif %}
             </div>
           </div>
-          {% endfor %}
-          {% else %}
-          <div class="text-center py-4 text-muted">
-            <i class="bi bi-rocket-takeoff-fill fs-2 mb-2 d-block opacity-40"></i>
-            <p class="small mb-2">尚無任務提議</p>
-            <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#proposalModal">
-              提議任務！
+
+          {# Cool name #}
+          <h5 class="fw-bold text-center mb-4" style="letter-spacing:.5px;">
+            ✨ {{ group.cool_name }}
+          </h5>
+
+          {# Member session avatar cards #}
+          <div class="d-flex flex-wrap justify-content-center gap-3">
+            {% for member in group.members %}
+              {% set gm = memberships_by_id.get(member.id) %}
+              <div class="d-flex flex-column align-items-center" style="min-width:64px;">
+                {# Avatar circle with emoji #}
+                <div class="position-relative mb-1">
+                  <div class="rounded-circle d-flex align-items-center justify-content-center shadow-sm"
+                       style="width:56px;height:56px;font-size:1.8rem;
+                         background:{{ '#e8f0ff' if member.gender == 'M' else '#fce8ff' }};
+                         {{ 'border:2.5px solid #0d6efd;' if member.id == current_user.id else 'border:2px solid #dee2e6;' }}">
+                    {{ gm.session_avatar if gm and gm.session_avatar else ('🧑' if member.gender == 'M' else '👩') }}
+                  </div>
+                  {% if member.id == current_user.id %}
+                    <span class="position-absolute bottom-0 end-0 badge rounded-pill bg-primary"
+                          style="font-size:.55rem;padding:2px 5px;">你</span>
+                  {% endif %}
+                </div>
+
+                {# Name + intro link #}
+                <div class="text-center" style="font-size:.72rem;max-width:64px;">
+                  <div class="fw-semibold text-truncate">{{ member.name }}</div>
+                  {% if member.id != current_user.id and member.introduction_link %}
+                    <a href="{{ member.introduction_link }}" target="_blank"
+                       class="text-primary text-decoration-none" title="查看介紹卡"
+                       style="font-size:.65rem;">
+                      介紹卡 <i class="bi bi-box-arrow-up-right"></i>
+                    </a>
+                  {% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+
+          {# Community guidelines tiny button #}
+          <div class="text-center mt-3">
+            <button class="btn btn-link text-muted p-0" style="font-size:.68rem;"
+                    data-bs-toggle="modal" data-bs-target="#guidelinesModal">
+              <i class="bi bi-shield-check me-1"></i>社群規範
             </button>
           </div>
-          {% endif %}
-        </div>
-      </div>
-      {% else %}
-      <div class="modern-card flex-grow-1 border-0 bg-light d-flex align-items-center justify-content-center text-muted">
-        <div class="text-center p-4">
-          <i class="bi bi-slash-circle fs-1 mb-2"></i>
-          <p class="mb-0">群組已取消，無法安排任務。</p>
-        </div>
-      </div>
-      {% endif %}
-    </div>
 
-    <!-- Right column: chat -->
+        </div>
+      </div>
+
+      {# ── Pinned board (transforms by phase) ── #}
+      {% if group.is_cancelled %}
+        <div class="card border-0 bg-light rounded-4 text-center p-4 text-muted">
+          <i class="bi bi-slash-circle fs-2 mb-2 opacity-40"></i>
+          <p class="mb-0 small">群組已取消</p>
+        </div>
+
+      {% elif group.is_closed %}
+        <div class="card border-0 rounded-4 shadow-sm">
+          <div class="card-body p-4">
+            <div class="text-center mb-3">
+              <div class="fs-2 mb-1">🌸</div>
+              <p class="fw-semibold mb-0">這局同行已圓滿結束</p>
+              <p class="text-muted small">感謝你的參與，期待下次再出發！</p>
+            </div>
+
+            {# My session result #}
+            {% if my_membership and my_membership.final_label %}
+              {% set fl = my_membership.final_label.value %}
+              <div class="rounded-3 p-3 mb-3 text-center"
+                   style="background:{% if fl == 'PERFECT' %}#f0fff4{% elif fl == 'GHOST' %}#f8f8f8{% else %}#fff8f0{% endif %};">
+                <div class="small text-muted mb-1">你的本局評分</div>
+                {% if fl == 'PERFECT' %}
+                  <span class="fw-bold text-success">✅ 完美出席</span>
+                {% elif fl == 'GHOST' %}
+                  <span class="fw-bold text-secondary">👻 本局未互動</span>
+                {% else %}
+                  <span class="fw-bold text-warning">⚠️ 未出席</span>
+                {% endif %}
+              </div>
+            {% endif %}
+
+            {# Received badges (anonymous counts) #}
+            {% set my_badges = received_badges.get(current_user.id, {}) %}
+            {% if my_badges %}
+              <div class="small text-muted mb-2 text-center">夥伴們送給你的祝福 ✨</div>
+              {% set badge_display = [
+                ('GOOD_CHAT',  '💬', '很有話聊'),
+                ('PUNCTUAL',   '🌟', '準時好旅伴'),
+                ('CARING',     '🍯', '貼心暖洋洋'),
+                ('FUNNY',      '🎭', '氣氛擔當'),
+              ] %}
+              <div class="d-flex flex-wrap gap-2 justify-content-center">
+                {% for bkey, bemoji, blabel in badge_display %}
+                  {% set cnt = my_badges.get(bkey, 0) %}
+                  {% if cnt > 0 %}
+                    <span class="badge rounded-pill px-3 py-2 fw-normal"
+                          style="background:#f0f2f5;color:#333;font-size:.8rem;">
+                      {{ bemoji }} {{ blabel }}
+                      <span class="ms-1 text-muted">×{{ cnt }}</span>
+                    </span>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+      {% elif group.is_feedback %}
+        {# Phase 4: Badge form #}
+        {% if badge_submitted %}
+          <div class="card border-0 rounded-4 shadow-sm">
+            <div class="card-body p-4 text-center">
+              <div class="fs-2 mb-2">🎉</div>
+              <p class="fw-semibold">祝福卡片已送出！</p>
+              <p class="text-muted small">感謝你的真誠回饋，數據將在結算後統一公開。</p>
+            </div>
+          </div>
+        {% else %}
+          <div class="card border-0 rounded-4 shadow-sm">
+            <div class="card-body p-3">
+              <div class="text-center mb-3">
+                <div class="fs-4">💬</div>
+                <p class="fw-semibold mb-1 small">這趟同行結束囉！</p>
+                <p class="text-muted" style="font-size:.75rem;">夥伴們是不是超棒？送個溫暖的問候與勳章吧！✨</p>
+              </div>
+              <form method="POST" action="{{ url_for('dashboard_bp.group_badge_submit', group_id=group.id) }}">
+                {% for member in group.members %}
+                  {% if member.id != current_user.id %}
+                    {% set gm = memberships_by_id.get(member.id) %}
+                    <div class="border rounded-3 p-3 mb-2">
+                      <div class="d-flex align-items-center gap-2 mb-2">
+                        <span style="font-size:1.4rem;">{{ gm.session_avatar if gm and gm.session_avatar else '👤' }}</span>
+                        <span class="fw-semibold small">{{ member.proper_name }}</span>
+                      </div>
+                      {% set badges = [
+                        ('good_chat',  '💬 很有話聊'),
+                        ('punctual',   '🌟 準時好旅伴'),
+                        ('caring',     '🍯 貼心暖洋洋'),
+                        ('funny',      '🎭 氣氛擔當'),
+                        ('no_show',    '☕ 這次好可惜沒能見到你'),
+                      ] %}
+                      {% for badge_key, badge_label in badges %}
+                        <div class="form-check form-check-sm">
+                          <input class="form-check-input" type="checkbox"
+                                 name="badge_{{ member.id }}_{{ badge_key }}" value="on"
+                                 id="badge_{{ member.id }}_{{ badge_key }}">
+                          <label class="form-check-label small" for="badge_{{ member.id }}_{{ badge_key }}">
+                            {{ badge_label }}
+                          </label>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                {% endfor %}
+                <button type="submit" class="btn btn-primary w-100 mt-2">
+                  🔘 送出我的祝福卡片！
+                </button>
+              </form>
+            </div>
+          </div>
+        {% endif %}
+
+      {% elif group.has_summary %}
+        {# Phase 2: 行程表 board #}
+        <div class="card border-0 rounded-4 shadow-sm">
+          <div class="card-body p-4">
+            <div class="d-flex align-items-center gap-2 mb-3">
+              <span class="fs-5">📌</span>
+              <span class="fw-bold">行程確定了！</span>
+            </div>
+            <div class="rounded-3 p-3 mb-3" style="background:#f8f9ff;">
+              <div class="d-flex align-items-start gap-2 mb-2">
+                <span>📍</span>
+                <div>
+                  <div class="text-muted" style="font-size:.7rem;">集合地點</div>
+                  <div class="fw-semibold small">{{ group.meet_location }}</div>
+                </div>
+              </div>
+              <div class="d-flex align-items-start gap-2 mb-2">
+                <span>📅</span>
+                <div>
+                  <div class="text-muted" style="font-size:.7rem;">見面時間</div>
+                  <div class="fw-semibold small">{{ group.meet_time.strftime('%Y/%m/%d %H:%M') }}</div>
+                </div>
+              </div>
+              {% if group.meet_notes %}
+                <div class="d-flex align-items-start gap-2">
+                  <span>💬</span>
+                  <div>
+                    <div class="text-muted" style="font-size:.7rem;">備註</div>
+                    <div class="small text-muted">{{ group.meet_notes }}</div>
+                  </div>
+                </div>
+              {% endif %}
+            </div>
+
+            {# Wish button #}
+            <button id="wishBtn" class="btn w-100 fw-semibold py-2"
+                    style="background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:12px;"
+                    {% if my_membership.clicked_wish_button %}disabled{% endif %}
+                    onclick="handleWish(event)">
+              {% if my_membership.clicked_wish_button %}
+                ✅ 已牽成這個願望
+              {% else %}
+                ☕ 牽成這個願望，一起出發吧！
+              {% endif %}
+            </button>
+            {% if my_membership.clicked_wish_button %}
+              <p class="text-center text-muted mt-1" style="font-size:.7rem;">同行指數 +1 已累計</p>
+            {% endif %}
+          </div>
+        </div>
+
+      {% else %}
+        {# Phase 1: Opening text board #}
+        <div class="card border-0 rounded-4 shadow-sm">
+          <div class="card-body p-4">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span>🎯</span>
+              <span class="fw-bold small">Citylove 同行小看板 🏃</span>
+            </div>
+            <div class="rounded-3 p-3 mb-3" style="background:#f8fff8;font-size:.82rem;line-height:1.7;">
+              {% set opener_name = group.opener.name if group.opener else '夥伴' %}
+              恭喜 {{ group.members|length }} 人局成團！這局的麥克風我們優先交給
+              <strong>{{ opener_name }}</strong>
+              開球，拋個你想完成的事、想去的地方或美食吧！✨
+              <br><br>
+              如果 {{ opener_name }} 正在忙著拯救世界，大家也別客氣，直接自由敲杯、暢所欲言！
+              喬好時間地點後，任何一人按下 <strong>📌 幫大家做個總結</strong> 鎖定行程就能拿積分唷！🌱
+              <br><br>
+              期待相見！🙌
+            </div>
+            <p class="text-center text-muted mb-0" style="font-size:.72rem;">
+              ⬇️ 在下方聊天室自由發言，隨時按「幫大家做個總結」鎖定行程
+            </p>
+          </div>
+        </div>
+      {% endif %}
+
+    </div>
+    {# ──────────────── END LEFT COLUMN ──────────────── #}
+
+
+    {# ─────────────────── RIGHT COLUMN: CHAT ─────────────────── #}
     <div class="col-lg-8">
-      <div class="modern-card h-100">
-        <div class="card-header-clean d-flex justify-content-between align-items-center">
-          <span><i class="bi bi-chat-dots me-2 text-primary"></i> 群組對話</span>
+      <div class="card border-0 shadow-sm rounded-4 d-flex flex-column"
+           style="height:82vh;min-height:500px;">
+
+        {# Chat header #}
+        <div class="card-header bg-white border-0 rounded-top-4 px-4 py-3
+                    d-flex justify-content-between align-items-center">
+          <span class="fw-semibold">
+            <i class="bi bi-chat-dots me-2 text-primary"></i>群組對話
+          </span>
           <span id="pollIndicator" class="text-success small" style="display:none!important;">
-            <i class="bi bi-circle-fill" style="font-size:.5rem;vertical-align:middle;"></i> 即時更新中
+            <i class="bi bi-circle-fill" style="font-size:.4rem;vertical-align:middle;"></i> 即時更新中
           </span>
         </div>
 
-        <div class="chat-container" id="messageBox">
+        {# Message area #}
+        <div class="flex-grow-1 overflow-auto px-3 py-2" id="messageBox"
+             style="scroll-behavior:smooth;">
           {% for msg in messages %}
-          {% set is_me = (msg.sender_id == current_user.id) %}
-          {% if msg.is_system_notification %}
-          <div class="text-center my-3">
-            <span class="badge bg-light text-muted fw-normal border px-3 py-2">{{ msg.content }}</span>
-          </div>
-          {% else %}
-          <div class="chat-bubble {{ 'msg-outgoing' if is_me else 'msg-incoming' }}">
-            {% if not is_me %}
-            <div class="fw-bold small mb-1">{{ msg.sender.proper_name }}</div>
+            {% set is_me = (msg.sender_id == current_user.id) %}
+            {% set gm = memberships_by_id.get(msg.sender_id) %}
+            {% if msg.is_system_notification %}
+              <div class="text-center my-3">
+                <span class="badge bg-light text-muted fw-normal border px-3 py-2"
+                      style="white-space:pre-wrap;text-align:left;display:inline-block;max-width:320px;">{{ msg.content }}</span>
+              </div>
+            {% else %}
+              <div class="d-flex {{ 'justify-content-end' if is_me else 'justify-content-start' }} mb-2">
+                {% if not is_me %}
+                  <div class="rounded-circle d-flex align-items-center justify-content-center me-2 flex-shrink-0"
+                       style="width:32px;height:32px;font-size:1.1rem;
+                         background:{{ '#e8f0ff' if msg.sender.gender == 'M' else '#fce8ff' }};
+                         border:1.5px solid #dee2e6;align-self:flex-end;">
+                    {{ gm.session_avatar if gm and gm.session_avatar else msg.sender.name[0] }}
+                  </div>
+                {% endif %}
+                <div style="max-width:70%;">
+                  {% if not is_me %}
+                    <div class="fw-semibold mb-1" style="font-size:.72rem;color:#888;">
+                      {{ msg.sender.proper_name }}
+                    </div>
+                  {% endif %}
+                  <div class="px-3 py-2 rounded-3"
+                       style="{{ 'background:#0d6efd;color:#fff;border-radius:18px 18px 4px 18px;' if is_me else 'background:#f0f2f5;border-radius:18px 18px 18px 4px;' }}">
+                    <span style="font-size:.9rem;">{{ msg.content }}</span>
+                    <div class="mt-1" style="font-size:.65rem;opacity:.65;">
+                      {{ msg.timestamp.strftime('%H:%M') }}
+                    </div>
+                  </div>
+                </div>
+              </div>
             {% endif %}
-            {{ msg.content }}
-            <span class="msg-time">{{ msg.timestamp.strftime('%Y-%m-%d %H:%M') }}</span>
-          </div>
-          {% endif %}
           {% endfor %}
         </div>
 
-        <div class="p-3 border-top bg-white">
-          {% if group.is_cancelled %}
-          <div class="alert alert-secondary mb-0 text-center py-2">
-            <i class="bi bi-lock-fill me-2"></i>群組已取消，對話功能關閉。
-          </div>
+        {# Bottom input area #}
+        <div class="border-top bg-white rounded-bottom-4 p-3">
+          {% if group.is_cancelled or group.is_closed %}
+            <div class="text-center text-muted py-2 small">
+              <i class="bi bi-lock me-1"></i>
+              {{ '群組已取消，對話功能關閉。' if group.is_cancelled else '此局已封存，對話僅供查閱。' }}
+            </div>
+          {% elif group.is_feedback %}
+            <div class="text-center text-muted py-2 small">
+              <i class="bi bi-star me-1 text-warning"></i>
+              請在左側填寫祝福卡片，完成本局結算。
+            </div>
           {% else %}
-          <div class="input-group" id="chatInputGroup">
-            <input type="text" id="chatInput" class="form-control border-0 bg-light"
-              placeholder="輸入訊息..." style="padding:12px;">
-            <button class="btn btn-primary px-4" id="chatSendBtn">
-              <i class="bi bi-send-fill"></i>
+            {# Active: input + summary button #}
+            <div class="input-group mb-2" id="chatInputGroup">
+              <input type="text" id="chatInput" class="form-control border-0 bg-light"
+                     placeholder="輸入訊息…" style="padding:10px 14px;border-radius:12px 0 0 12px;">
+              <button class="btn btn-primary px-4" id="chatSendBtn" style="border-radius:0 12px 12px 0;">
+                <i class="bi bi-send-fill"></i>
+              </button>
+            </div>
+            <div id="chatError" class="text-danger small mb-1" style="display:none;">
+              <i class="bi bi-exclamation-circle me-1"></i>傳送失敗，請稍後再試。
+            </div>
+            <button class="btn btn-outline-secondary w-100 py-2"
+                    style="border-radius:10px;font-size:.85rem;"
+                    data-bs-toggle="modal" data-bs-target="#summaryModal">
+              📌 幫大家做個總結
             </button>
-          </div>
-          <div id="chatError" class="text-danger small mt-1" style="display:none;">
-            <i class="bi bi-exclamation-circle me-1"></i>傳送失敗，請稍後再試。
-          </div>
           {% endif %}
         </div>
+
       </div>
     </div>
+    {# ───────────────── END RIGHT COLUMN ───────────────── #}
 
   </div>
 </div>
 
-<!-- Proposal modal -->
-{% if not group.is_cancelled %}
-<div class="modal fade" id="proposalModal" tabindex="-1">
+
+{# ══════════ MODALS ══════════ #}
+
+{# Summary modal #}
+{% if group.is_active %}
+<div class="modal fade" id="summaryModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">任務排程 🕵️</h5>
+    <div class="modal-content rounded-4 border-0 shadow">
+      <div class="modal-header border-0 pb-1">
+        <h5 class="modal-title fw-bold">📌 幫大家做個總結</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <form action="{{ url_for('dashboard_bp.group_submit_proposal', group_id=group.id) }}" method="POST">
-        <div class="modal-body">
+      <form action="{{ url_for('dashboard_bp.group_summary', group_id=group.id) }}" method="POST">
+        <div class="modal-body pt-2">
+          {% if group.has_summary %}
+            <div class="alert alert-info py-2 small">
+              <i class="bi bi-info-circle me-1"></i>已有行程——送出後會覆蓋舊的總結。
+            </div>
+          {% endif %}
           <div class="mb-3">
-            <label class="form-label">餐廳/地點</label>
-            <input type="text" name="restaurant" class="form-control" placeholder="例：北車饗食天堂" required>
+            <label class="form-label small fw-semibold">📍 集合地點</label>
+            <input type="text" name="location" class="form-control"
+                   placeholder="請輸入見面地點"
+                   value="{{ group.meet_location or '' }}" required>
           </div>
           <div class="mb-3">
-            <label class="form-label">日期/時間</label>
-            <input type="datetime-local" name="date_time" class="form-control" required>
+            <label class="form-label small fw-semibold">📅 見面時間</label>
+            <input type="datetime-local" name="meet_time" class="form-control"
+                   value="{{ group.meet_time.strftime('%Y-%m-%dT%H:%M') if group.meet_time else '' }}"
+                   required>
+          </div>
+          <div class="mb-1">
+            <label class="form-label small fw-semibold">💬 備註小提醒（選填）</label>
+            <input type="text" name="notes" class="form-control"
+                   placeholder="例如：記得帶雨傘唷！"
+                   value="{{ group.meet_notes or '' }}">
           </div>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-          <button type="submit" class="btn btn-primary">提出任務</button>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary px-4">確認送出</button>
         </div>
       </form>
     </div>
@@ -202,36 +439,83 @@
 </div>
 {% endif %}
 
+{# Community guidelines modal #}
+<div class="modal fade" id="guidelinesModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content rounded-4 border-0 shadow">
+      <div class="modal-header border-0 pb-1">
+        <h6 class="modal-title fw-bold">
+          <i class="bi bi-shield-check text-primary me-1"></i>Citylove 社群規範
+        </h6>
+        <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="font-size:.82rem;line-height:1.7;">
+        <p>🌟 <strong>尊重每位夥伴</strong> — 以友善、尊重的方式交流，不得有任何歧視、騷擾或冒犯言論。</p>
+        <p>📍 <strong>誠實赴約</strong> — 答應出席請準時到場；有突發狀況請提前告知夥伴。</p>
+        <p>🔒 <strong>保護個人資訊</strong> — 請勿在群組內分享他人電話、住址等私人資料。</p>
+        <p>🤝 <strong>友善互動</strong> — 本平台以輕鬆同行為主，請勿進行商業推廣或散布不實訊息。</p>
+        <p class="mb-0">💬 <strong>積極參與</strong> — 積極互動是讓大家都有美好體驗的關鍵！</p>
+        <hr class="my-2">
+        <p class="mb-0 text-muted" style="font-size:.73rem;">違反規範可能導致帳號暫停或永久停權。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+{# ══════════ SCRIPTS ══════════ #}
 <script>
-  const messageBox = document.getElementById('messageBox');
-  const chatInput  = document.getElementById('chatInput');
-  const chatSendBtn = document.getElementById('chatSendBtn');
-  const chatError  = document.getElementById('chatError');
+(function () {
+  const GROUP_ID     = {{ group.id }};
+  const messageBox   = document.getElementById('messageBox');
+  const chatInput    = document.getElementById('chatInput');
+  const chatSendBtn  = document.getElementById('chatSendBtn');
+  const chatError    = document.getElementById('chatError');
   const pollIndicator = document.getElementById('pollIndicator');
+  const isActive     = {{ 'true' if group.is_active else 'false' }};
+
   const submitUrl = "{{ url_for('dashboard_bp.group_send_message', group_id=group.id) }}";
   const pollUrl   = "{{ url_for('dashboard_bp.group_get_messages', group_id=group.id) }}";
+  const wishUrl   = "{{ url_for('dashboard_bp.group_wish', group_id=group.id) }}";
 
   let lastMsgId = {{ messages[-1].id if messages else 0 }};
 
-  function scrollToBottom() { messageBox.scrollTop = messageBox.scrollHeight; }
+  function scrollToBottom() {
+    messageBox.scrollTop = messageBox.scrollHeight;
+  }
 
-  function escapeHtml(str) {
+  function esc(str) {
     return String(str)
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
   function appendMessage(msg) {
-    let el = document.createElement('div');
+    const el = document.createElement('div');
     if (msg.is_system_notification) {
       el.className = 'text-center my-3';
-      el.innerHTML = `<span class="badge bg-light text-muted fw-normal border px-3 py-2">${escapeHtml(msg.content)}</span>`;
+      el.innerHTML = `<span class="badge bg-light text-muted fw-normal border px-3 py-2"
+        style="white-space:pre-wrap;text-align:left;display:inline-block;max-width:320px;">${esc(msg.content)}</span>`;
     } else {
-      el.className = `chat-bubble ${msg.is_me ? 'msg-outgoing' : 'msg-incoming'}`;
-      let inner = '';
-      if (!msg.is_me) inner += `<div class="fw-bold small mb-1">${escapeHtml(msg.sender_name)}</div>`;
-      inner += escapeHtml(msg.content);
-      inner += `<span class="msg-time">${escapeHtml(msg.timestamp)}</span>`;
-      el.innerHTML = inner;
+      const isMe = msg.is_me;
+      el.className = `d-flex ${isMe ? 'justify-content-end' : 'justify-content-start'} mb-2`;
+      const avatar = msg.sender_avatar || (isMe ? '' : msg.sender_name[0]);
+      const avatarHtml = isMe ? '' : `
+        <div class="rounded-circle d-flex align-items-center justify-content-center me-2 flex-shrink-0"
+             style="width:32px;height:32px;font-size:1.1rem;background:#f0f2f5;
+                    border:1.5px solid #dee2e6;align-self:flex-end;">
+          ${esc(avatar)}
+        </div>`;
+      const nameHtml = isMe ? '' : `<div class="fw-semibold mb-1" style="font-size:.72rem;color:#888;">${esc(msg.sender_name)}</div>`;
+      const bubbleStyle = isMe
+        ? 'background:#0d6efd;color:#fff;border-radius:18px 18px 4px 18px;'
+        : 'background:#f0f2f5;border-radius:18px 18px 18px 4px;';
+      el.innerHTML = `${avatarHtml}<div style="max-width:70%;">
+        ${nameHtml}
+        <div class="px-3 py-2 rounded-3" style="${bubbleStyle}">
+          <span style="font-size:.9rem;">${esc(msg.content)}</span>
+          <div class="mt-1" style="font-size:.65rem;opacity:.65;">${esc(msg.timestamp.slice(11,16))}</div>
+        </div></div>`;
     }
     messageBox.appendChild(el);
     if (msg.id > lastMsgId) lastMsgId = msg.id;
@@ -242,7 +526,7 @@
     if (!content) return;
     chatInput.value = '';
     chatSendBtn.disabled = true;
-    chatError.style.display = 'none';
+    if (chatError) chatError.style.display = 'none';
     try {
       const res = await fetch(submitUrl, {
         method: 'POST',
@@ -255,14 +539,14 @@
         scrollToBottom();
       } else {
         chatInput.value = content;
-        chatError.style.display = 'block';
+        if (chatError) chatError.style.display = 'block';
       }
-    } catch (e) {
+    } catch {
       chatInput.value = content;
-      chatError.style.display = 'block';
+      if (chatError) chatError.style.display = 'block';
     } finally {
       chatSendBtn.disabled = false;
-      chatInput.focus();
+      chatInput && chatInput.focus();
     }
   }
 
@@ -271,25 +555,39 @@
       const res = await fetch(`${pollUrl}?after_id=${lastMsgId}`);
       if (res.ok) {
         const msgs = await res.json();
-        msgs.forEach(msg => {
-          if (!msg.is_me) appendMessage(msg);
-          else if (msg.id > lastMsgId) lastMsgId = msg.id;
-        });
+        msgs.forEach(msg => { if (!msg.is_me) appendMessage(msg); else if (msg.id > lastMsgId) lastMsgId = msg.id; });
         if (msgs.length > 0) scrollToBottom();
       }
-    } catch (e) {}
+    } catch {}
   }
 
-  if (chatSendBtn) {
+  if (isActive && chatSendBtn) {
     chatSendBtn.addEventListener('click', sendMessage);
-    chatInput.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-    });
-    chatInput.addEventListener('input', () => { chatError.style.display = 'none'; });
-    pollIndicator.style.setProperty('display', 'inline-flex', 'important');
+    chatInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
+    if (chatError) chatInput.addEventListener('input', () => { chatError.style.display = 'none'; });
+    if (pollIndicator) pollIndicator.style.setProperty('display', 'inline-flex', 'important');
     setInterval(pollMessages, 5000);
   }
 
   scrollToBottom();
+
+  // ── Wish button ──────────────────────────────────────
+  window.handleWish = async function (e) {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    try {
+      const res = await fetch(wishUrl, { method: 'POST', headers: { 'X-CSRFToken': '' } });
+      const data = await res.json();
+      if (data.success || data.already_clicked) {
+        btn.textContent = '✅ 已牽成這個願望';
+        btn.classList.add('opacity-75');
+        const hint = btn.nextElementSibling;
+        if (hint) hint.style.display = 'block';
+      }
+    } catch {
+      btn.disabled = false;
+    }
+  };
+})();
 </script>
 {% endblock %}
