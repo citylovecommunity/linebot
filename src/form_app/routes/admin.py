@@ -35,9 +35,10 @@ def _invalidate_dashboard_cache():
         r.delete(_DASHBOARD_CACHE_KEY)
 
 from form_app.models import (
-    Invite, Member, Matching, MatchingStatus, UserMatchScore,
+    ActivityLabel, Invite, Member, Matching, MatchingStatus, UserMatchScore,
     DateProposal, ProposalStatus, Line_Info,
-    GroupMatching, GroupMatchingStatus, GroupMessage, GroupDateProposal, group_members,
+    GroupMatching, GroupMatchingStatus, GroupMembership, GroupMessage, GroupDateProposal,
+    assign_session_avatars,
 )
 from collections import defaultdict
 from form_app.decorators import admin_required, developer_required
@@ -579,6 +580,25 @@ def edit_user(user_id):
         if current_user.is_developer:
             user.is_developer = 'is_developer' in request.form
 
+        # Companion score / activity label
+        activity_label_val = request.form.get('activity_label', '').strip().upper()
+        if activity_label_val:
+            try:
+                user.activity_label = ActivityLabel[activity_label_val]
+            except KeyError:
+                pass
+        companion_score_str = request.form.get('companion_score', '').strip()
+        if companion_score_str.isdigit():
+            user.companion_score = int(companion_score_str)
+        offense_count_str = request.form.get('observer_offense_count', '').strip()
+        if offense_count_str.isdigit():
+            user.observer_offense_count = int(offense_count_str)
+        if 'reset_observer' in request.form:
+            from form_app.services.group_matching import compute_activity_label
+            user.activity_label = compute_activity_label(user.companion_score or 0)
+            user.observer_since = None
+            user.observer_offense_count = 0
+
         birthday_str = request.form.get('birthday', '').strip()
         if birthday_str:
             try:
@@ -826,11 +846,35 @@ def create_group():
         return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
 
     from form_app.services.cool_name import generate_funny_name
-    group = GroupMatching(cool_name=generate_funny_name(), members=members)
+    avatars = assign_session_avatars(len(members))
+    group = GroupMatching(
+        cool_name=generate_funny_name(),
+        expires_at=datetime.now() + timedelta(days=15),
+        memberships=[
+            GroupMembership(member_id=m.id, session_avatar=avatars[i])
+            for i, m in enumerate(members)
+        ],
+    )
     session.add(group)
     session.commit()
     _invalidate_dashboard_cache()
     flash(f'群組「{group.cool_name}」已建立', 'success')
+    return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+
+
+@bp.route('/groups/auto-form', methods=['POST'])
+@login_required
+@admin_required
+def auto_form_groups():
+    session = get_db()
+    from form_app.services.group_matching import form_groups
+    created = form_groups(session)
+    session.commit()
+    _invalidate_dashboard_cache()
+    if created:
+        flash(f'自動生成了 {len(created)} 個群組', 'success')
+    else:
+        flash('目前沒有符合條件的會員可以分組', 'warning')
     return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
 
 
