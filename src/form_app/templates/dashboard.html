@@ -16,6 +16,44 @@
         </div>
     </div>
 
+    {# ── Companion score card ── #}
+    <div class="card border-0 shadow-sm rounded-4 mb-4 px-4 py-3">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+        <div class="d-flex align-items-center gap-3">
+          <span style="font-size:2rem;">{{ current_user.label_emoji }}</span>
+          <div>
+            <div class="fw-bold" style="font-size:1rem;">{{ current_user.label_name }}</div>
+            <div class="text-muted" style="font-size:.78rem;">
+              同行指數：<strong>{{ current_user.companion_score or 0 }}</strong>
+              {% if current_user.label_next_at %}
+                / {{ current_user.label_next_at }}
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% if current_user.activity_label and current_user.activity_label.value != 'OBSERVER' and current_user.label_next_at %}
+          <div class="flex-grow-1" style="min-width:140px;max-width:260px;">
+            <div class="d-flex justify-content-between mb-1" style="font-size:.72rem;color:#999;">
+              <span>{{ current_user.label_name }}</span>
+              <span>下一等級</span>
+            </div>
+            <div class="progress" style="height:6px;border-radius:99px;">
+              <div class="progress-bar bg-{{ current_user.label_color }}"
+                   style="width:{{ current_user.label_progress_pct }}%;border-radius:99px;"></div>
+            </div>
+          </div>
+        {% elif current_user.activity_label and current_user.activity_label.value == 'OBSERVER' %}
+          <div class="text-muted small">
+            {% if current_user.observer_sleep_days is not none and current_user.observer_sleep_days > 0 %}
+              🍂 休眠中，還有 <strong>{{ current_user.observer_sleep_days }}</strong> 天
+            {% else %}
+              🌱 休眠期已結束，請查看 LINE 通知
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
     {% if missing_items %}
     <div class="card border-warning mb-3">
         <div class="card-header bg-warning text-dark">
@@ -154,26 +192,32 @@
                 <div class="modern-card p-4 h-100 shadow-sm position-relative">
                     <div class="d-flex justify-content-between align-items-start mb-3">
                         {% if group.is_active %}
-                        <span class="badge rounded-pill bg-primary bg-opacity-10 text-primary">
-                            <i class="bi bi-people-fill me-1"></i> 群組中
+                        <span class="badge rounded-pill bg-success bg-opacity-10 text-success">
+                            <i class="bi bi-people-fill me-1"></i> 同行中
+                        </span>
+                        {% elif group.is_feedback %}
+                        <span class="badge rounded-pill bg-warning bg-opacity-10 text-warning">
+                            <i class="bi bi-star-fill me-1"></i> 評分中
+                        </span>
+                        {% elif group.is_closed %}
+                        <span class="badge rounded-pill bg-secondary bg-opacity-10 text-secondary">
+                            <i class="bi bi-archive me-1"></i> 已封存
                         </span>
                         {% else %}
                         <span class="badge rounded-pill bg-secondary bg-opacity-10 text-secondary">
-                            <i class="bi bi-dash-circle me-1"></i> 已結束
+                            <i class="bi bi-dash-circle me-1"></i> 已取消
                         </span>
                         {% endif %}
-                        <span class="text-muted small">{{ group.members|length }} 人</span>
+                        <span class="text-muted small">{{ group.memberships|length }} 人</span>
                     </div>
 
                     <div class="d-flex gap-1 mb-3 flex-wrap">
-                        {% for member in group.members %}
-                        <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold shadow-sm"
-                            style="width:36px;height:36px;font-size:.85rem;
-                              background:linear-gradient(135deg,
-                                {{ '#667eea' if member.gender == 'M' else '#f093fb' }} 0%,
-                                {{ '#764ba2' if member.gender == 'M' else '#f5576c' }} 100%);
-                              {{ 'border:2px solid #0d6efd;' if member.id == current_user.id else '' }}">
-                            {{ member.name[0] }}
+                        {% for gm in group.memberships %}
+                        <div class="rounded-circle d-flex align-items-center justify-content-center shadow-sm"
+                            style="width:36px;height:36px;font-size:1.2rem;
+                              background:{{ '#e8f0ff' if gm.member.gender == 'M' else '#fce8ff' }};
+                              {{ 'border:2px solid #0d6efd;' if gm.member_id == current_user.id else 'border:1.5px solid #dee2e6;' }}">
+                            {{ gm.session_avatar or gm.member.name[0] }}
                         </div>
                         {% endfor %}
                     </div>

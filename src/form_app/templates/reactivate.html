@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-5" style="max-width:480px;">
+  <div class="card border-0 shadow-sm rounded-4 text-center p-5">
+    <div class="fs-1 mb-3">🌱</div>
+    <h4 class="fw-bold mb-2">落葉休眠假期結束啦！</h4>
+    <p class="text-muted mb-4">
+      嗨 {{ current_user.name }}！Citylove 已經幫你充飽電，隨時準備好再次陪你出門探索生活。<br><br>
+      點擊下方按鈕，我們就會把你加入下週一的同行盲盒配對池！✨
+    </p>
+    <form method="POST" action="{{ url_for('dashboard_bp.reactivate') }}">
+      <button type="submit" class="btn btn-lg w-100 fw-semibold py-3"
+              style="background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:14px;">
+        ☕ 牽成這個願望，一起出發吧！
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -121,6 +121,43 @@
       </div>
     </div>
 
+    <!-- ── Companion Score & Label ──────────────────────────────── -->
+    <div class="card mb-3">
+      <div class="card-header fw-semibold">同行指數 / Activity Label</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-sm-4">
+            <label class="form-label small">Activity Label</label>
+            <select class="form-select form-select-sm" name="activity_label">
+              <option value="TRAVELER"       {% if user and user.activity_label and user.activity_label.value == 'TRAVELER'        %}selected{% endif %}>🌱 同行者</option>
+              <option value="ACTIVE_TRAVELER"{% if user and user.activity_label and user.activity_label.value == 'ACTIVE_TRAVELER' %}selected{% endif %}>🌟 活躍同行者</option>
+              <option value="SUPER_TRAVELER" {% if user and user.activity_label and user.activity_label.value == 'SUPER_TRAVELER'  %}selected{% endif %}>🏆 超級同行者</option>
+              <option value="OBSERVER"       {% if user and user.activity_label and user.activity_label.value == 'OBSERVER'        %}selected{% endif %}>🍂 觀察者</option>
+            </select>
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label small">同行指數 (companion_score)</label>
+            <input type="number" class="form-control form-control-sm" name="companion_score" min="0"
+                   value="{{ user.companion_score if user and user.companion_score is not none else 0 }}">
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label small">Observer 計數 (offense_count)</label>
+            <div class="input-group input-group-sm">
+              <input type="number" class="form-control" name="observer_offense_count" min="0"
+                     value="{{ user.observer_offense_count if user and user.observer_offense_count is not none else 0 }}">
+              {% if user and user.activity_label and user.activity_label.value == 'OBSERVER' %}
+                <button type="submit" name="reset_observer" value="1"
+                        class="btn btn-outline-warning btn-sm"
+                        onclick="return confirm('確定要解除休眠並重設計數嗎？')">
+                  解除休眠
+                </button>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ── Profile Links ─────────────────────────────────────────── -->
     <div class="card mb-3">
       <div class="card-header fw-semibold">Profile Links</div>

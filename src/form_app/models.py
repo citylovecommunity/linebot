@@ -1,6 +1,7 @@
 
 import enum
-from datetime import date, datetime, timezone
+import random
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import Column, DateTime, Integer, Table
@@ -32,17 +33,45 @@ class Base(DeclarativeBase):
 
 class GroupMatchingStatus(enum.Enum):
     ACTIVE = "ACTIVE"
+    FEEDBACK = "FEEDBACK"   # Phase 4: collecting anonymous badges
+    CLOSED = "CLOSED"       # Day 15: archived
     CANCELLED = "CANCELLED"
 
 
-# Association table for the M2M between GroupMatching and Member.
-# Defined early so both Member and GroupMatching can reference it.
-group_members = Table(
-    'group_members',
-    Base.metadata,
-    Column('group_id', Integer, ForeignKey('group_matching.id'), primary_key=True),
-    Column('member_id', Integer, ForeignKey('member.id'), primary_key=True),
-)
+class ActivityLabel(enum.Enum):
+    TRAVELER = "TRAVELER"               # 🌱 同行者 (0–4 pts)
+    ACTIVE_TRAVELER = "ACTIVE_TRAVELER" # 🌟 活躍同行者 (5–14 pts)
+    SUPER_TRAVELER = "SUPER_TRAVELER"   # 🏆 超級同行者 (15+ pts)
+    OBSERVER = "OBSERVER"               # 🍂 觀察者 (consecutive bad sessions)
+
+
+class MemberSessionLabel(enum.Enum):
+    PERFECT = "PERFECT"   # 🟢 完美同行
+    GHOST = "GHOST"       # 👻 本局幽靈
+    NO_SHOW = "NO_SHOW"   # 🕊️ 本局放鳥
+
+
+class BadgeType(enum.Enum):
+    GOOD_CHAT = "GOOD_CHAT"   # 💬 很有話聊
+    PUNCTUAL = "PUNCTUAL"     # 🌟 準時好旅伴
+    CARING = "CARING"         # 🍯 貼心暖洋洋
+    FUNNY = "FUNNY"           # 🎭 氣氛擔當
+    NO_SHOW = "NO_SHOW"       # ☕ 這次好可惜沒能見到你
+
+
+# Pool of cute avatars randomly assigned per GroupMembership (no duplicates within a session).
+COMPANION_AVATARS: list[str] = [
+    "🐱", "🐶", "🐰", "🦊", "🐻", "🐼", "🦋", "🌸",
+    "🌺", "🌻", "🍀", "🐙", "🦔", "🐿️", "🦜", "🐨",
+    "🌹", "🌷", "🦩", "🐬", "🌿", "🍁", "🐧", "🦚",
+    "🦌", "🐸", "🦦", "🌴", "🦁", "🐯", "🦄", "🐘",
+    "🦒", "🦓", "🐊", "🦀", "🐡", "🌈", "🎋", "🌙",
+]
+
+
+def assign_session_avatars(count: int) -> list[str]:
+    """Return `count` unique avatars sampled from the pool without replacement."""
+    return random.sample(COMPANION_AVATARS, min(count, len(COMPANION_AVATARS)))
 
 
 class Member(Base):
@@ -170,9 +199,77 @@ class Member(Base):
     # Used to give priority boosts and unlock re-matching with historical partners.
     consecutive_unmatched_weeks: Mapped[int] = mapped_column(default=0)
 
-    group_matchings: Mapped[list["GroupMatching"]] = relationship(
-        "GroupMatching", secondary=group_members, back_populates="members"
+    # Group session participation (new system)
+    group_memberships: Mapped[list["GroupMembership"]] = relationship(
+        "GroupMembership",
+        foreign_keys="GroupMembership.member_id",
+        back_populates="member",
     )
+
+    @property
+    def group_matchings(self) -> list["GroupMatching"]:
+        return [gm.group for gm in self.group_memberships]
+
+    # Activity label & companion score (group feature)
+    activity_label: Mapped[ActivityLabel] = mapped_column(
+        SAEnum(ActivityLabel, native_enum=False, values_callable=lambda x: [e.value for e in x]),
+        default=ActivityLabel.TRAVELER,
+    )
+    companion_score: Mapped[int] = mapped_column(default=0)
+    observer_since: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    observer_offense_count: Mapped[int] = mapped_column(default=0)
+
+    # ── Label display helpers (used by templates) ──────────────────────────
+    _LABEL_META = {
+        ActivityLabel.TRAVELER:       ("🌱", "同行者",     "success",   0,  5),
+        ActivityLabel.ACTIVE_TRAVELER:("🌟", "活躍同行者", "primary",   5,  15),
+        ActivityLabel.SUPER_TRAVELER: ("🏆", "超級同行者", "warning",   15, None),
+        ActivityLabel.OBSERVER:       ("🍂", "觀察者",     "secondary", 0,  None),
+    }
+
+    @property
+    def label_emoji(self) -> str:
+        return self._LABEL_META.get(self.activity_label, ("🌱", "", "", 0, None))[0]
+
+    @property
+    def label_name(self) -> str:
+        return self._LABEL_META.get(self.activity_label, ("", "同行者", "", 0, None))[1]
+
+    @property
+    def label_color(self) -> str:
+        return self._LABEL_META.get(self.activity_label, ("", "", "success", 0, None))[2]
+
+    @property
+    def label_progress_pct(self) -> int:
+        """0-100 progress bar value toward the next label tier. 100 if at max."""
+        meta = self._LABEL_META.get(self.activity_label)
+        if not meta:
+            return 0
+        _, _, _, low, high = meta
+        if high is None:
+            return 100
+        score = self.companion_score or 0
+        span = high - low
+        return min(100, int((score - low) / span * 100)) if span > 0 else 0
+
+    @property
+    def label_next_at(self) -> Optional[int]:
+        """Score threshold for the next label, or None if already at max / observer."""
+        meta = self._LABEL_META.get(self.activity_label)
+        return meta[4] if meta else None
+
+    @property
+    def observer_sleep_days(self) -> Optional[int]:
+        """Remaining sleep days if OBSERVER, else None."""
+        if self.activity_label != ActivityLabel.OBSERVER or not self.observer_since:
+            return None
+        total = 14 if (self.observer_offense_count or 0) <= 1 else 28
+        from datetime import timezone as _tz
+        os = self.observer_since
+        if os.tzinfo is None:
+            os = os.replace(tzinfo=_tz.utc)
+        elapsed = (datetime.now(_tz.utc) - os).days
+        return max(0, total - elapsed)
 
     @property
     def membership_months(self) -> Optional[int]:
@@ -499,6 +596,46 @@ class Invite(Base):
         return datetime.now(timezone.utc) <= exp
 
 
+class GroupMembership(Base):
+    """One row per (member, group_session) pair. Replaces the old group_members M2M table."""
+    __tablename__ = "group_membership"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("group_matching.id"), index=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey("member.id"), index=True)
+    joined_at: Mapped[datetime] = mapped_column(default=datetime.now)
+
+    session_avatar: Mapped[Optional[str]]  # emoji from COMPANION_AVATARS pool
+
+    # Ghost-detection counters (updated as messages arrive, evaluated at day 15)
+    message_count: Mapped[int] = mapped_column(default=0)
+    clicked_wish_button: Mapped[bool] = mapped_column(default=False)
+
+    # Set at day-15 close
+    final_label: Mapped[Optional[MemberSessionLabel]] = mapped_column(
+        SAEnum(MemberSessionLabel, native_enum=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=True,
+    )
+
+    # Referral tracking (閨蜜/兄弟 pull-in)
+    is_referral: Mapped[bool] = mapped_column(default=False)
+    referred_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("member.id"))
+
+    group: Mapped["GroupMatching"] = relationship(
+        "GroupMatching", back_populates="memberships", foreign_keys=[group_id]
+    )
+    member: Mapped["Member"] = relationship(
+        "Member", back_populates="group_memberships", foreign_keys=[member_id]
+    )
+    referrer: Mapped[Optional["Member"]] = relationship(
+        "Member", foreign_keys=[referred_by_id]
+    )
+
+    @property
+    def is_ghost(self) -> bool:
+        return self.message_count == 0 and not self.clicked_wish_button
+
+
 class GroupMatching(Base):
     __tablename__ = "group_matching"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -512,7 +649,29 @@ class GroupMatching(Base):
         default=GroupMatchingStatus.ACTIVE,
     )
     created_at: Mapped[datetime] = mapped_column(default=datetime.now)
+    expires_at: Mapped[Optional[datetime]]  # created_at + 15 days, set on formation
     is_notified: Mapped[bool] = mapped_column(default=False)
+
+    # Grouping metadata
+    region: Mapped[Optional[str]]  # e.g. "北區", "中區", "南區"
+    opener_member_id: Mapped[Optional[int]] = mapped_column(ForeignKey("member.id"))
+    opener: Mapped[Optional["Member"]] = relationship(foreign_keys=[opener_member_id])
+
+    # Phase 2 summary (set when any member submits the summary form)
+    meet_location: Mapped[Optional[str]]
+    meet_time: Mapped[Optional[datetime]]
+    meet_notes: Mapped[Optional[str]]
+    summary_submitted_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("member.id"))
+    summary_submitted_by: Mapped[Optional["Member"]] = relationship(
+        foreign_keys=[summary_submitted_by_id]
+    )
+
+    # Phase 3: track whether 24-hr reminder was sent
+    meetup_reminder_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+    @property
+    def has_summary(self) -> bool:
+        return self.meet_time is not None
 
     last_message_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("group_message.id", use_alter=True, name="fk_group_matching_last_message")
@@ -521,9 +680,17 @@ class GroupMatching(Base):
         foreign_keys="GroupMatching.last_message_id", post_update=True
     )
 
-    members: Mapped[list["Member"]] = relationship(
-        "Member", secondary=group_members, back_populates="group_matchings"
+    memberships: Mapped[list["GroupMembership"]] = relationship(
+        "GroupMembership",
+        foreign_keys="GroupMembership.group_id",
+        back_populates="group",
+        cascade="all, delete-orphan",
     )
+
+    @property
+    def members(self) -> list["Member"]:
+        return [gm.member for gm in self.memberships]
+
     messages: Mapped[list["GroupMessage"]] = relationship(
         "GroupMessage",
         back_populates="group",
@@ -539,6 +706,14 @@ class GroupMatching(Base):
     @property
     def is_active(self):
         return self.status is GroupMatchingStatus.ACTIVE
+
+    @property
+    def is_feedback(self):
+        return self.status is GroupMatchingStatus.FEEDBACK
+
+    @property
+    def is_closed(self):
+        return self.status is GroupMatchingStatus.CLOSED
 
     @property
     def is_cancelled(self):
@@ -581,6 +756,24 @@ class GroupDateProposal(Base):
 
     group: Mapped["GroupMatching"] = relationship(back_populates="proposals")
     proposer: Mapped["Member"] = relationship(foreign_keys=[proposer_id])
+
+
+class GroupBadge(Base):
+    """Anonymous Phase-4 badge sent from one member to another after a session meetup."""
+    __tablename__ = "group_badge"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("group_matching.id"), index=True)
+    from_member_id: Mapped[int] = mapped_column(ForeignKey("member.id"))
+    to_member_id: Mapped[int] = mapped_column(ForeignKey("member.id"))
+    badge_type: Mapped[BadgeType] = mapped_column(
+        SAEnum(BadgeType, native_enum=False, values_callable=lambda x: [e.value for e in x])
+    )
+    created_at: Mapped[datetime] = mapped_column(default=datetime.now)
+
+    group: Mapped["GroupMatching"] = relationship(foreign_keys=[group_id])
+    from_member: Mapped["Member"] = relationship(foreign_keys=[from_member_id])
+    to_member: Mapped["Member"] = relationship(foreign_keys=[to_member_id])
 
 
 class UserMatchScore(Base):

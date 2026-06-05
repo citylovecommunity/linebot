@@ -164,3 +164,79 @@ def task_notify_expiring_members():
 
     current_app.logger.info(f"notify-expiring-members: sent to {sent}/{len(expiring)} members.")
     return "OK", 200
+
+
+@bp.route('/form-groups', methods=['POST'])
+def task_form_groups():
+    if request.headers.get('X-Task-Secret') != settings.TASK_SECRET:
+        return "Unauthorized", 401
+
+    from form_app.services.group_matching import form_groups
+
+    session = get_db()
+    created = form_groups(session)
+    session.commit()
+
+    summary = [
+        f"  [{g.cool_name}] {g.region} — {len(g.memberships)}人"
+        for g in created
+    ]
+    msg = f"已建立 {len(created)} 個同行局：\n" + "\n".join(summary) if created else "本次無新同行局"
+    current_app.logger.info(msg)
+    return msg, 200
+
+
+@bp.route('/close-expired-groups', methods=['POST'])
+def task_close_expired_groups():
+    if request.headers.get('X-Task-Secret') != settings.TASK_SECRET:
+        return "Unauthorized", 401
+
+    from form_app.services.group_session import open_group_feedback, close_expired_groups
+
+    session = get_db()
+
+    # Step 1: open Phase 4 for groups whose meetup has passed
+    feedback_opened = open_group_feedback(session)
+
+    # Step 2: close sessions that have reached day 15
+    result = close_expired_groups(session)
+    session.commit()
+
+    msg = (
+        f"Phase-4 opened: {len(feedback_opened)} 局 | "
+        f"Closed: {result['closed']} 局 | "
+        f"Hibernations: {result['hibernations']}"
+    )
+    current_app.logger.info(msg)
+    return msg, 200
+
+
+@bp.route('/send-meetup-reminders', methods=['POST'])
+def task_send_meetup_reminders():
+    if request.headers.get('X-Task-Secret') != settings.TASK_SECRET:
+        return "Unauthorized", 401
+
+    from form_app.services.group_session import send_meetup_reminders
+
+    session = get_db()
+    sent = send_meetup_reminders(session)
+    session.commit()
+
+    msg = f"24小時行前提醒已發送：{sent} 局"
+    current_app.logger.info(msg)
+    return msg, 200
+
+
+@bp.route('/send-observer-wakeups', methods=['POST'])
+def task_send_observer_wakeups():
+    if request.headers.get('X-Task-Secret') != settings.TASK_SECRET:
+        return "Unauthorized", 401
+
+    from form_app.services.group_session import send_observer_wakeups
+
+    session = get_db()
+    sent = send_observer_wakeups(session)
+
+    msg = f"Observer 喚醒通知已發送：{sent} 人"
+    current_app.logger.info(msg)
+    return msg, 200

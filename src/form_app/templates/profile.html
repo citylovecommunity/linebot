@@ -68,6 +68,47 @@
     </div>
   </div>
 
+  <!-- Companion Score -->
+  <div class="card mb-3 shadow-sm">
+    <div class="card-header fw-semibold">同行指數</div>
+    <div class="card-body">
+      <div class="d-flex align-items-center gap-3 mb-3">
+        <span style="font-size:2.2rem;">{{ current_user.label_emoji }}</span>
+        <div>
+          <div class="fw-bold">{{ current_user.label_name }}</div>
+          <div class="text-muted small">
+            指數：<strong>{{ current_user.companion_score or 0 }}</strong>
+            {% if current_user.label_next_at %}
+              / {{ current_user.label_next_at }}
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% if current_user.activity_label and current_user.activity_label.value != 'OBSERVER' and current_user.label_next_at %}
+        <div class="d-flex justify-content-between mb-1" style="font-size:.75rem;color:#999;">
+          <span>{{ current_user.label_name }}</span>
+          <span>下一等級</span>
+        </div>
+        <div class="progress mb-2" style="height:8px;border-radius:99px;">
+          <div class="progress-bar bg-{{ current_user.label_color }}"
+               style="width:{{ current_user.label_progress_pct }}%;border-radius:99px;"></div>
+        </div>
+        <div class="text-muted small">再累積 <strong>{{ current_user.label_next_at - (current_user.companion_score or 0) }}</strong> 點即可升級！</div>
+      {% elif current_user.activity_label and current_user.activity_label.value == 'OBSERVER' %}
+        <div class="alert alert-warning py-2 small mb-0">
+          🍂 目前處於落葉休眠狀態。
+          {% if current_user.observer_sleep_days is not none and current_user.observer_sleep_days > 0 %}
+            還有 <strong>{{ current_user.observer_sleep_days }}</strong> 天後可重新啟動。
+          {% else %}
+            休眠期已結束，請查看 LINE 通知以重新加入！
+          {% endif %}
+        </div>
+      {% else %}
+        <div class="text-muted small">你已達到最高等級 🏆，繼續保持！</div>
+      {% endif %}
+    </div>
+  </div>
+
   <!-- Change Password -->
   <div class="card shadow-sm">
     <div class="card-header fw-semibold">變更密碼</div>
