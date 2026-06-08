@@ -857,6 +857,7 @@ def create_group():
     )
     session.add(group)
     session.commit()
+    process_all_notifications(session)
     _invalidate_dashboard_cache()
     flash(f'群組「{group.cool_name}」已建立', 'success')
     return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
@@ -870,6 +871,7 @@ def auto_form_groups():
     from form_app.services.group_matching import form_groups
     created = form_groups(session)
     session.commit()
+    process_all_notifications(session)
     _invalidate_dashboard_cache()
     if created:
         flash(f'自動生成了 {len(created)} 個群組', 'success')
