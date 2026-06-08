@@ -1,5 +1,3 @@
-from datetime import date as _date
-
 from form_app.services.scoring import UserProfileAdapter
 
 _SKIP_VALUES = {'不限', '無', '無宗教信仰', ''}
@@ -51,40 +49,23 @@ def generate_match_intro(viewer, partner) -> str:
 
 def generate_match_intro_long(viewer, partner, cool_name: str = "") -> str:
     """
-    Multi-line friend-style introduction used in the LINE new-match notification.
-    Each member gets a personalised message describing their specific partner.
+    Multi-line consultant-recommendation introduction used in the LINE new-match notification.
+    Each member gets a personalised message about their specific partner.
     """
     v = UserProfileAdapter.from_member(viewer)
     p = UserProfileAdapter.from_member(partner)
 
     pronoun = "他" if partner.gender == "M" else "她"
 
-    # --- Partner description line ---
-    desc_parts = []
-    if p.birth_year:
-        age = _date.today().year - p.birth_year
-        desc_parts.append(f"{age}歲")
-    if p.height:
-        desc_parts.append(f"身高{p.height}cm")
-    if p.job and p.job.strip() not in _SKIP_VALUES:
-        desc_parts.append(p.job)
-    desc = "，".join(desc_parts)
-
-    # --- Why they match ---
     reasons = _shared_reasons(v, p)
     reason_line = "，".join(reasons[:2]) if reasons else None
 
-    # --- Assemble ---
-    lines = [f"我幫你找到了一位很棒的對象！\n"]
-    partner_line = f"👤 {partner.proper_name}"
-    if desc:
-        partner_line += f"，{desc}"
-    lines.append(partner_line)
+    lines = [f"顧問覺得 {partner.proper_name} 是一個值得認識的人！\n"]
 
     if reason_line:
         lines.append(f"✨ {reason_line}")
+        lines.append("")
 
-    lines.append("")
     if cool_name:
         lines.append(f"代號：{cool_name}")
 
