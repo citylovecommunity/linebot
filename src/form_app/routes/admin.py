@@ -926,17 +926,22 @@ def new_matching():
             flash('不能配對同一個人', 'danger')
             return redirect(url_for('admin_bp.new_matching'))
 
-        from sqlalchemy import or_ as _or_dup
-        existing = session.query(Matching).filter(
-            Matching.status != MatchingStatus.DRAFT,
-            _or_dup(
-                (Matching.subject_id == subject_id) & (Matching.object_id == object_id),
-                (Matching.subject_id == object_id) & (Matching.object_id == subject_id),
-            )
-        ).first()
-        if existing:
-            flash(f'這兩位已有配對紀錄「{existing.cool_name}」，無法重複配對', 'danger')
-            return redirect(url_for('admin_bp.new_matching'))
+        sub_member = session.get(Member, subject_id)
+        obj_member = session.get(Member, object_id)
+        is_test_pair = (sub_member and sub_member.is_test) or (obj_member and obj_member.is_test)
+
+        if not is_test_pair:
+            from sqlalchemy import or_ as _or_dup
+            existing = session.query(Matching).filter(
+                Matching.status != MatchingStatus.DRAFT,
+                _or_dup(
+                    (Matching.subject_id == subject_id) & (Matching.object_id == object_id),
+                    (Matching.subject_id == object_id) & (Matching.object_id == subject_id),
+                )
+            ).first()
+            if existing:
+                flash(f'這兩位已有配對紀錄「{existing.cool_name}」，無法重複配對', 'danger')
+                return redirect(url_for('admin_bp.new_matching'))
 
         sub_score = session.query(UserMatchScore).filter(
             UserMatchScore.source_user_id == subject_id,
@@ -948,12 +953,10 @@ def new_matching():
         ).first()
 
         if sub_score is None or obj_score is None:
-            subject_member = session.get(Member, subject_id)
-            object_member = session.get(Member, object_id)
             if sub_score is None:
-                sub_score = _compute_and_save_score(session, subject_member, object_member)
+                sub_score = _compute_and_save_score(session, sub_member, obj_member)
             if obj_score is None:
-                obj_score = _compute_and_save_score(session, object_member, subject_member)
+                obj_score = _compute_and_save_score(session, obj_member, sub_member)
 
         new_match = Matching(
             subject_id=subject_id,
@@ -971,9 +974,10 @@ def new_matching():
         flash(f'已手動建立配對「{new_match.cool_name}」', 'success')
         return redirect(url_for('admin_bp.admin_dashboard', tab='matchings'))
 
+    from sqlalchemy import or_ as _or_active
     all_members = (
         session.query(Member)
-        .filter(Member.is_member_active == True)
+        .filter(_or_active(Member.is_member_active == True, Member.is_test == True))
         .options(joinedload(Member.line_info))
         .order_by(Member.name)
         .all()

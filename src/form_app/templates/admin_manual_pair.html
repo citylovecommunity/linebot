@@ -85,6 +85,9 @@
             <div class="d-flex justify-content-between align-items-start">
               <div>
                 <span class="fw-semibold">{{ m.name }}</span>
+                {% if m.is_test %}
+                <span class="badge bg-warning text-dark ms-1 badge-line">測試</span>
+                {% endif %}
                 {% if m.rank %}
                 <span class="badge bg-secondary ms-1 badge-line">{{ m.rank }}</span>
                 {% endif %}
@@ -153,6 +156,9 @@
             <div class="d-flex justify-content-between align-items-start">
               <div>
                 <span class="fw-semibold">{{ m.name }}</span>
+                {% if m.is_test %}
+                <span class="badge bg-warning text-dark ms-1 badge-line">測試</span>
+                {% endif %}
                 {% if m.rank %}
                 <span class="badge bg-secondary ms-1 badge-line">{{ m.rank }}</span>
                 {% endif %}
