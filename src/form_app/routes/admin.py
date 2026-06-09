@@ -926,6 +926,18 @@ def new_matching():
             flash('不能配對同一個人', 'danger')
             return redirect(url_for('admin_bp.new_matching'))
 
+        from sqlalchemy import or_ as _or_dup
+        existing = session.query(Matching).filter(
+            Matching.status != MatchingStatus.DRAFT,
+            _or_dup(
+                (Matching.subject_id == subject_id) & (Matching.object_id == object_id),
+                (Matching.subject_id == object_id) & (Matching.object_id == subject_id),
+            )
+        ).first()
+        if existing:
+            flash(f'這兩位已有配對紀錄「{existing.cool_name}」，無法重複配對', 'danger')
+            return redirect(url_for('admin_bp.new_matching'))
+
         sub_score = session.query(UserMatchScore).filter(
             UserMatchScore.source_user_id == subject_id,
             UserMatchScore.target_user_id == object_id

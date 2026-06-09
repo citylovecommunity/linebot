@@ -173,8 +173,12 @@ def task_form_groups():
 
     from form_app.services.group_matching import form_groups
 
+    from form_app.services.messaging import process_all_notifications
+
     session = get_db()
     created = form_groups(session)
+    session.commit()
+    process_all_notifications(session)
     session.commit()
 
     summary = [
