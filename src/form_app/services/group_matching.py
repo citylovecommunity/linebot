@@ -481,10 +481,7 @@ def form_groups(session: Session) -> list[GroupMatching]:
                         x for x in male_buckets.get(region, []) if x.id != m.id
                     ]
 
-    # Flush so group IDs are available before notifications
+    # Flush so group IDs are available (caller is responsible for commit + notifications)
     session.flush()
-
-    for group in created:
-        _notify_group_formed(group, session)
 
     return created
