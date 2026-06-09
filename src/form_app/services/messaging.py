@@ -55,14 +55,14 @@ def collect_unread_message_texts(session):
                 f"  {m.user.proper_name}: {_trim(m.content)}" for m in msgs
             )
             text = (
-                f"📩 {matching.cool_name} — {count} 則未讀\n"
+                f"🔔 {matching.cool_name} — {count} 則未讀\n"
                 f"{lines}\n\n"
-                f"🔗 馬上回覆: {APP_URL}/dashboard/{matching_id}"
+                f"👇 點此開啟對話：\n{APP_URL}/dashboard/{matching_id}"
             )
         else:
             text = (
-                f"📩 {matching.cool_name} — 您有 {count} 則未讀訊息\n\n"
-                f"🔗 馬上回覆: {APP_URL}/dashboard/{matching_id}"
+                f"🔔 {matching.cool_name} — 您有 {count} 則未讀訊息\n\n"
+                f"👇 點此開啟對話：\n{APP_URL}/dashboard/{matching_id}"
             )
 
         updates[receiver_id].append(text)
