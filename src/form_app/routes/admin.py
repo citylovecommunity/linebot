@@ -842,6 +842,13 @@ def broadcast_message():
 
     session.commit()
 
+    # Deduplicate: collect per-member list of affected matching IDs so a member
+    # in multiple targeted matchings receives exactly one LINE push.
+    member_matchings: dict[int, list[int]] = defaultdict(list)
+    for matching in matchings:
+        for uid in (matching.subject_id, matching.object_id):
+            member_matchings[uid].append(matching.id)
+
     from linebot import LineBotApi
     from linebot.models import TextSendMessage
     from form_app.extensions import line_bot_helper
@@ -850,27 +857,30 @@ def broadcast_message():
     dev = settings.is_dev
     sent = failed = 0
 
-    for matching in matchings:
-        for uid in (matching.subject_id, matching.object_id):
-            member = members_by_id.get(uid)
-            if not member:
+    for uid, mid_list in member_matchings.items():
+        member = members_by_id.get(uid)
+        if not member:
+            continue
+        if dev:
+            target_line_id = settings.LINE_TEST_USER_ID
+        else:
+            if not member.line_info:
                 continue
-            if dev:
-                target_line_id = settings.LINE_TEST_USER_ID
-            else:
-                if not member.line_info:
-                    continue
-                target_line_id = member.line_info.user_id
-            line_text = (
-                f"📢 系統通知\n\n{content}\n\n"
-                f"🔗 前往對話：{settings.APP_URL}/dashboard/{matching.id}"
-            )
-            try:
-                line_bot_api.push_message(target_line_id, TextSendMessage(text=line_text))
-                sent += 1
-            except Exception as e:
-                failed += 1
-                print(f"[broadcast] Failed to notify user {uid}: {e}")
+            target_line_id = member.line_info.user_id
+
+        if len(mid_list) == 1:
+            chat_link = f"🔗 前往對話：{settings.APP_URL}/dashboard/{mid_list[0]}"
+        else:
+            links = "\n".join(f"  • {settings.APP_URL}/dashboard/{mid}" for mid in mid_list)
+            chat_link = f"🔗 受影響的對話：\n{links}"
+
+        line_text = f"📢 系統通知\n\n{content}\n\n{chat_link}"
+        try:
+            line_bot_api.push_message(target_line_id, TextSendMessage(text=line_text))
+            sent += 1
+        except Exception as e:
+            failed += 1
+            print(f"[broadcast] Failed to notify user {uid}: {e}")
 
     _invalidate_dashboard_cache()
     flash(
