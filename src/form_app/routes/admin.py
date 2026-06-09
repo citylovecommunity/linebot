@@ -35,7 +35,7 @@ def _invalidate_dashboard_cache():
         r.delete(_DASHBOARD_CACHE_KEY)
 
 from form_app.models import (
-    ActivityLabel, Invite, Member, Matching, MatchingStatus, UserMatchScore,
+    ActivityLabel, Invite, Member, Matching, MatchingStatus, Message, UserMatchScore,
     DateProposal, ProposalStatus, Line_Info,
     GroupMatching, GroupMatchingStatus, GroupMembership, GroupMessage, GroupDateProposal,
     assign_session_avatars,
@@ -789,6 +789,96 @@ def create_draft_pair():
     _invalidate_dashboard_cache()
     flash(f'已新增草稿配對：{subject.name} ＆ {obj.name}', 'success')
     return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
+
+
+@bp.route('/broadcast', methods=['POST'])
+@login_required
+@admin_required
+def broadcast_message():
+    session = get_db()
+    content = request.form.get('content', '').strip()
+    target = request.form.get('target')
+    matching_ids = request.form.getlist('matching_ids', type=int)
+
+    if not content:
+        flash('訊息內容不能為空', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='matchings'))
+
+    if target == 'all':
+        matchings = session.query(Matching).filter(
+            Matching.status == MatchingStatus.ACTIVE
+        ).all()
+    else:
+        if not matching_ids:
+            flash('請選擇至少一個配對', 'danger')
+            return redirect(url_for('admin_bp.admin_dashboard', tab='matchings'))
+        matchings = session.query(Matching).filter(
+            Matching.id.in_(matching_ids),
+            Matching.status == MatchingStatus.ACTIVE
+        ).all()
+
+    if not matchings:
+        flash('沒有符合條件的進行中配對', 'warning')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='matchings'))
+
+    for matching in matchings:
+        msg = Message(
+            content=content,
+            user_id=matching.subject_id,
+            matching_id=matching.id,
+            is_system_notification=True,
+            is_notified=True,
+        )
+        session.add(msg)
+
+    involved_ids = {uid for m in matchings for uid in (m.subject_id, m.object_id)}
+    members = (
+        session.query(Member)
+        .filter(Member.id.in_(involved_ids))
+        .options(joinedload(Member.line_info))
+        .all()
+    )
+    members_by_id = {m.id: m for m in members}
+
+    session.commit()
+
+    from linebot import LineBotApi
+    from linebot.models import TextSendMessage
+    from form_app.extensions import line_bot_helper
+
+    line_bot_api = LineBotApi(line_bot_helper.configuration.access_token)
+    dev = settings.is_dev
+    sent = failed = 0
+
+    for matching in matchings:
+        for uid in (matching.subject_id, matching.object_id):
+            member = members_by_id.get(uid)
+            if not member:
+                continue
+            if dev:
+                target_line_id = settings.LINE_TEST_USER_ID
+            else:
+                if not member.line_info:
+                    continue
+                target_line_id = member.line_info.user_id
+            line_text = (
+                f"📢 系統通知\n\n{content}\n\n"
+                f"🔗 前往對話：{settings.APP_URL}/dashboard/{matching.id}"
+            )
+            try:
+                line_bot_api.push_message(target_line_id, TextSendMessage(text=line_text))
+                sent += 1
+            except Exception as e:
+                failed += 1
+                print(f"[broadcast] Failed to notify user {uid}: {e}")
+
+    _invalidate_dashboard_cache()
+    flash(
+        f'廣播訊息已發送至 {len(matchings)} 個配對'
+        f'（LINE 通知：{sent} 人成功{"、" + str(failed) + " 人失敗" if failed else ""}）',
+        'success'
+    )
+    return redirect(url_for('admin_bp.admin_dashboard', tab='matchings'))
 
 
 @bp.route('/matchings/<int:matching_id>/cancel', methods=['POST'])

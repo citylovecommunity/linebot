@@ -414,9 +414,14 @@
     <div class="tab-pane fade" id="matchings" role="tabpanel">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="mb-0">配對列表</h5>
-        <a href="{{ url_for('admin_bp.new_matching') }}" class="btn btn-sm btn-success">
-          <i class="bi bi-people"></i> 手動配對
-        </a>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#broadcastModal">
+            <i class="bi bi-megaphone"></i> 廣播訊息
+          </button>
+          <a href="{{ url_for('admin_bp.new_matching') }}" class="btn btn-sm btn-success">
+            <i class="bi bi-people"></i> 手動配對
+          </a>
+        </div>
       </div>
       <div class="table-responsive">
         <table class="table table-hover table-sm align-middle">
@@ -1155,6 +1160,78 @@
   }
 </script>
 
+<!-- 廣播訊息 Modal -->
+<div class="modal fade" id="broadcastModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-megaphone me-2"></i>廣播訊息至配對聊天室</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('admin_bp.broadcast_message') }}">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">訊息內容</label>
+            <textarea name="content" class="form-control" rows="4"
+                      placeholder="輸入要廣播的訊息…" required></textarea>
+            <div class="form-text">訊息會以系統通知的形式顯示在聊天室，並同時推送 LINE 通知給每位成員。</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">發送對象</label>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="target" id="targetAll"
+                     value="all" checked onchange="toggleMatchingPicker()">
+              <label class="form-check-label" for="targetAll">
+                所有進行中的配對
+                <span class="badge bg-success ms-1">
+                  {{ matchings | selectattr('status.value', 'equalto', 'ACTIVE') | list | length }} 個
+                </span>
+              </label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="target" id="targetSelected"
+                     value="selected" onchange="toggleMatchingPicker()">
+              <label class="form-check-label" for="targetSelected">選擇特定配對</label>
+            </div>
+          </div>
+
+          <div id="matchingPicker" style="display:none;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="small text-muted">選擇配對（僅顯示進行中）</span>
+              <button type="button" class="btn btn-sm btn-outline-secondary"
+                      onclick="toggleAllMatchings()">全選／取消全選</button>
+            </div>
+            <div class="border rounded p-2" style="max-height:260px;overflow-y:auto;">
+              {% for m in matchings %}{% if m.status.value == 'ACTIVE' %}
+              {% set subj = members_by_id.get(m.subject_id) %}
+              {% set obj  = members_by_id.get(m.object_id) %}
+              <div class="form-check py-1 border-bottom">
+                <input class="form-check-input matching-cb" type="checkbox"
+                       name="matching_ids" value="{{ m.id }}" id="mcb_{{ m.id }}">
+                <label class="form-check-label" for="mcb_{{ m.id }}">
+                  <span class="fw-semibold">{{ m.cool_name }}</span>
+                  <span class="text-muted small ms-2">
+                    {{ subj.name if subj else '—' }} ♥ {{ obj.name if obj else '—' }}
+                  </span>
+                </label>
+              </div>
+              {% endif %}{% endfor %}
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary"
+                  onclick="return confirmBroadcast()">
+            <i class="bi bi-send"></i> 發送廣播
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <!-- 草稿編輯 Modal -->
 <!-- 建立群組 Modal -->
 <div class="modal fade" id="createGroupModal" tabindex="-1">
@@ -1351,6 +1428,28 @@ function confirmAndLockApprove(form) {
   form.closest('.d-flex').querySelectorAll('button').forEach(b => { b.disabled = true; });
 
   return true;
+}
+
+function toggleMatchingPicker() {
+  const selected = document.getElementById('targetSelected').checked;
+  document.getElementById('matchingPicker').style.display = selected ? '' : 'none';
+}
+
+function toggleAllMatchings() {
+  const cbs = document.querySelectorAll('.matching-cb');
+  const anyUnchecked = [...cbs].some(cb => !cb.checked);
+  cbs.forEach(cb => cb.checked = anyUnchecked);
+}
+
+function confirmBroadcast() {
+  const target = document.querySelector('input[name="target"]:checked').value;
+  if (target === 'selected') {
+    const checked = document.querySelectorAll('.matching-cb:checked').length;
+    if (checked === 0) { alert('請選擇至少一個配對'); return false; }
+    return confirm(`確定要廣播訊息至 ${checked} 個配對嗎？`);
+  }
+  const total = document.querySelectorAll('.matching-cb').length;
+  return confirm(`確定要廣播訊息至全部 ${total} 個進行中的配對嗎？`);
 }
 </script>
 {% endblock %}
