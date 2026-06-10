@@ -1,5 +1,9 @@
 {% extends "base.html" %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4 px-3 px-lg-4" style="max-width:1200px;">
 
@@ -418,8 +422,9 @@
           </div>
           <div class="mb-3">
             <label class="form-label small fw-semibold">📅 見面時間</label>
-            <input type="datetime-local" name="meet_time" class="form-control"
-                   value="{{ group.meet_time.strftime('%Y-%m-%dT%H:%M') if group.meet_time else '' }}"
+            <input type="text" id="summaryDatePicker" name="meet_time" class="form-control"
+                   placeholder="選擇日期與時間"
+                   data-default="{{ group.meet_time.strftime('%Y-%m-%dT%H:%M') if group.meet_time else '' }}"
                    required>
           </div>
           <div class="mb-1">
@@ -590,4 +595,22 @@
   };
 })();
 </script>
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+(function () {
+  var el = document.getElementById('summaryDatePicker');
+  if (el) {
+    flatpickr(el, {
+      enableTime: true,
+      dateFormat: 'Y-m-dTH:i',
+      minuteIncrement: 15,
+      defaultDate: el.dataset.default || null
+    });
+  }
+})();
+</script>
+{% endblock %}
+
 {% endblock %}

@@ -8,6 +8,10 @@
 
 {% extends "base.html" %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+{% endblock %}
+
 {% block content %}
 
 {% if is_preview %}
@@ -282,7 +286,7 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">日期/時間</label>
-                        <input type="datetime-local" name="date_time" class="form-control" required>
+                        <input type="text" id="proposalDatePicker" name="date_time" class="form-control" placeholder="選擇日期與時間" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">誰訂位</label>
@@ -409,5 +413,17 @@
 
     scrollToBottom();
 </script>
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+flatpickr('#proposalDatePicker', {
+    enableTime: true,
+    dateFormat: 'Y-m-dTH:i',
+    minuteIncrement: 15,
+    minDate: 'today'
+});
+</script>
+{% endblock %}
 
 {% endblock %}
