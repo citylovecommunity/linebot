@@ -1,7 +1,9 @@
+import logging
 from collections import defaultdict
 from datetime import datetime, timezone, timedelta
 
 from linebot import LineBotApi
+from linebot.exceptions import LineBotApiError
 from linebot.models import TextMessage
 from sqlalchemy import and_
 from sqlalchemy.orm import joinedload
@@ -345,10 +347,23 @@ def process_all_notifications(session):
             line_messages = [TextMessage(text=m) for m in messages[:4]]
             line_messages.append(TextMessage(text=f"⋯ 還有 {len(messages) - 4} 則通知，請登入查看。"))
 
-        print(f"Sending {len(line_messages)} msgs to user {user.id}")
+        logging.info("Sending %d msgs to user %s", len(line_messages), user.id)
 
         try:
             line_bot_api.push_message(target_line_id, messages=line_messages)
             user.last_notification_sent_at = now
+        except LineBotApiError as e:
+            if e.status_code == 429:
+                logging.error(
+                    "LINE monthly quota exceeded — notifications halted. user_id=%s",
+                    user.id,
+                    exc_info=True,
+                )
+            else:
+                logging.error(
+                    "Failed to push LINE message to user %s: %s", user.id, e, exc_info=True
+                )
         except Exception as e:
-            print(f"Failed to push LINE message to user {user.id}: {e}")
+            logging.error(
+                "Unexpected error pushing LINE message to user %s: %s", user.id, e, exc_info=True
+            )

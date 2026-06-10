@@ -17,7 +17,7 @@ def _shared_reasons(v: UserProfileAdapter, p: UserProfileAdapter) -> list[str]:
 
     shared_regions = v.datable_place & p.datable_place
     if shared_regions:
-        reasons.append(f"都可以在{sorted(shared_regions)[0]}約會")
+        reasons.append(f"都可以在{sorted(shared_regions)[0]}見面")
 
     if (v.diet and p.diet and v.diet == p.diet
             and v.diet.strip() not in _SKIP_VALUES):
@@ -29,7 +29,7 @@ def _shared_reasons(v: UserProfileAdapter, p: UserProfileAdapter) -> list[str]:
 
     if (v.pref_min_height and p.height and p.height >= v.pref_min_height
             and not any('身高' in r for r in reasons)):
-        reasons.append("對方身高是你喜歡的類型")
+        reasons.append("顧問認為你們很合適")
 
     return reasons
 
