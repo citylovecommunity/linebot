@@ -659,7 +659,20 @@ def edit_user(user_id):
         flash(f'已更新會員 {user.name}', 'success')
         return redirect(url_for('admin_bp.admin_dashboard'))
 
-    return render_template('admin_user_form.html', user=user)
+    from sqlalchemy import or_
+    from sqlalchemy.orm import subqueryload
+    matchings = (
+        session.query(Matching)
+        .filter(or_(Matching.subject_id == user_id, Matching.object_id == user_id))
+        .options(
+            joinedload(Matching.subject),
+            joinedload(Matching.object),
+            subqueryload(Matching.proposals).joinedload(DateProposal.proposer),
+        )
+        .order_by(Matching.created_at.desc())
+        .all()
+    )
+    return render_template('admin_user_form.html', user=user, matchings=matchings)
 
 
 @bp.route('/users/<int:user_id>/delete', methods=['POST'])
@@ -904,6 +917,9 @@ def cancel_matching(matching_id):
     session.commit()
     _invalidate_dashboard_cache()
     flash(f'已取消配對「{matching.cool_name}」', 'success')
+    back = request.referrer or ''
+    if 'matchings' in back and str(matching_id) in back:
+        return redirect(url_for('admin_bp.matching_detail', matching_id=matching_id))
     return redirect(url_for('admin_bp.admin_dashboard', tab='matchings'))
 
 
@@ -920,6 +936,9 @@ def reactivate_matching(matching_id):
     session.commit()
     _invalidate_dashboard_cache()
     flash(f'已重新啟用配對「{matching.cool_name}」', 'success')
+    back = request.referrer or ''
+    if 'matchings' in back and str(matching_id) in back:
+        return redirect(url_for('admin_bp.matching_detail', matching_id=matching_id))
     return redirect(url_for('admin_bp.admin_dashboard', tab='matchings'))
 
 
@@ -1320,6 +1339,133 @@ def delete_draft(matching_id):
     _invalidate_dashboard_cache()
     flash(f'已刪除草稿配對「{cool_name}」。', 'success')
     return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
+
+
+@bp.route('/matchings/<int:matching_id>', methods=['GET'])
+@login_required
+@admin_required
+def matching_detail(matching_id):
+    from sqlalchemy import tuple_
+    from sqlalchemy.orm import subqueryload
+    session = get_db()
+    matching = (
+        session.query(Matching)
+        .filter(Matching.id == matching_id)
+        .options(
+            joinedload(Matching.subject),
+            joinedload(Matching.object),
+            subqueryload(Matching.proposals).joinedload(DateProposal.proposer),
+            subqueryload(Matching.messages).joinedload(Message.user),
+        )
+        .first()
+    )
+    if matching is None:
+        flash('找不到該配對', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='matchings'))
+
+    # Score breakdowns for both directions
+    score_rows = session.query(UserMatchScore).filter(
+        tuple_(UserMatchScore.source_user_id, UserMatchScore.target_user_id).in_([
+            (matching.subject_id, matching.object_id),
+            (matching.object_id, matching.subject_id),
+        ])
+    ).all()
+    breakdown_subj = next(
+        (r.breakdown or {} for r in score_rows if r.source_user_id == matching.subject_id), {}
+    )
+    breakdown_obj = next(
+        (r.breakdown or {} for r in score_rows if r.source_user_id == matching.object_id), {}
+    )
+
+    proposals = sorted(matching.proposals, key=lambda p: p.proposed_datetime)
+    messages = sorted(matching.messages, key=lambda m: m.timestamp)
+
+    return render_template(
+        'admin_matching_detail.html',
+        matching=matching,
+        breakdown_subj=breakdown_subj,
+        breakdown_obj=breakdown_obj,
+        proposals=proposals,
+        messages=messages,
+    )
+
+
+@bp.route('/matchings/<int:matching_id>/edit-cool-name', methods=['POST'])
+@login_required
+@admin_required
+def matching_edit_cool_name(matching_id):
+    session = get_db()
+    matching = session.get(Matching, matching_id)
+    if matching is None:
+        flash('找不到該配對', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='matchings'))
+    matching.cool_name = request.form.get('cool_name', '').strip() or matching.cool_name
+    session.commit()
+    _invalidate_dashboard_cache()
+    flash('已更新代號', 'success')
+    return redirect(url_for('admin_bp.matching_detail', matching_id=matching_id))
+
+
+@bp.route('/matchings/<int:matching_id>/complete', methods=['POST'])
+@login_required
+@admin_required
+def complete_matching(matching_id):
+    session = get_db()
+    matching = session.get(Matching, matching_id)
+    if matching is None:
+        flash('找不到該配對', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='matchings'))
+    matching.complete()
+    session.commit()
+    _invalidate_dashboard_cache()
+    flash(f'已將配對「{matching.cool_name}」標記為已完成', 'success')
+    return redirect(url_for('admin_bp.matching_detail', matching_id=matching_id))
+
+
+@bp.route('/matchings/<int:matching_id>/resend-notification', methods=['POST'])
+@login_required
+@admin_required
+def matching_resend_notification(matching_id):
+    session = get_db()
+    matching = session.get(Matching, matching_id)
+    if matching is None:
+        flash('找不到該配對', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='matchings'))
+    matching.is_match_notified = False
+    session.commit()
+    process_all_notifications(session)
+    flash('已重新發送配對通知', 'success')
+    return redirect(url_for('admin_bp.matching_detail', matching_id=matching_id))
+
+
+@bp.route('/matchings/<int:matching_id>/proposals/<int:proposal_id>/confirm', methods=['POST'])
+@login_required
+@admin_required
+def matching_confirm_proposal(matching_id, proposal_id):
+    session = get_db()
+    proposal = session.get(DateProposal, proposal_id)
+    if proposal is None or proposal.matching_id != matching_id:
+        flash('找不到該提案', 'danger')
+        return redirect(url_for('admin_bp.matching_detail', matching_id=matching_id))
+    proposal.confirm()
+    session.commit()
+    flash('已確認見面提案', 'success')
+    return redirect(url_for('admin_bp.matching_detail', matching_id=matching_id))
+
+
+@bp.route('/matchings/<int:matching_id>/proposals/<int:proposal_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def matching_delete_proposal(matching_id, proposal_id):
+    session = get_db()
+    proposal = session.get(DateProposal, proposal_id)
+    if proposal is None or proposal.matching_id != matching_id:
+        flash('找不到該提案', 'danger')
+        return redirect(url_for('admin_bp.matching_detail', matching_id=matching_id))
+    proposal.delete()
+    session.commit()
+    flash('已刪除見面提案', 'success')
+    return redirect(url_for('admin_bp.matching_detail', matching_id=matching_id))
 
 
 @bp.route('/members/<int:user_id>/match-history')

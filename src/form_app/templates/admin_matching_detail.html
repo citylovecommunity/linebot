@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block title %}配對詳情 — {{ matching.cool_name }} — Admin{% endblock %}
+
+{% block content %}
+<div class="container mt-4" style="max-width: 960px;">
+
+  <!-- Back -->
+  <div class="d-flex align-items-center mb-4 gap-3">
+    <a href="{{ url_for('admin_bp.admin_dashboard', tab='matchings') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+    <h3 class="mb-0">配對詳情</h3>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+    <div class="alert alert-{{ 'danger' if cat == 'danger' else 'success' }} alert-dismissible fade show" role="alert">
+      {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+  {% endwith %}
+
+  <!-- ══════════════════════════════════════════════════
+       Section 1 — Header: cool name + status + actions
+  ══════════════════════════════════════════════════ -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <div class="row align-items-center g-3">
+
+        <!-- Cool name (inline edit) -->
+        <div class="col-md-4">
+          <form method="POST" action="{{ url_for('admin_bp.matching_edit_cool_name', matching_id=matching.id) }}"
+                class="d-flex gap-2 align-items-center">
+            <input type="text" class="form-control form-control-lg fw-bold"
+                   name="cool_name" value="{{ matching.cool_name or '' }}"
+                   placeholder="代號" style="max-width:200px;">
+            <button type="submit" class="btn btn-sm btn-outline-primary">
+              <i class="bi bi-pencil-fill"></i>
+            </button>
+          </form>
+          <div class="text-muted small mt-1">建立於 {{ matching.created_at.strftime('%Y-%m-%d') }}</div>
+        </div>
+
+        <!-- Status badge -->
+        <div class="col-md-2 text-center">
+          {% if matching.status.value == 'ACTIVE' %}
+            <span class="badge bg-success fs-6">進行中</span>
+          {% elif matching.status.value == 'COMPLETED' %}
+            <span class="badge bg-info text-dark fs-6">已完成</span>
+          {% elif matching.status.value == 'CANCELLED' %}
+            <span class="badge bg-secondary fs-6">已取消</span>
+          {% elif matching.status.value == 'DRAFT' %}
+            <span class="badge bg-warning text-dark fs-6">草稿</span>
+          {% endif %}
+        </div>
+
+        <!-- Action buttons -->
+        <div class="col-md-6 d-flex flex-wrap gap-2 justify-content-md-end">
+          {% if matching.status.value == 'ACTIVE' %}
+            <form method="POST" action="{{ url_for('admin_bp.complete_matching', matching_id=matching.id) }}"
+                  onsubmit="return confirm('確定標記為已完成？')">
+              <button class="btn btn-info text-white btn-sm">
+                <i class="bi bi-check2-circle me-1"></i>標記完成
+              </button>
+            </form>
+            <form method="POST" action="{{ url_for('admin_bp.cancel_matching', matching_id=matching.id) }}"
+                  onsubmit="return confirm('確定取消此配對？')">
+              <button class="btn btn-danger btn-sm">
+                <i class="bi bi-x-circle me-1"></i>取消配對
+              </button>
+            </form>
+          {% elif matching.status.value in ('CANCELLED', 'COMPLETED') %}
+            <form method="POST" action="{{ url_for('admin_bp.reactivate_matching', matching_id=matching.id) }}"
+                  onsubmit="return confirm('確定重新啟用此配對？')">
+              <button class="btn btn-success btn-sm">
+                <i class="bi bi-arrow-counterclockwise me-1"></i>重新啟用
+              </button>
+            </form>
+          {% elif matching.status.value == 'DRAFT' %}
+            <form method="POST" action="{{ url_for('admin_bp.approve_draft', matching_id=matching.id) }}"
+                  onsubmit="return confirm('確定核准此草稿？')">
+              <button class="btn btn-success btn-sm">
+                <i class="bi bi-check2 me-1"></i>核准草稿
+              </button>
+            </form>
+            <form method="POST" action="{{ url_for('admin_bp.delete_draft', matching_id=matching.id) }}"
+                  onsubmit="return confirm('確定刪除此草稿？')">
+              <button class="btn btn-danger btn-sm">
+                <i class="bi bi-trash me-1"></i>刪除草稿
+              </button>
+            </form>
+          {% endif %}
+          <form method="POST" action="{{ url_for('admin_bp.matching_resend_notification', matching_id=matching.id) }}"
+                onsubmit="return confirm('確定重新發送配對通知給雙方？')">
+            <button class="btn btn-outline-secondary btn-sm">
+              <i class="bi bi-bell me-1"></i>重發通知
+            </button>
+          </form>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════
+       Section 2 — Members & score breakdown
+  ══════════════════════════════════════════════════ -->
+  <div class="row mb-4 g-3">
+    {% for member, partner, grading, breakdown in [
+        (matching.subject, matching.object, matching.grading_metric, breakdown_subj),
+        (matching.object,  matching.subject, matching.obj_grading_metric, breakdown_obj)
+    ] %}
+    <div class="col-md-6">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          {% if member %}
+          <a href="{{ url_for('admin_bp.edit_user', user_id=member.id) }}"
+             class="fw-semibold text-decoration-none {{ 'text-primary' if member.gender == 'M' else 'text-danger' }}">
+            {{ member.name }}
+          </a>
+          {% else %}<span class="text-muted">— 已刪除 —</span>{% endif %}
+          <span class="badge bg-dark">給對方 {{ grading }} 分</span>
+        </div>
+        <div class="card-body small">
+          {% if member %}
+          <div class="text-muted mb-2">
+            {% if member.birthday %}{{ 2026 - member.birthday.year }}歲{% endif %}
+            {% if member.height %} · {{ member.height }}cm{% endif %}
+            {% if member.rank %} · Rank {{ member.rank }}{% endif %}
+          </div>
+          {% endif %}
+
+          {% if breakdown %}
+          <div class="fw-semibold mb-1">配對分數明細（對 {{ partner.name if partner else '對方' }} 的評分）</div>
+          <table class="table table-sm table-borderless mb-0">
+            <tbody>
+              {% for key, val in breakdown.items() %}
+              {% set n = val | float %}
+              <tr>
+                <td class="text-muted ps-0">{{ key }}</td>
+                <td class="text-end pe-0 fw-semibold {{ 'text-success' if n > 0 else ('text-danger' if n < 0 else '') }}">
+                  {{ '+' if n > 0 else '' }}{{ val }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <span class="text-muted">無分數明細</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════
+       Section 3 — Date proposals
+  ══════════════════════════════════════════════════ -->
+  <div class="card mb-4">
+    <div class="card-header fw-semibold">
+      <i class="bi bi-calendar-event me-1"></i> 見面提案
+      <span class="badge bg-secondary ms-1">{{ proposals | length }}</span>
+    </div>
+    {% if proposals %}
+    <div class="card-body p-0">
+      <table class="table table-sm table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3">日期時間</th>
+            <th>地點</th>
+            <th>提案人</th>
+            <th>狀態</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in proposals %}
+          <tr class="{{ 'table-success' if p.status.value == 'CONFIRMED' else ('table-secondary text-muted' if p.status.value == 'DELETED' else '') }}">
+            <td class="ps-3">{{ p.proposed_datetime.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td>{{ p.restaurant_name }}</td>
+            <td>{{ p.proposer.name if p.proposer else '—' }}</td>
+            <td>
+              {% if p.status.value == 'CONFIRMED' %}<span class="badge bg-success">已確認</span>
+              {% elif p.status.value == 'PENDING' %}<span class="badge bg-warning text-dark">待確認</span>
+              {% elif p.status.value == 'DELETED' %}<span class="badge bg-secondary">已刪除</span>
+              {% endif %}
+            </td>
+            <td class="text-end pe-3">
+              {% if p.status.value == 'PENDING' %}
+              <form method="POST"
+                    action="{{ url_for('admin_bp.matching_confirm_proposal', matching_id=matching.id, proposal_id=p.id) }}"
+                    class="d-inline">
+                <button class="btn btn-xs btn-success btn-sm py-0 px-2">確認</button>
+              </form>
+              <form method="POST"
+                    action="{{ url_for('admin_bp.matching_delete_proposal', matching_id=matching.id, proposal_id=p.id) }}"
+                    class="d-inline" onsubmit="return confirm('確定刪除此提案？')">
+                <button class="btn btn-xs btn-outline-danger btn-sm py-0 px-2">刪除</button>
+              </form>
+              {% elif p.status.value == 'CONFIRMED' %}
+              <form method="POST"
+                    action="{{ url_for('admin_bp.matching_delete_proposal', matching_id=matching.id, proposal_id=p.id) }}"
+                    class="d-inline" onsubmit="return confirm('確定取消已確認的見面？')">
+                <button class="btn btn-xs btn-outline-danger btn-sm py-0 px-2">取消</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="card-body text-muted">尚無見面提案。</div>
+    {% endif %}
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════
+       Section 4 — Chat log
+  ══════════════════════════════════════════════════ -->
+  <div class="card mb-5">
+    <div class="card-header fw-semibold">
+      <i class="bi bi-chat-dots me-1"></i> 對話記錄
+      <span class="badge bg-secondary ms-1">{{ messages | length }}</span>
+    </div>
+    {% if messages %}
+    <div class="card-body" style="max-height:480px; overflow-y:auto;" id="chatLog">
+      {% for msg in messages %}
+      {% set is_subj = msg.user_id == matching.subject_id %}
+      <div class="d-flex mb-3 {{ 'justify-content-end' if is_subj else '' }}">
+        <div style="max-width:70%;">
+          <div class="small text-muted mb-1 {{ 'text-end' if is_subj else '' }}">
+            {{ msg.user.name if msg.user else '—' }}
+            · {{ msg.timestamp.strftime('%m-%d %H:%M') }}
+            {% if msg.is_system_notification %}<span class="badge bg-light text-secondary ms-1">系統</span>{% endif %}
+          </div>
+          <div class="p-2 rounded {{ 'bg-primary text-white' if is_subj else 'bg-light border' }}"
+               style="white-space:pre-wrap; word-break:break-word;">{{ msg.content }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="card-body text-muted">尚無對話記錄。</div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+  // Scroll chat to bottom on load
+  const log = document.getElementById('chatLog');
+  if (log) log.scrollTop = log.scrollHeight;
+</script>
+{% endblock %}

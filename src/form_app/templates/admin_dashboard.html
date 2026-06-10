@@ -147,7 +147,6 @@
               <th>資格</th>
               <th class="sortable" data-col="7" style="cursor:pointer;">未配對 <i class="bi bi-arrow-down-up small"></i></th>
               <th class="sortable" data-col="8" style="cursor:pointer;">到期日 <i class="bi bi-arrow-down-up small"></i></th>
-              <th>操作</th>
             </tr>
           </thead>
           <tbody>
@@ -164,7 +163,7 @@
               data-eligible="{{ 'not-ready' if non_eligible_map.get(member.id) else 'ready' }}"
               data-expiry="{{ expiry_state }}">
               <td class="text-muted small" data-val="{{ member.id }}">{{ member.id }}</td>
-              <td data-val="{{ member.name }}">{{ member.name }}</td>
+              <td data-val="{{ member.name }}"><a href="{{ url_for('admin_bp.edit_user', user_id=member.id) }}" class="text-decoration-none">{{ member.name }}</a></td>
               <td>{{ '男' if member.gender == 'M' else '女' }}</td>
               <td>{{ member.phone_number }}</td>
               <td>{{ member.rank or '—' }}</td>
@@ -216,24 +215,6 @@
                 {% else %}
                 <span class="text-muted">—</span>
                 {% endif %}
-              </td>
-              <td class="text-nowrap">
-                <a href="{{ url_for('admin_bp.edit_user', user_id=member.id) }}"
-                  class="btn btn-sm btn-outline-primary">編輯</a>
-                <button type="button" class="btn btn-sm btn-outline-secondary"
-                  onclick="showMatchHistory({{ member.id }}, '{{ member.name }}')"
-                  title="配對記錄（共 {{ member_match_counts[member.id] }} 次）">
-                  <i class="bi bi-clock-history"></i>
-                  {% if member_match_counts[member.id] %}
-                  <span class="badge bg-secondary">{{ member_match_counts[member.id] }}</span>
-                  {% endif %}
-                </button>
-                <form method="POST"
-                  action="{{ url_for('admin_bp.delete_user', user_id=member.id) }}"
-                  class="d-inline"
-                  onsubmit="return confirm('確定要永久刪除「{{ member.name }}」嗎？此操作無法復原。')">
-                  <button type="submit" class="btn btn-sm btn-outline-danger">刪除</button>
-                </form>
               </td>
             </tr>
             {% endfor %}
@@ -327,9 +308,9 @@
             {% set has_dealbreaker = matching.grading_metric == -9999 or matching.obj_grading_metric == -9999 %}
             <tr {% if has_dealbreaker %}class="table-danger"{% endif %}>
               <td class="text-muted small">{{ loop.index }}{% if has_dealbreaker %} <span class="badge bg-danger" title="硬排除條件">⚠</span>{% endif %}</td>
-              <td><span class="fw-semibold">{{ matching.cool_name }}</span></td>
+              <td><a href="{{ url_for('admin_bp.matching_detail', matching_id=matching.id) }}" class="fw-semibold">{{ matching.cool_name }}</a></td>
               <td>
-                <span class="text-primary fw-semibold">{{ male.name if male else '—' }}</span>
+                {% if male %}<a href="{{ url_for('admin_bp.edit_user', user_id=male.id) }}" class="text-primary fw-semibold text-decoration-none">{{ male.name }}</a>{% else %}<span class="text-primary fw-semibold">—</span>{% endif %}
                 {% if male %}{% set mw = weeks_unmatched_by_id.get(male.id) %}
                 {% if mw is none %}<span class="badge bg-secondary ms-1" style="font-size:.65em">從未</span>
                 {% elif mw >= 4 %}<span class="badge bg-danger ms-1" style="font-size:.65em">{{ mw }}w</span>
@@ -347,7 +328,7 @@
                 {% endif %}
               </td>
               <td>
-                <span class="text-danger fw-semibold">{{ female.name if female else '—' }}</span>
+                {% if female %}<a href="{{ url_for('admin_bp.edit_user', user_id=female.id) }}" class="text-danger fw-semibold text-decoration-none">{{ female.name }}</a>{% else %}<span class="text-danger fw-semibold">—</span>{% endif %}
                 {% if female %}{% set fw = weeks_unmatched_by_id.get(female.id) %}
                 {% if fw is none %}<span class="badge bg-secondary ms-1" style="font-size:.65em">從未</span>
                 {% elif fw >= 4 %}<span class="badge bg-danger ms-1" style="font-size:.65em">{{ fw }}w</span>
@@ -443,9 +424,9 @@
             {% set obj  = members_by_id.get(matching.object_id) %}
             <tr>
               <td class="text-muted small">{{ matching.id }}</td>
-              <td>{{ matching.cool_name }}</td>
-              <td>{{ subj.name if subj else '—' }}</td>
-              <td>{{ obj.name if obj else '—' }}</td>
+              <td><a href="{{ url_for('admin_bp.matching_detail', matching_id=matching.id) }}" class="fw-semibold">{{ matching.cool_name }}</a></td>
+              <td>{% if subj %}<a href="{{ url_for('admin_bp.edit_user', user_id=subj.id) }}" class="text-decoration-none">{{ subj.name }}</a>{% else %}—{% endif %}</td>
+              <td>{% if obj %}<a href="{{ url_for('admin_bp.edit_user', user_id=obj.id) }}" class="text-decoration-none">{{ obj.name }}</a>{% else %}—{% endif %}</td>
               <td>
                 {% if matching.status.value == 'ACTIVE' %}
                 <span class="badge bg-success">進行中</span>
