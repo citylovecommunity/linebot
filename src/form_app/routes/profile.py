@@ -3,8 +3,10 @@ from datetime import datetime, timezone
 from flask import Blueprint, render_template, request
 from sqlalchemy.exc import IntegrityError
 
+from form_app.config import settings
 from form_app.database import get_db
 from form_app.models import Invite, Member
+from form_app.services.liff_token import make_liff_token
 from form_app.services.security import hash_password
 
 bp = Blueprint('profile_bp', __name__, url_prefix='/profile')
@@ -91,7 +93,11 @@ def register(token):
 
         try:
             session.commit()
-            return render_template('profile_setup_done.html', member=member)
+            liff_url = None
+            if settings.LIFF_ID:
+                token = make_liff_token(member.phone_number)
+                liff_url = f"https://liff.line.me/{settings.LIFF_ID}?token={token}"
+            return render_template('profile_setup_done.html', member=member, liff_url=liff_url)
         except IntegrityError:
             session.rollback()
             invite.used_at = None

@@ -11,6 +11,7 @@ from form_app.models import (
     GroupMatching, GroupMembership, GroupMessage, GroupDateProposal,
 )
 from form_app.services.security import verify_password, hash_password
+from form_app.services.liff_token import make_liff_token
 from form_app.config import settings
 
 bp = Blueprint('dashboard_bp', __name__, url_prefix="/dashboard")
@@ -598,7 +599,11 @@ def reactivate():
 @bp.route('/profile')
 @login_required
 def profile():
-    return render_template('profile.html')
+    liff_url = None
+    if settings.LIFF_ID:
+        token = make_liff_token(current_user.phone_number)
+        liff_url = f"https://liff.line.me/{settings.LIFF_ID}?token={token}"
+    return render_template('profile.html', liff_url=liff_url)
 
 
 @bp.route('/profile/change-password', methods=['POST'])

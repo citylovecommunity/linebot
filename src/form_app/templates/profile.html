@@ -109,6 +109,33 @@
     </div>
   </div>
 
+  <!-- LINE Binding -->
+  <div class="card mb-3 shadow-sm">
+    <div class="card-header fw-semibold">LINE 帳號綁定</div>
+    <div class="card-body">
+      {% if current_user.line_info %}
+        <div class="d-flex align-items-center gap-2 text-success">
+          <i class="bi bi-check-circle-fill fs-5"></i>
+          <span>已綁定 LINE，配對通知將自動發送。</span>
+        </div>
+        {% if liff_url %}
+        <div class="mt-2">
+          <a href="{{ liff_url }}" class="btn btn-sm btn-outline-success" target="_blank" rel="noopener">
+            <i class="bi bi-arrow-repeat"></i> 重新綁定
+          </a>
+        </div>
+        {% endif %}
+      {% elif liff_url %}
+        <p class="text-muted small mb-3">點擊下方按鈕，在 LINE App 中開啟並完成綁定。</p>
+        <a href="{{ liff_url }}" class="btn btn-success w-100" target="_blank" rel="noopener">
+          <i class="bi bi-chat-dots-fill"></i> 立即綁定 LINE 帳號
+        </a>
+      {% else %}
+        <p class="text-muted small mb-0">請聯絡客服以綁定你的 LINE 帳號。</p>
+      {% endif %}
+    </div>
+  </div>
+
   <!-- Change Password -->
   <div class="card shadow-sm">
     <div class="card-header fw-semibold">變更密碼</div>

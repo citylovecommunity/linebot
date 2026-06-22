@@ -25,6 +25,8 @@ class Settings(BaseSettings):
 
     REDIS_URL: Optional[str] = None
 
+    LIFF_ID: Optional[str] = None
+
     model_config = SettingsConfigDict(
         env_file='.env', env_file_encoding='utf-8', extra='ignore')
 
