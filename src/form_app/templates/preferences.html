@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>修改偏好 — CityLove</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    :root { --brand: #c0506a; --brand-light: #fff0f5; --brand-dark: #8c2d42; }
+    body { background: #fdf6f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+    .hero {
+      background: linear-gradient(135deg, #c0506a 0%, #8c2d42 100%);
+      color: #fff;
+      padding: 2.5rem 1.5rem 4rem;
+      text-align: center;
+    }
+    .hero h1 { font-size: 1.8rem; font-weight: 800; }
+    .hero p  { font-size: .95rem; opacity: .85; margin: .4rem 0 0; }
+
+    .card-section {
+      background: #fff;
+      border-radius: 1.25rem;
+      box-shadow: 0 4px 24px rgba(0,0,0,.08);
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .section-title { font-size: 1rem; font-weight: 700; color: #4a1020; margin-bottom: 1rem; }
+
+    .lock-opt { transition: all .15s; cursor: pointer; user-select: none; }
+    .lock-opt:hover { border-color: var(--brand) !important; }
+    .lock-selected { border-color: var(--brand) !important; background: var(--brand-light); }
+    .lock-hard     { border-color: #dc3545 !important; background: #fff0f0; }
+
+    .toggle-card {
+      border: 2px solid #e5e5e5; border-radius: 1rem;
+      padding: 1rem 1.25rem; cursor: pointer;
+      transition: all .15s; user-select: none;
+    }
+    .toggle-card:hover { border-color: var(--brand); }
+    .toggle-card.active { border-color: var(--brand); background: var(--brand-light); }
+    .toggle-card.inactive { border-color: #adb5bd; background: #f8f9fa; }
+    .toggle-card input { display: none; }
+
+    .btn-save {
+      background: var(--brand); color: #fff; border: none;
+      border-radius: .75rem; padding: .85rem; font-size: 1rem;
+      font-weight: 700; width: 100%;
+    }
+    .btn-save:hover { background: var(--brand-dark); color: #fff; }
+  </style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>修改配對偏好</h1>
+  <p>{{ member.name }} 的偏好設定</p>
+</div>
+
+<div class="container px-3" style="max-width: 480px; margin-top: -2rem;">
+
+  {% if saved %}
+  <div class="alert alert-success rounded-3 shadow-sm" role="alert">
+    ✅ 偏好已成功更新！
+  </div>
+  {% endif %}
+
+  <form method="POST" action="{{ url_for('dashboard_bp.preferences', token=token) }}">
+
+    <!-- Weekly Matching Toggle -->
+    <div class="card-section">
+      <div class="section-title">每週配對訂閱</div>
+      <p class="text-muted small mb-3">關閉後將不再參加每週配對，隨時可以重新開啟。</p>
+      <div class="d-flex gap-2">
+        <label class="toggle-card flex-fill text-center {{ 'active' if member.is_member_active else '' }}">
+          <input type="radio" name="is_member_active" value="1" {% if member.is_member_active %}checked{% endif %}>
+          <div class="fw-bold">✅ 參加配對</div>
+          <div class="small text-muted mt-1">每週自動配對</div>
+        </label>
+        <label class="toggle-card flex-fill text-center {{ 'inactive' if not member.is_member_active else '' }}">
+          <input type="radio" name="is_member_active" value="0" {% if not member.is_member_active %}checked{% endif %}>
+          <div class="fw-bold">⏸ 暫停配對</div>
+          <div class="small text-muted mt-1">本週不參加</div>
+        </label>
+      </div>
+    </div>
+
+    <!-- Height Range -->
+    <div class="card-section">
+      <div class="section-title">對象身高偏好（cm）</div>
+      <div class="row g-3">
+        <div class="col">
+          <label class="form-label small text-muted">最低身高</label>
+          <input type="number" class="form-control" name="pref_min_height"
+                 value="{{ member.pref_min_height or '' }}" placeholder="例：155" min="140" max="220">
+        </div>
+        <div class="col">
+          <label class="form-label small text-muted">最高身高</label>
+          <input type="number" class="form-control" name="pref_max_height"
+                 value="{{ member.pref_max_height or '' }}" placeholder="例：185" min="140" max="220">
+        </div>
+      </div>
+
+      <!-- Height lock -->
+      <div class="mt-3">
+        <div class="small text-muted mb-2">不符合時的處理方式</div>
+        <div class="d-flex gap-2">
+          <label class="lock-opt flex-fill text-center py-2 rounded border
+            {% if not (member.pref_locks or {}).get('height') %}lock-selected{% endif %}">
+            <input type="radio" name="lock_height" value="0" class="d-none"
+                   {% if not (member.pref_locks or {}).get('height') %}checked{% endif %}>
+            <div>📉 扣分</div>
+            <div class="small text-muted">降低配對分數</div>
+          </label>
+          <label class="lock-opt flex-fill text-center py-2 rounded border
+            {% if (member.pref_locks or {}).get('height') %}lock-selected lock-hard{% endif %}">
+            <input type="radio" name="lock_height" value="1" class="d-none"
+                   {% if (member.pref_locks or {}).get('height') %}checked{% endif %}>
+            <div>🔒 絕對不配</div>
+            <div class="small text-muted">超出範圍不配對</div>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Age Range (birth year) -->
+    <div class="card-section">
+      <div class="section-title">對象年齡偏好（出生年）</div>
+      <p class="text-muted small mb-3">填寫可接受的出生年範圍，數字越大代表越年輕。</p>
+      <div class="row g-3">
+        <div class="col">
+          <label class="form-label small text-muted">最早出生年（最大年齡）</label>
+          <input type="number" class="form-control" name="pref_oldest_birth_year"
+                 value="{{ member.pref_oldest_birth_year or '' }}" placeholder="例：1985" min="1950" max="2010">
+        </div>
+        <div class="col">
+          <label class="form-label small text-muted">最晚出生年（最小年齡）</label>
+          <input type="number" class="form-control" name="pref_youngest_birth_year"
+                 value="{{ member.pref_youngest_birth_year or '' }}" placeholder="例：2003" min="1950" max="2010">
+        </div>
+      </div>
+    </div>
+
+    <!-- Region lock -->
+    <div class="card-section">
+      <div class="section-title">約會地區偏好</div>
+      {% set regions = (member.user_info or {}).get('可約會地區 (可複選)', '') %}
+      <p class="text-muted small mb-3">
+        目前設定：{% if regions %}{{ regions }}{% else %}尚未設定{% endif %}
+      </p>
+      <div class="d-flex gap-2">
+        <label class="lock-opt flex-fill text-center py-2 rounded border
+          {% if not (member.pref_locks or {}).get('region') %}lock-selected{% endif %}">
+          <input type="radio" name="lock_region" value="0" class="d-none"
+                 {% if not (member.pref_locks or {}).get('region') %}checked{% endif %}>
+          <div>📉 扣分</div>
+          <div class="small text-muted">無共同地區時扣分</div>
+        </label>
+        <label class="lock-opt flex-fill text-center py-2 rounded border
+          {% if (member.pref_locks or {}).get('region') %}lock-selected lock-hard{% endif %}">
+          <input type="radio" name="lock_region" value="1" class="d-none"
+                 {% if (member.pref_locks or {}).get('region') %}checked{% endif %}>
+          <div>🔒 絕對不配</div>
+          <div class="small text-muted">無共同地區不配對</div>
+        </label>
+      </div>
+    </div>
+
+    <button type="submit" class="btn-save mb-4">儲存偏好設定</button>
+
+  </form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  // Keep toggle-card visual state in sync with radio selection
+  document.querySelectorAll('.toggle-card input[type=radio]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      const group = radio.closest('.d-flex');
+      group.querySelectorAll('.toggle-card').forEach(c => c.classList.remove('active', 'inactive'));
+      const label = radio.closest('.toggle-card');
+      label.classList.add(radio.value === '1' ? 'active' : 'inactive');
+    });
+  });
+
+  // Keep lock-opt visual state in sync
+  document.querySelectorAll('.lock-opt input[type=radio]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      const group = radio.closest('.d-flex');
+      group.querySelectorAll('.lock-opt').forEach(c => c.classList.remove('lock-selected', 'lock-hard'));
+      const label = radio.closest('.lock-opt');
+      label.classList.add('lock-selected');
+      if (radio.value === '1') label.classList.add('lock-hard');
+    });
+  });
+</script>
+
+</body>
+</html>

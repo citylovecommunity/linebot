@@ -186,18 +186,16 @@ def generate_menu_image() -> bytes:
 # ---------------------------------------------------------------------------
 # Rich menu definition
 # ---------------------------------------------------------------------------
-def build_rich_menu(app_url: str, liff_id: str | None) -> RichMenuRequest:
-    bind_url = f"https://liff.line.me/{liff_id}" if liff_id else f"{app_url}/liff/bind"
-
+def build_rich_menu(app_url: str) -> RichMenuRequest:
     action_grid = [
         [
-            URIAction(uri=bind_url,                label="綁定電話"),
+            MessageAction(text="綁定電話",          label="綁定電話"),
             URIAction(uri=f"{app_url}/dashboard/", label="我的配對"),
             URIAction(uri=f"{app_url}/dashboard/", label="任務提案"),
         ],
         [
             MessageAction(text="修改偏好",          label="修改偏好"),
-            URIAction(uri=f"{app_url}/profile/",   label="個人主頁"),
+            MessageAction(text="個人主頁",          label="個人主頁"),
             MessageAction(text="聯絡客服",          label="聯絡我們"),
         ],
     ]
@@ -253,7 +251,7 @@ def main() -> None:
             print("Done (--delete mode).")
             return
 
-        rich_menu = build_rich_menu(settings.APP_URL, settings.LIFF_ID)
+        rich_menu = build_rich_menu(settings.APP_URL)
         response = messaging_api.create_rich_menu(rich_menu)
         menu_id = response.rich_menu_id
         print(f"\nCreated rich menu: {menu_id}")

@@ -11,7 +11,7 @@ from form_app.models import (
     GroupMatching, GroupMembership, GroupMessage, GroupDateProposal,
 )
 from form_app.services.security import verify_password, hash_password
-from form_app.services.liff_token import make_liff_token
+from form_app.services.liff_token import make_liff_token, load_member_token
 from form_app.config import settings
 
 bp = Blueprint('dashboard_bp', __name__, url_prefix="/dashboard")
@@ -645,3 +645,35 @@ def save_pref_locks():
     db.commit()
     flash('偏好設定已更新', 'success')
     return redirect(url_for('dashboard_bp.profile'))
+
+
+@bp.route('/preferences/<token>', methods=['GET', 'POST'])
+def preferences(token):
+    member_id = load_member_token(token)
+    if member_id is None:
+        return render_template('link_expired.html'), 410
+
+    db = get_db()
+    member = db.get(Member, member_id)
+    if not member:
+        abort(404)
+
+    saved = False
+    if request.method == 'POST':
+        def _int(key):
+            v = request.form.get(key, '').strip()
+            return int(v) if v and v.lstrip('-').isdigit() else None
+
+        member.pref_min_height = _int('pref_min_height')
+        member.pref_max_height = _int('pref_max_height')
+        member.pref_oldest_birth_year = _int('pref_oldest_birth_year')
+        member.pref_youngest_birth_year = _int('pref_youngest_birth_year')
+        member.pref_locks = {
+            'height': request.form.get('lock_height') == '1',
+            'region': request.form.get('lock_region') == '1',
+        }
+        member.is_member_active = request.form.get('is_member_active') == '1'
+        db.commit()
+        saved = True
+
+    return render_template('preferences.html', member=member, token=token, saved=saved)
