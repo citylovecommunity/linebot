@@ -111,9 +111,32 @@
         return;
       }
 
-      const token = new URLSearchParams(location.search).get('token');
+      const params = new URLSearchParams(location.search);
+      const token = params.get('token');
+      const page  = params.get('page');
 
-      if (token) {
+      if (page === 'pref') {
+        // Preferences flow: look up member by LINE userId and redirect
+        show('⏳', '正在載入…', '請稍候。', 'secondary');
+        try {
+          const resp = await fetch('/liff/preferences-link', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ line_user_id: profile.userId }),
+          });
+          const body = await resp.json();
+          if (body.ok) {
+            location.href = body.url;
+          } else if (body.error === 'not_bound') {
+            show('📱', '尚未綁定', '請先點選選單中的「綁定電話」完成綁定，再使用此功能。', 'warning');
+          } else {
+            show('❌', '發生錯誤', '請聯繫客服協助。', 'danger');
+          }
+        } catch (e) {
+          show('❌', '網路錯誤', '請確認網路連線後重試。', 'danger');
+        }
+
+      } else if (token) {
         // Token flow (from join page / member centre): auto-bind immediately
         try {
           const body = await callBind({ token, line_user_id: profile.userId });
@@ -121,6 +144,7 @@
         } catch (e) {
           show('❌', '網路錯誤', '請確認網路連線後重試。', 'danger');
         }
+
       } else {
         // No-token flow (from rich menu): ask for phone number
         document.getElementById('loading').classList.add('d-none');
@@ -136,7 +160,6 @@
             return;
           }
           errEl.classList.add('d-none');
-
           document.getElementById('phone-submit').disabled = true;
           document.getElementById('phone-submit').textContent = '綁定中…';
 

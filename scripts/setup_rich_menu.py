@@ -195,7 +195,7 @@ def build_rich_menu(app_url: str, liff_id: str | None) -> RichMenuRequest:
             URIAction(uri=f"{app_url}/dashboard/", label="任務提案"),
         ],
         [
-            MessageAction(text="修改偏好",          label="修改偏好"),
+            URIAction(uri=f"https://liff.line.me/{liff_id}?page=pref" if liff_id else f"{app_url}/liff/bind?page=pref", label="修改偏好"),
             MessageAction(text="個人主頁",          label="個人主頁"),
             MessageAction(text="聯絡客服",          label="聯絡我們"),
         ],

@@ -664,16 +664,71 @@ def preferences(token):
             v = request.form.get(key, '').strip()
             return int(v) if v and v.lstrip('-').isdigit() else None
 
+        def _str(key):
+            return request.form.get(key, '').strip()
+
+        # Numeric preference columns
         member.pref_min_height = _int('pref_min_height')
         member.pref_max_height = _int('pref_max_height')
         member.pref_oldest_birth_year = _int('pref_oldest_birth_year')
         member.pref_youngest_birth_year = _int('pref_youngest_birth_year')
+
+        # Preference locks
         member.pref_locks = {
             'height': request.form.get('lock_height') == '1',
             'region': request.form.get('lock_region') == '1',
         }
+
+        # Weekly matching subscription
         member.is_member_active = request.form.get('is_member_active') == '1'
+
+        # user_info JSONB fields
+        ui = dict(member.user_info or {})
+        regions = request.form.getlist('date_regions')
+        ui['可約會地區 (可複選)'] = ','.join(regions)
+        ui['您的飲食習慣'] = _str('diet')
+        ui['宗教信仰'] = _str('religion')
+        dealbreakers = request.form.getlist('dealbreakers')
+        ui['您完全無法接受的對象條件 (可複選)'] = ','.join(dealbreakers) if dealbreakers else '不設限'
+        ui['不能接受的飲食習慣'] = _str('dealbreaker_diet')
+        ui['無法接受之職業類別'] = _str('dealbreaker_job')
+        ui['無法接受的宗教信仰'] = _str('dealbreaker_religion')
+        member.user_info = ui
+
         db.commit()
         saved = True
 
     return render_template('preferences.html', member=member, token=token, saved=saved)
+
+
+@bp.route('/preferences/<token>/change-password', methods=['POST'])
+def preferences_change_password(token):
+    member_id = load_member_token(token)
+    if member_id is None:
+        return render_template('link_expired.html'), 410
+
+    db = get_db()
+    member = db.get(Member, member_id)
+    if not member:
+        abort(404)
+
+    current_pw  = request.form.get('current_password', '').strip()
+    new_pw      = request.form.get('new_password', '').strip()
+    confirm_pw  = request.form.get('confirm_password', '').strip()
+
+    pw_error = None
+    pw_saved = False
+    if not member.password_hash or not verify_password(member.password_hash, current_pw):
+        pw_error = '目前密碼不正確'
+    elif len(new_pw) < 6:
+        pw_error = '新密碼至少需要 6 個字元'
+    elif new_pw != confirm_pw:
+        pw_error = '兩次輸入的密碼不一致'
+    else:
+        member.password_hash = hash_password(new_pw)
+        db.commit()
+        pw_saved = True
+
+    return render_template('preferences.html', member=member, token=token,
+                           saved=False, pw_saved=pw_saved, pw_error=pw_error,
+                           active_tab='security')

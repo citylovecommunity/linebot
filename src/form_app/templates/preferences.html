@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>修改偏好 — CityLove</title>
+  <title>偏好設定 — CityLove</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
     :root { --brand: #c0506a; --brand-light: #fff0f5; --brand-dark: #8c2d42; }
@@ -11,41 +11,72 @@
 
     .hero {
       background: linear-gradient(135deg, #c0506a 0%, #8c2d42 100%);
-      color: #fff;
-      padding: 2.5rem 1.5rem 4rem;
-      text-align: center;
+      color: #fff; padding: 2.5rem 1.5rem 4rem; text-align: center;
     }
     .hero h1 { font-size: 1.8rem; font-weight: 800; }
     .hero p  { font-size: .95rem; opacity: .85; margin: .4rem 0 0; }
 
-    .card-section {
-      background: #fff;
-      border-radius: 1.25rem;
+    .main-card {
+      background: #fff; border-radius: 1.25rem;
       box-shadow: 0 4px 24px rgba(0,0,0,.08);
-      padding: 1.5rem;
-      margin-bottom: 1rem;
+      overflow: hidden; margin-bottom: 1.5rem;
     }
-    .section-title { font-size: 1rem; font-weight: 700; color: #4a1020; margin-bottom: 1rem; }
 
+    /* Tab nav */
+    .tab-nav {
+      display: flex; border-bottom: 2px solid #f0e0e6;
+    }
+    .tab-btn {
+      flex: 1; padding: .85rem .5rem; text-align: center; font-weight: 600;
+      font-size: .9rem; color: #888; background: none; border: none;
+      border-bottom: 3px solid transparent; margin-bottom: -2px;
+      cursor: pointer; transition: all .15s;
+    }
+    .tab-btn.active { color: var(--brand); border-bottom-color: var(--brand); }
+
+    .tab-panel { display: none; padding: 1.5rem; }
+    .tab-panel.active { display: block; }
+
+    .section-title { font-size: .95rem; font-weight: 700; color: #4a1020; margin-bottom: .85rem; }
+    .section-divider { border-top: 1px solid #f5e5ea; margin: 1.25rem 0; }
+
+    /* Pill checkboxes */
+    .pill-group { display: flex; flex-wrap: wrap; gap: .4rem; }
+    .pill-label {
+      display: inline-flex; align-items: center;
+      padding: .32rem .75rem; border-radius: 99px; cursor: pointer;
+      border: 1.5px solid #ddd; font-size: .85rem; color: #555;
+      transition: all .15s; user-select: none;
+    }
+    .pill-label input { display: none; }
+    .pill-label:hover { border-color: var(--brand); color: var(--brand); }
+    .pill-label:has(input:checked) {
+      background: var(--brand-light); border-color: var(--brand);
+      color: var(--brand); font-weight: 600;
+    }
+    .pill-label.db:has(input:checked) { background: #fff0f0; border-color: #dc3545; color: #dc3545; }
+    .pill-label.db:hover { border-color: #dc3545; color: #dc3545; }
+
+    /* Lock toggles */
     .lock-opt { transition: all .15s; cursor: pointer; user-select: none; }
     .lock-opt:hover { border-color: var(--brand) !important; }
     .lock-selected { border-color: var(--brand) !important; background: var(--brand-light); }
     .lock-hard     { border-color: #dc3545 !important; background: #fff0f0; }
 
+    /* Matching toggle */
     .toggle-card {
       border: 2px solid #e5e5e5; border-radius: 1rem;
       padding: 1rem 1.25rem; cursor: pointer;
       transition: all .15s; user-select: none;
     }
-    .toggle-card:hover { border-color: var(--brand); }
-    .toggle-card.active { border-color: var(--brand); background: var(--brand-light); }
-    .toggle-card.inactive { border-color: #adb5bd; background: #f8f9fa; }
     .toggle-card input { display: none; }
+    .toggle-active   { border-color: var(--brand) !important; background: var(--brand-light); }
+    .toggle-inactive { border-color: #adb5bd !important; background: #f8f9fa; }
 
     .btn-save {
       background: var(--brand); color: #fff; border: none;
-      border-radius: .75rem; padding: .85rem; font-size: 1rem;
-      font-weight: 700; width: 100%;
+      border-radius: .75rem; padding: .8rem; font-size: 1rem;
+      font-weight: 700; width: 100%; margin-top: 1rem;
     }
     .btn-save:hover { background: var(--brand-dark); color: #fff; }
   </style>
@@ -53,144 +84,249 @@
 <body>
 
 <div class="hero">
-  <h1>修改配對偏好</h1>
-  <p>{{ member.name }} 的偏好設定</p>
+  <h1>偏好設定</h1>
+  <p>{{ member.name }}</p>
 </div>
 
-<div class="container px-3" style="max-width: 480px; margin-top: -2rem;">
+<div class="container px-3 pb-4" style="max-width: 520px; margin-top: -2rem;">
+
+  {% set active_tab = active_tab or 'prefs' %}
 
   {% if saved %}
-  <div class="alert alert-success rounded-3 shadow-sm" role="alert">
-    ✅ 偏好已成功更新！
-  </div>
+  <div class="alert alert-success rounded-3 shadow-sm mb-3">✅ 偏好設定已更新！</div>
+  {% endif %}
+  {% if pw_saved %}
+  <div class="alert alert-success rounded-3 shadow-sm mb-3">✅ 密碼已成功更新！</div>
+  {% endif %}
+  {% if pw_error %}
+  <div class="alert alert-danger rounded-3 shadow-sm mb-3">{{ pw_error }}</div>
   {% endif %}
 
-  <form method="POST" action="{{ url_for('dashboard_bp.preferences', token=token) }}">
+  <div class="main-card">
 
-    <!-- Weekly Matching Toggle -->
-    <div class="card-section">
-      <div class="section-title">每週配對訂閱</div>
-      <p class="text-muted small mb-3">關閉後將不再參加每週配對，隨時可以重新開啟。</p>
-      <div class="d-flex gap-2">
-        <label class="toggle-card flex-fill text-center {{ 'active' if member.is_member_active else '' }}">
-          <input type="radio" name="is_member_active" value="1" {% if member.is_member_active %}checked{% endif %}>
-          <div class="fw-bold">✅ 參加配對</div>
-          <div class="small text-muted mt-1">每週自動配對</div>
-        </label>
-        <label class="toggle-card flex-fill text-center {{ 'inactive' if not member.is_member_active else '' }}">
-          <input type="radio" name="is_member_active" value="0" {% if not member.is_member_active %}checked{% endif %}>
-          <div class="fw-bold">⏸ 暫停配對</div>
-          <div class="small text-muted mt-1">本週不參加</div>
-        </label>
-      </div>
+    <!-- Tab navigation -->
+    <div class="tab-nav">
+      <button class="tab-btn {% if active_tab == 'prefs' %}active{% endif %}"
+              onclick="switchTab('prefs', this)">配對偏好</button>
+      <button class="tab-btn {% if active_tab == 'security' %}active{% endif %}"
+              onclick="switchTab('security', this)">帳號安全</button>
     </div>
 
-    <!-- Height Range -->
-    <div class="card-section">
-      <div class="section-title">對象身高偏好（cm）</div>
-      <div class="row g-3">
-        <div class="col">
-          <label class="form-label small text-muted">最低身高</label>
-          <input type="number" class="form-control" name="pref_min_height"
-                 value="{{ member.pref_min_height or '' }}" placeholder="例：155" min="140" max="220">
-        </div>
-        <div class="col">
-          <label class="form-label small text-muted">最高身高</label>
-          <input type="number" class="form-control" name="pref_max_height"
-                 value="{{ member.pref_max_height or '' }}" placeholder="例：185" min="140" max="220">
-        </div>
-      </div>
+    <!-- ══ Tab 1: 配對偏好 ══ -->
+    <div id="tab-prefs" class="tab-panel {% if active_tab == 'prefs' %}active{% endif %}">
+      <form method="POST" action="{{ url_for('dashboard_bp.preferences', token=token) }}">
+      {% set ui = member.user_info or {} %}
+      {% set locks = member.pref_locks or {} %}
 
-      <!-- Height lock -->
-      <div class="mt-3">
-        <div class="small text-muted mb-2">不符合時的處理方式</div>
-        <div class="d-flex gap-2">
-          <label class="lock-opt flex-fill text-center py-2 rounded border
-            {% if not (member.pref_locks or {}).get('height') %}lock-selected{% endif %}">
-            <input type="radio" name="lock_height" value="0" class="d-none"
-                   {% if not (member.pref_locks or {}).get('height') %}checked{% endif %}>
-            <div>📉 扣分</div>
-            <div class="small text-muted">降低配對分數</div>
+        <!-- Weekly matching -->
+        <div class="section-title">每週配對訂閱</div>
+        <div class="d-flex gap-2 mb-3">
+          <label class="toggle-card flex-fill text-center {{ 'toggle-active' if member.is_member_active else '' }}">
+            <input type="radio" name="is_member_active" value="1" {% if member.is_member_active %}checked{% endif %}>
+            <div class="fw-bold">✅ 參加配對</div>
+            <div class="small text-muted mt-1">每週自動配對</div>
           </label>
-          <label class="lock-opt flex-fill text-center py-2 rounded border
-            {% if (member.pref_locks or {}).get('height') %}lock-selected lock-hard{% endif %}">
-            <input type="radio" name="lock_height" value="1" class="d-none"
-                   {% if (member.pref_locks or {}).get('height') %}checked{% endif %}>
-            <div>🔒 絕對不配</div>
-            <div class="small text-muted">超出範圍不配對</div>
+          <label class="toggle-card flex-fill text-center {{ 'toggle-inactive' if not member.is_member_active else '' }}">
+            <input type="radio" name="is_member_active" value="0" {% if not member.is_member_active %}checked{% endif %}>
+            <div class="fw-bold">⏸ 暫停配對</div>
+            <div class="small text-muted mt-1">本週不參加</div>
           </label>
         </div>
-      </div>
-    </div>
 
-    <!-- Age Range (birth year) -->
-    <div class="card-section">
-      <div class="section-title">對象年齡偏好（出生年）</div>
-      <p class="text-muted small mb-3">填寫可接受的出生年範圍，數字越大代表越年輕。</p>
-      <div class="row g-3">
-        <div class="col">
-          <label class="form-label small text-muted">最早出生年（最大年齡）</label>
-          <input type="number" class="form-control" name="pref_oldest_birth_year"
-                 value="{{ member.pref_oldest_birth_year or '' }}" placeholder="例：1985" min="1950" max="2010">
+        <div class="section-divider"></div>
+
+        <!-- My info -->
+        <div class="section-title">我的資料</div>
+        <div class="mb-3">
+          <div class="small fw-semibold mb-2">可見面地區</div>
+          {% set cur_regions = ui.get('可約會地區 (可複選)', '') %}
+          <div class="pill-group">
+            {% for r in ['大台北地區','桃園','新竹','台中','台南','高雄','基隆','宜蘭','花蓮','台東'] %}
+            <label class="pill-label">
+              <input type="checkbox" name="date_regions" value="{{ r }}"
+                     {% if r in cur_regions %}checked{% endif %}>{{ r }}
+            </label>
+            {% endfor %}
+          </div>
         </div>
-        <div class="col">
-          <label class="form-label small text-muted">最晚出生年（最小年齡）</label>
-          <input type="number" class="form-control" name="pref_youngest_birth_year"
-                 value="{{ member.pref_youngest_birth_year or '' }}" placeholder="例：2003" min="1950" max="2010">
+        <div class="row g-2 mb-1">
+          <div class="col-6">
+            <label class="form-label small fw-semibold">飲食習慣</label>
+            {% set cur_diet = ui.get('您的飲食習慣', '') %}
+            <select class="form-select form-select-sm" name="diet">
+              <option value="">— 未設定 —</option>
+              {% for d in ['葷','素','葷素皆可','純素'] %}
+              <option value="{{ d }}" {% if cur_diet == d %}selected{% endif %}>{{ d }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label small fw-semibold">宗教信仰</label>
+            {% set cur_rel = ui.get('宗教信仰', '') %}
+            <select class="form-select form-select-sm" name="religion">
+              <option value="">— 未設定 —</option>
+              {% for rel in ['無特別宗教信仰（無限制）','佛教','基督教','天主教','伊斯蘭教','道教'] %}
+              <option value="{{ rel }}" {% if cur_rel == rel %}selected{% endif %}>{{ rel }}</option>
+              {% endfor %}
+            </select>
+          </div>
         </div>
-      </div>
+
+        <div class="section-divider"></div>
+
+        <!-- Partner preferences -->
+        <div class="section-title">期待對象條件</div>
+        <div class="mb-3">
+          <div class="small fw-semibold mb-2">對象身高偏好（cm）</div>
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <input type="number" class="form-control form-control-sm" name="pref_min_height"
+                   value="{{ member.pref_min_height or '' }}" placeholder="最低">
+            <span class="text-muted">～</span>
+            <input type="number" class="form-control form-control-sm" name="pref_max_height"
+                   value="{{ member.pref_max_height or '' }}" placeholder="最高">
+          </div>
+          <div class="d-flex gap-2">
+            <label class="lock-opt flex-fill text-center py-2 rounded border small {% if not locks.get('height') %}lock-selected{% endif %}">
+              <input type="radio" name="lock_height" value="0" class="d-none" {% if not locks.get('height') %}checked{% endif %}>
+              <div>📉 扣分</div>
+            </label>
+            <label class="lock-opt flex-fill text-center py-2 rounded border small {% if locks.get('height') %}lock-selected lock-hard{% endif %}">
+              <input type="radio" name="lock_height" value="1" class="d-none" {% if locks.get('height') %}checked{% endif %}>
+              <div>🔒 絕對不配</div>
+            </label>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <div class="small fw-semibold mb-1">對象年齡偏好（出生年，數字越大越年輕）</div>
+          <div class="row g-2">
+            <div class="col">
+              <label class="form-label" style="font-size:.78rem;color:#888;">最早出生年（最大年齡）</label>
+              <input type="number" class="form-control form-control-sm" name="pref_oldest_birth_year"
+                     value="{{ member.pref_oldest_birth_year or '' }}" placeholder="例：1985">
+            </div>
+            <div class="col">
+              <label class="form-label" style="font-size:.78rem;color:#888;">最晚出生年（最小年齡）</label>
+              <input type="number" class="form-control form-control-sm" name="pref_youngest_birth_year"
+                     value="{{ member.pref_youngest_birth_year or '' }}" placeholder="例：2003">
+            </div>
+          </div>
+        </div>
+
+        <div class="mb-1">
+          <div class="small fw-semibold mb-2">約會地區不符合時</div>
+          <div class="d-flex gap-2">
+            <label class="lock-opt flex-fill text-center py-2 rounded border small {% if not locks.get('region') %}lock-selected{% endif %}">
+              <input type="radio" name="lock_region" value="0" class="d-none" {% if not locks.get('region') %}checked{% endif %}>
+              <div>📉 扣分</div>
+            </label>
+            <label class="lock-opt flex-fill text-center py-2 rounded border small {% if locks.get('region') %}lock-selected lock-hard{% endif %}">
+              <input type="radio" name="lock_region" value="1" class="d-none" {% if locks.get('region') %}checked{% endif %}>
+              <div>🔒 絕對不配</div>
+            </label>
+          </div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <!-- Dealbreakers -->
+        <div class="section-title" style="color:#dc3545;">絕對不接受條件</div>
+        <p class="text-muted small mb-2">勾選後，系統將永不把符合此條件的對象配對給您。</p>
+        {% set cur_db = ui.get('您完全無法接受的對象條件 (可複選)', '') %}
+        <div class="pill-group mb-3">
+          {% for item in ['離婚','有小孩','抽菸','喝酒','紋身'] %}
+          <label class="pill-label db">
+            <input type="checkbox" name="dealbreakers" value="{{ item }}"
+                   {% if item in cur_db %}checked{% endif %}>{{ item }}
+          </label>
+          {% endfor %}
+        </div>
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label small fw-semibold">不接受的飲食習慣</label>
+            {% set cur_db_diet = ui.get('不能接受的飲食習慣', '') %}
+            <select class="form-select form-select-sm" name="dealbreaker_diet">
+              <option value="">不設限</option>
+              {% for d in ['葷','素','純素'] %}
+              <option value="{{ d }}" {% if cur_db_diet == d %}selected{% endif %}>{{ d }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label small fw-semibold">不接受的宗教信仰</label>
+            {% set cur_db_rel = ui.get('無法接受的宗教信仰', '') %}
+            <select class="form-select form-select-sm" name="dealbreaker_religion">
+              <option value="">不設限</option>
+              {% for rel in ['佛教','基督教','天主教','伊斯蘭教','道教'] %}
+              <option value="{{ rel }}" {% if cur_db_rel == rel %}selected{% endif %}>{{ rel }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label small fw-semibold">不接受的職業類別</label>
+            <input type="text" class="form-control form-control-sm" name="dealbreaker_job"
+                   placeholder="例：軍警消" value="{{ ui.get('無法接受之職業類別', '') }}">
+          </div>
+        </div>
+
+        <button type="submit" class="btn-save">儲存偏好設定</button>
+      </form>
     </div>
 
-    <!-- Region lock -->
-    <div class="card-section">
-      <div class="section-title">約會地區偏好</div>
-      {% set regions = (member.user_info or {}).get('可約會地區 (可複選)', '') %}
-      <p class="text-muted small mb-3">
-        目前設定：{% if regions %}{{ regions }}{% else %}尚未設定{% endif %}
-      </p>
-      <div class="d-flex gap-2">
-        <label class="lock-opt flex-fill text-center py-2 rounded border
-          {% if not (member.pref_locks or {}).get('region') %}lock-selected{% endif %}">
-          <input type="radio" name="lock_region" value="0" class="d-none"
-                 {% if not (member.pref_locks or {}).get('region') %}checked{% endif %}>
-          <div>📉 扣分</div>
-          <div class="small text-muted">無共同地區時扣分</div>
-        </label>
-        <label class="lock-opt flex-fill text-center py-2 rounded border
-          {% if (member.pref_locks or {}).get('region') %}lock-selected lock-hard{% endif %}">
-          <input type="radio" name="lock_region" value="1" class="d-none"
-                 {% if (member.pref_locks or {}).get('region') %}checked{% endif %}>
-          <div>🔒 絕對不配</div>
-          <div class="small text-muted">無共同地區不配對</div>
-        </label>
-      </div>
+    <!-- ══ Tab 2: 帳號安全 ══ -->
+    <div id="tab-security" class="tab-panel {% if active_tab == 'security' %}active{% endif %}">
+      <form method="POST" action="{{ url_for('dashboard_bp.preferences_change_password', token=token) }}">
+
+        <div class="section-title">變更密碼</div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">目前密碼</label>
+          <input type="password" class="form-control" name="current_password"
+                 autocomplete="current-password" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">新密碼</label>
+          <input type="password" class="form-control" name="new_password"
+                 autocomplete="new-password" required minlength="6">
+          <div class="form-text">至少 6 個字元</div>
+        </div>
+        <div class="mb-1">
+          <label class="form-label small fw-semibold">確認新密碼</label>
+          <input type="password" class="form-control" name="confirm_password"
+                 autocomplete="new-password" required>
+        </div>
+
+        <button type="submit" class="btn-save">更新密碼</button>
+      </form>
     </div>
 
-    <button type="submit" class="btn-save mb-4">儲存偏好設定</button>
-
-  </form>
+  </div><!-- /main-card -->
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-  // Keep toggle-card visual state in sync with radio selection
-  document.querySelectorAll('.toggle-card input[type=radio]').forEach(radio => {
-    radio.addEventListener('change', () => {
-      const group = radio.closest('.d-flex');
-      group.querySelectorAll('.toggle-card').forEach(c => c.classList.remove('active', 'inactive'));
-      const label = radio.closest('.toggle-card');
-      label.classList.add(radio.value === '1' ? 'active' : 'inactive');
+  function switchTab(name, btn) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    btn.classList.add('active');
+  }
+
+  // Toggle card sync
+  document.querySelectorAll('.toggle-card input').forEach(r => {
+    r.addEventListener('change', () => {
+      r.closest('.d-flex').querySelectorAll('.toggle-card')
+        .forEach(c => c.classList.remove('toggle-active', 'toggle-inactive'));
+      r.closest('.toggle-card').classList.add(r.value === '1' ? 'toggle-active' : 'toggle-inactive');
     });
   });
-
-  // Keep lock-opt visual state in sync
-  document.querySelectorAll('.lock-opt input[type=radio]').forEach(radio => {
-    radio.addEventListener('change', () => {
-      const group = radio.closest('.d-flex');
-      group.querySelectorAll('.lock-opt').forEach(c => c.classList.remove('lock-selected', 'lock-hard'));
-      const label = radio.closest('.lock-opt');
-      label.classList.add('lock-selected');
-      if (radio.value === '1') label.classList.add('lock-hard');
+  // Lock opt sync
+  document.querySelectorAll('.lock-opt input').forEach(r => {
+    r.addEventListener('change', () => {
+      r.closest('.d-flex').querySelectorAll('.lock-opt')
+        .forEach(c => c.classList.remove('lock-selected', 'lock-hard'));
+      const lbl = r.closest('.lock-opt');
+      lbl.classList.add('lock-selected');
+      if (r.value === '1') lbl.classList.add('lock-hard');
     });
   });
 </script>
