@@ -7,7 +7,7 @@ from flask_login import LoginManager, current_user
 
 from form_app.config import settings
 from form_app.database import get_db, init_db
-from form_app.routes import admin, auth, dashboard, dev, liff, profile, tasks, webhook
+from form_app.routes import admin, auth, dashboard, dev, join, liff, profile, tasks, webhook
 from form_app.models import Member
 
 app = Flask(__name__)
@@ -31,6 +31,7 @@ app.register_blueprint(tasks.bp)
 app.register_blueprint(dev.bp)
 app.register_blueprint(profile.bp)
 app.register_blueprint(liff.bp)
+app.register_blueprint(join.bp)
 
 
 login_manager = LoginManager()
