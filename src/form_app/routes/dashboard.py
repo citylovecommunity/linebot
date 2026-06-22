@@ -631,3 +631,17 @@ def change_password():
     db.commit()
     flash('密碼已成功更新', 'success')
     return redirect(url_for('dashboard_bp.profile'))
+
+
+@bp.route('/profile/locks', methods=['POST'])
+@login_required
+def save_pref_locks():
+    db = get_db()
+    user = db.get(Member, current_user.id)
+    user.pref_locks = {
+        'height': request.form.get('lock_height') == '1',
+        'region': request.form.get('lock_region') == '1',
+    }
+    db.commit()
+    flash('偏好設定已更新', 'success')
+    return redirect(url_for('dashboard_bp.profile'))

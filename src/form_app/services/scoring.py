@@ -47,6 +47,7 @@ class UserProfileAdapter:
             info.setdefault('您期待認識的對象最大年紀', str(member.pref_oldest_birth_year))
         if member.pref_youngest_birth_year:
             info.setdefault('您期待認識的對象最小年紀', str(member.pref_youngest_birth_year))
+        info['_locks'] = member.pref_locks or {}
         return cls(info)
 
     def _parse_int(self, key, default=0):
@@ -152,6 +153,10 @@ class UserProfileAdapter:
     @property
     def pref_youngest_birth_year(self):
         return self._parse_int("您期待認識的對象最小年紀", 2030)
+
+    @property
+    def pref_locks(self) -> dict:
+        return self.raw.get('_locks', {})
 
 
 def get_eligible_matching_pool(session: Session, defer_user_info: bool = False):
@@ -261,15 +266,27 @@ def calculate_match_score(me_adapter, candidate_adapter):
         score += points
         breakdown['hobbies'] = f"+{points}"
 
-    # --- 6. HEIGHT (soft preference penalty) ---
+    # --- 6. HEIGHT (soft penalty, or hard if locked) ---
+    height_locked = me_adapter.pref_locks.get('height', False)
     if me_adapter.pref_min_height and candidate_adapter.height and \
             candidate_adapter.height < me_adapter.pref_min_height:
+        if height_locked:
+            return HARD_EXCLUDE, {'hard_dealbreaker': 'height_below_min'}
         score -= 20
         breakdown['min_height'] = "-20"
+    if me_adapter.pref_max_height and me_adapter.pref_max_height < 250 and \
+            candidate_adapter.height and candidate_adapter.height > me_adapter.pref_max_height:
+        if height_locked:
+            return HARD_EXCLUDE, {'hard_dealbreaker': 'height_above_max'}
+        score -= 20
+        breakdown['max_height'] = "-20"
 
-    # --- 7. DATABLE REGIONS (soft penalty if zero overlap) ---
+    # --- 7. DATABLE REGIONS (soft penalty, or hard if locked) ---
+    region_locked = me_adapter.pref_locks.get('region', False)
     if candidate_adapter.datable_place and me_adapter.datable_place and \
             len(candidate_adapter.datable_place.intersection(me_adapter.datable_place)) == 0:
+        if region_locked:
+            return HARD_EXCLUDE, {'hard_dealbreaker': 'region_no_overlap'}
         score -= 20
         breakdown['datable_place'] = "-20"
 

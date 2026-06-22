@@ -58,6 +58,11 @@ def join():
         if plan_months and plan_months.isdigit():
             user_info['購買的方案期數 /月（ 填寫純數字 ）'] = plan_months
 
+        pref_locks = {
+            'height': request.form.get('lock_height') == '1',
+            'region': request.form.get('lock_region') == '1',
+        }
+
         password_plain = request.form.get('password', '').strip()
         if not password_plain and birthday:
             password_plain = birthday.strftime('%Y%m%d')
@@ -79,6 +84,7 @@ def join():
             marital_status=request.form.get('marital_status') or None,
             fill_form_at=datetime.now(),
             user_info=user_info,
+            pref_locks=pref_locks,
             password_hash=hash_password(password_plain) if password_plain else None,
             **prefs,
         )

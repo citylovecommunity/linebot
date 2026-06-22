@@ -126,6 +126,11 @@
     .feature-item span { font-size: 1.6rem; display: block; }
     .feature-item p { font-size: .78rem; opacity: .9; margin: .25rem 0 0; }
 
+    .lock-choice { transition: all .15s; cursor: pointer; user-select: none; }
+    .lock-choice:hover { border-color: #6c757d !important; }
+    .lock-choice-selected { border-color: #0d6efd !important; background: #eef3ff; }
+    .lock-choice-hard     { border-color: #dc3545 !important; background: #fff0f0; }
+
     @media (max-width: 400px) {
       .plan-grid   { grid-template-columns: 1fr; }
       .hero h1     { font-size: 2rem; }
@@ -277,6 +282,22 @@
           {% endfor %}
         </div>
 
+        <div class="mt-3 p-3 rounded" style="background:#f8f9fa;border:1.5px solid #dee2e6;">
+          <div class="fw-semibold small mb-2">地區偏好的嚴格程度</div>
+          <div class="d-flex gap-2">
+            <label class="lock-choice flex-fill text-center py-2 rounded border lock-choice-selected" id="region-soft-label">
+              <input type="radio" name="lock_region" value="0" class="d-none" checked onchange="highlightLock('region')">
+              <div class="small fw-semibold">📉 扣分</div>
+              <div style="font-size:.75rem;color:#888;">無共同地區時降低分數</div>
+            </label>
+            <label class="lock-choice flex-fill text-center py-2 rounded border" id="region-hard-label">
+              <input type="radio" name="lock_region" value="1" class="d-none" onchange="highlightLock('region')">
+              <div class="small fw-semibold">🔒 絕對不配</div>
+              <div style="font-size:.75rem;color:#888;">無共同地區永不配對</div>
+            </label>
+          </div>
+        </div>
+
         <div class="wizard-nav">
           <button type="button" class="btn-back" onclick="goTo(2)">←</button>
           <button type="button" class="btn-next" onclick="goTo(4)">繼續 →</button>
@@ -307,6 +328,22 @@
             <label class="form-label">對象最晚出生年</label>
             <input type="number" class="form-control" name="pref_youngest_birth_year" min="1940" max="2010" placeholder="例：2000">
             <div class="form-text">2000 = 最小不超過 2000 年出生</div>
+          </div>
+        </div>
+
+        <div class="mt-1 mb-3 p-3 rounded" style="background:#f8f9fa;border:1.5px solid #dee2e6;">
+          <div class="fw-semibold small mb-2">身高偏好的嚴格程度</div>
+          <div class="d-flex gap-2">
+            <label class="lock-choice flex-fill text-center py-2 rounded border lock-choice-selected" id="height-soft-label">
+              <input type="radio" name="lock_height" value="0" class="d-none" checked onchange="highlightLock('height')">
+              <div class="small fw-semibold">📉 扣分</div>
+              <div style="font-size:.75rem;color:#888;">不在範圍內時降低分數</div>
+            </label>
+            <label class="lock-choice flex-fill text-center py-2 rounded border" id="height-hard-label">
+              <input type="radio" name="lock_height" value="1" class="d-none" onchange="highlightLock('height')">
+              <div class="small fw-semibold">🔒 絕對不配</div>
+              <div style="font-size:.75rem;color:#888;">超出範圍永不配對</div>
+            </label>
           </div>
         </div>
 
@@ -443,6 +480,16 @@
       return;
     }
   });
+
+  function highlightLock(pref) {
+    const soft = document.getElementById(pref + '-soft-label');
+    const hard = document.getElementById(pref + '-hard-label');
+    const isHard = document.querySelector(`input[name="lock_${pref}"][value="1"]`).checked;
+    soft.className = soft.className.replace(' lock-choice-selected','').replace(' lock-choice-hard','');
+    hard.className = hard.className.replace(' lock-choice-selected','').replace(' lock-choice-hard','');
+    if (isHard) hard.classList.add('lock-choice-hard');
+    else soft.classList.add('lock-choice-selected');
+  }
 
   // Init: if there's a server-side error, go straight to step 1
   {% if error %}

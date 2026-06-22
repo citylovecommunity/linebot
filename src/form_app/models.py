@@ -114,6 +114,9 @@ class Member(Base):
     pref_oldest_birth_year: Mapped[Optional[int]]
     pref_youngest_birth_year: Mapped[Optional[int]]
 
+    # Keys: 'height', 'region' — value True means hard dealbreaker, False means soft (-20 pts)
+    pref_locks: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+
     @property
     def is_authenticated(self):
         return True
