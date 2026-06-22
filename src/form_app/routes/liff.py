@@ -3,7 +3,7 @@ from sqlalchemy.exc import IntegrityError
 
 from form_app.config import settings
 from form_app.database import get_db
-from form_app.models import Line_Info
+from form_app.models import Line_Info, Member
 from form_app.services.liff_token import load_liff_token
 
 bp = Blueprint('liff_bp', __name__, url_prefix='/liff')
@@ -17,17 +17,28 @@ def bind():
 @bp.route('/bind', methods=['POST'])
 def bind_callback():
     data = request.get_json(silent=True) or {}
-    token = data.get('token', '').strip()
     line_user_id = data.get('line_user_id', '').strip()
+    token = data.get('token', '').strip()
+    phone_number = data.get('phone_number', '').strip()
 
-    if not token or not line_user_id:
+    if not line_user_id:
         return jsonify(ok=False, error='missing_params'), 400
 
-    phone_number = load_liff_token(token)
-    if not phone_number:
-        return jsonify(ok=False, error='invalid_or_expired_token'), 400
-
     db = get_db()
+
+    if token:
+        # Token flow (from join page / member centre)
+        phone_number = load_liff_token(token)
+        if not phone_number:
+            return jsonify(ok=False, error='invalid_or_expired_token'), 400
+    elif phone_number:
+        # Phone-number flow (from rich menu, no pre-issued token)
+        member = db.query(Member).filter_by(phone_number=phone_number).first()
+        if not member:
+            return jsonify(ok=False, error='member_not_found'), 404
+    else:
+        return jsonify(ok=False, error='missing_params'), 400
+
     existing = db.query(Line_Info).filter_by(phone_number=phone_number).first()
     if existing:
         if existing.user_id == line_user_id:
@@ -40,7 +51,6 @@ def bind_callback():
         db.commit()
     except IntegrityError:
         db.rollback()
-        # user_id unique constraint: this LINE account is already bound to another phone
         return jsonify(ok=False, error='line_account_already_used'), 409
 
     return jsonify(ok=True)
