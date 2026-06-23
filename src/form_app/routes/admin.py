@@ -37,7 +37,7 @@ def _invalidate_dashboard_cache():
 from form_app.models import (
     ActivityLabel, Invite, Member, Matching, MatchingStatus, Message, UserMatchScore,
     DateProposal, ProposalStatus, Line_Info,
-    GroupMatching, GroupMatchingStatus, GroupMembership, GroupMessage, GroupDateProposal,
+    GroupMatching, GroupMatchingStatus, GroupMembership, GroupMessage, GroupDateProposal, GroupBadge,
     assign_session_avatars,
 )
 from collections import defaultdict
@@ -689,21 +689,42 @@ def delete_user(user_id):
         flash(f'無法刪除「{user.name}」：該會員有配對記錄，請先取消所有配對。', 'danger')
         return redirect(url_for('admin_bp.admin_dashboard'))
 
-    # Remove related scores, draft matchings, and line_info before deleting member
-    session.query(UserMatchScore).filter(
-        (UserMatchScore.source_user_id == user_id) |
-        (UserMatchScore.target_user_id == user_id)
-    ).delete(synchronize_session=False)
-    session.query(Matching).filter(
-        ((Matching.subject_id == user_id) | (Matching.object_id == user_id)),
-        Matching.status == MatchingStatus.DRAFT,
-    ).delete(synchronize_session=False)
-    if user.line_info:
-        session.delete(user.line_info)
+    if user.group_memberships:
+        flash(f'無法刪除「{user.name}」：該會員有群組記錄，請先移除群組。', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard'))
 
     name = user.name
-    session.delete(user)
-    session.commit()
+    try:
+        # NULL out nullable FKs that point to this member
+        session.query(Invite).filter(Invite.created_by_id == user_id).update(
+            {Invite.created_by_id: None}, synchronize_session=False)
+        session.query(GroupMembership).filter(GroupMembership.referred_by_id == user_id).update(
+            {GroupMembership.referred_by_id: None}, synchronize_session=False)
+        session.query(GroupMatching).filter(GroupMatching.opener_member_id == user_id).update(
+            {GroupMatching.opener_member_id: None}, synchronize_session=False)
+        session.query(GroupMatching).filter(GroupMatching.summary_submitted_by_id == user_id).update(
+            {GroupMatching.summary_submitted_by_id: None}, synchronize_session=False)
+
+        # Delete non-nullable dependent rows
+        session.query(UserMatchScore).filter(
+            (UserMatchScore.source_user_id == user_id) |
+            (UserMatchScore.target_user_id == user_id)
+        ).delete(synchronize_session=False)
+        session.query(Matching).filter(
+            ((Matching.subject_id == user_id) | (Matching.object_id == user_id)),
+            Matching.status == MatchingStatus.DRAFT,
+        ).delete(synchronize_session=False)
+
+        if user.line_info:
+            session.delete(user.line_info)
+
+        session.delete(user)
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        flash(f'刪除失敗：{e}', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard'))
+
     _invalidate_dashboard_cache()
     flash(f'已刪除會員「{name}」', 'success')
     return redirect(url_for('admin_bp.admin_dashboard'))
