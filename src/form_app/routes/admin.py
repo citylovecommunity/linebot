@@ -689,10 +689,14 @@ def delete_user(user_id):
         flash(f'無法刪除「{user.name}」：該會員有配對記錄，請先取消所有配對。', 'danger')
         return redirect(url_for('admin_bp.admin_dashboard'))
 
-    # Remove related scores and line_info before deleting member
+    # Remove related scores, draft matchings, and line_info before deleting member
     session.query(UserMatchScore).filter(
         (UserMatchScore.source_user_id == user_id) |
         (UserMatchScore.target_user_id == user_id)
+    ).delete(synchronize_session=False)
+    session.query(Matching).filter(
+        ((Matching.subject_id == user_id) | (Matching.object_id == user_id)),
+        Matching.status == MatchingStatus.DRAFT,
     ).delete(synchronize_session=False)
     if user.line_info:
         session.delete(user.line_info)
