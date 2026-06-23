@@ -548,7 +548,7 @@ def new_user():
             session.commit()
         except IntegrityError:
             session.rollback()
-            flash(f'手機號碼 {member.phone_number} 已存在，請使用其他號碼', 'danger')
+            flash(f'手機號碼 {request.form["phone_number"]} 已存在，請使用其他號碼', 'danger')
             return render_template('admin_user_form.html', user=None)
         _invalidate_dashboard_cache()
         flash(f'已新增會員 {member.name}', 'success')
@@ -653,7 +653,7 @@ def edit_user(user_id):
             session.commit()
         except IntegrityError:
             session.rollback()
-            flash(f'手機號碼 {user.phone_number} 已存在，請使用其他號碼', 'danger')
+            flash(f'手機號碼 {request.form["phone_number"]} 已存在，請使用其他號碼', 'danger')
             return render_template('admin_user_form.html', user=user)
         _invalidate_dashboard_cache()
         flash(f'已更新會員 {user.name}', 'success')
