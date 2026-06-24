@@ -27,6 +27,9 @@ class Settings(BaseSettings):
 
     LIFF_ID: Optional[str] = None
 
+    CLOUDINARY_CLOUD_NAME: str = "ddlaiteiw"
+    CLOUDINARY_UPLOAD_PRESET: str = "citylove_server"
+
     model_config = SettingsConfigDict(
         env_file='.env', env_file_encoding='utf-8', extra='ignore')
 

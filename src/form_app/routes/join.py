@@ -1,5 +1,7 @@
 from datetime import datetime
 
+import cloudinary
+import cloudinary.uploader
 from flask import Blueprint, redirect, render_template, request, url_for
 from sqlalchemy.exc import IntegrityError
 
@@ -9,6 +11,8 @@ from form_app.database import get_db
 from form_app.models import Member
 from form_app.services.liff_token import make_liff_token
 from form_app.services.security import hash_password
+
+cloudinary.config(cloud_name=settings.CLOUDINARY_CLOUD_NAME)
 
 bp = Blueprint('join_bp', __name__)
 
@@ -63,8 +67,14 @@ def join(slug: str):
         if birthday:
             user_info.setdefault('您的出生年月日', birthday.strftime('%Y/%m/%d'))
 
-        # TODO: upload profile_photo to Cloudinary and store URL in user_info
-        # photo = request.files.get('profile_photo')
+        photo = request.files.get('profile_photo')
+        if photo and photo.filename:
+            result = cloudinary.uploader.unsigned_upload(
+                photo,
+                settings.CLOUDINARY_UPLOAD_PRESET,
+                folder="citylove/members",
+            )
+            user_info['相片網址'] = result['secure_url']
 
         password_plain = birthday.strftime('%Y%m%d') if birthday else None
 
