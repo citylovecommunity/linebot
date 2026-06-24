@@ -102,6 +102,7 @@ class Member(Base):
     email: Mapped[Optional[str]]
     id_card_no: Mapped[Optional[str]]
     fill_form_at: Mapped[datetime]
+    join_campaign: Mapped[Optional[str]]    # slug from campaigns.py; None = admin-created
     user_info: Mapped[Dict[str, Any]] = mapped_column(JSONB, nullable=True)
 
     rank: Mapped[Optional[str]]

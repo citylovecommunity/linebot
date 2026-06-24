@@ -1,8 +1,9 @@
 from datetime import datetime
 
-from flask import Blueprint, render_template, request
+from flask import Blueprint, redirect, render_template, request, url_for
 from sqlalchemy.exc import IntegrityError
 
+from form_app.campaigns import get_campaign
 from form_app.config import settings
 from form_app.database import get_db
 from form_app.models import Member
@@ -17,16 +18,23 @@ def _set_if_present(d: dict, key: str, value: str):
         d[key] = value
 
 
-@bp.route('/join', methods=['GET', 'POST'])
-def join():
+@bp.route('/join')
+def join_default():
+    return redirect(url_for('join_bp.join', slug='default'))
+
+
+@bp.route('/join/<slug>', methods=['GET', 'POST'])
+def join(slug: str):
+    campaign = get_campaign(slug)
     error = None
 
     if request.method == 'POST':
-        name = request.form.get('name', '').strip()
-        phone = request.form.get('phone_number', '').strip()
-        gender = request.form.get('gender', '').strip()
+        name         = request.form.get('name', '').strip()
+        phone        = request.form.get('phone_number', '').strip()
+        gender       = request.form.get('gender', '').strip()
         birthday_str = request.form.get('birthday', '').strip()
-        height_str = request.form.get('height', '').strip()
+        height_str   = request.form.get('height', '').strip()
+        campaign_slug = request.form.get('campaign', slug)
 
         birthday = None
         if birthday_str:
@@ -36,43 +44,29 @@ def join():
                 pass
 
         user_info = {}
-        _set_if_present(user_info, '您目前的感情狀況', request.form.get('marital_status', '').strip())
-        _set_if_present(user_info, '您有無小孩需要扶養', request.form.get('has_children', '').strip())
-        _set_if_present(user_info, '會員之職業類別', request.form.get('job_category', '').strip())
-        _set_if_present(user_info, '您的飲食習慣', request.form.get('diet', '').strip())
-        _set_if_present(user_info, '宗教信仰', request.form.get('religion', '').strip())
 
+        # Step 2 fields
+        _set_if_present(user_info, '您目前的感情狀況',   request.form.get('marital_status', '').strip())
+        _set_if_present(user_info, '您有無小孩需要扶養', request.form.get('has_children', '').strip())
+        _set_if_present(user_info, '會員之職業類別',     request.form.get('job_category', '').strip())
+        _set_if_present(user_info, '宗教信仰',           request.form.get('religion', '').strip())
+        _set_if_present(user_info, '簡單介紹自己',       request.form.get('self_intro', '').strip())
+
+        interests = request.form.getlist('interests')
+        if interests:
+            user_info['興趣'] = ','.join(interests)
+
+        # Step 3 fields
         regions = request.form.getlist('date_regions')
         user_info['可約會地區 (可複選)'] = ','.join(regions) if regions else ''
-
-        dealbreakers = request.form.getlist('dealbreakers')
-        user_info['您完全無法接受的對象條件 (可複選)'] = ','.join(dealbreakers) if dealbreakers else '不設限'
-        _set_if_present(user_info, '不能接受的飲食習慣', request.form.get('dealbreaker_diet', '').strip())
-        _set_if_present(user_info, '無法接受之職業類別', request.form.get('dealbreaker_job', '').strip())
-        _set_if_present(user_info, '無法接受的宗教信仰', request.form.get('dealbreaker_religion', '').strip())
 
         if birthday:
             user_info.setdefault('您的出生年月日', birthday.strftime('%Y/%m/%d'))
 
-        plan_months = request.form.get('plan_months', '').strip()
-        if plan_months and plan_months.isdigit():
-            user_info['購買的方案期數 /月（ 填寫純數字 ）'] = plan_months
+        # TODO: upload profile_photo to Cloudinary and store URL in user_info
+        # photo = request.files.get('profile_photo')
 
-        pref_locks = {
-            'height': request.form.get('lock_height') == '1',
-            'region': request.form.get('lock_region') == '1',
-        }
-
-        password_plain = request.form.get('password', '').strip()
-        if not password_plain and birthday:
-            password_plain = birthday.strftime('%Y%m%d')
-
-        pref_fields = ['pref_min_height', 'pref_max_height', 'pref_oldest_birth_year', 'pref_youngest_birth_year']
-        prefs = {}
-        for f in pref_fields:
-            val = request.form.get(f, '').strip()
-            if val and val.lstrip('-').isdigit():
-                prefs[f] = int(val)
+        password_plain = birthday.strftime('%Y%m%d') if birthday else None
 
         member = Member(
             name=name,
@@ -83,10 +77,9 @@ def join():
             email=request.form.get('email', '').strip() or None,
             marital_status=request.form.get('marital_status') or None,
             fill_form_at=datetime.now(),
+            join_campaign=campaign_slug,
             user_info=user_info,
-            pref_locks=pref_locks,
             password_hash=hash_password(password_plain) if password_plain else None,
-            **prefs,
         )
         db = get_db()
         db.add(member)
@@ -101,4 +94,4 @@ def join():
             db.rollback()
             error = f'手機號碼 {phone} 已被使用，請確認後重試。'
 
-    return render_template('join.html', error=error)
+    return render_template('join.html', campaign=campaign, error=error)

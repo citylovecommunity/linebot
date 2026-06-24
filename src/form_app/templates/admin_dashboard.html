@@ -163,7 +163,12 @@
               data-eligible="{{ 'not-ready' if non_eligible_map.get(member.id) else 'ready' }}"
               data-expiry="{{ expiry_state }}">
               <td class="text-muted small" data-val="{{ member.id }}">{{ member.id }}</td>
-              <td data-val="{{ member.name }}"><a href="{{ url_for('admin_bp.edit_user', user_id=member.id) }}" class="text-decoration-none">{{ member.name }}</a></td>
+              <td data-val="{{ member.name }}">
+                <a href="{{ url_for('admin_bp.edit_user', user_id=member.id) }}" class="text-decoration-none">{{ member.name }}</a>
+                {% if member.join_campaign %}
+                <span class="badge ms-1" style="background:#f5841f;font-size:.65em;">{{ member.join_campaign }}</span>
+                {% endif %}
+              </td>
               <td>{{ '男' if member.gender == 'M' else '女' }}</td>
               <td>{{ member.phone_number }}</td>
               <td>{{ member.rank or '—' }}</td>

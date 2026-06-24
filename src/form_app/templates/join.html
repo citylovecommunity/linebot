@@ -3,191 +3,246 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>加入 CityLove — 遇見志同道合的人</title>
+  <title>加入 CityLove 城遇</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌟</text></svg>">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root {
       --brand: #e75480;
       --brand-light: #fce4ec;
       --brand-dark: #c2185b;
+      --brand-orange: #f5841f;
     }
-    body { background: #fdf6f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-
-    /* ── Hero ── */
-    .hero {
-      background: linear-gradient(135deg, #e75480 0%, #9c27b0 100%);
-      color: #fff;
-      padding: 3.5rem 1.5rem 5rem;
-      text-align: center;
+    * { box-sizing: border-box; }
+    body {
+      background: #f5f0f2;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+      margin: 0;
     }
-    .hero h1 { font-size: 2.4rem; font-weight: 800; letter-spacing: -0.5px; }
-    .hero p  { font-size: 1.05rem; opacity: .88; max-width: 340px; margin: .75rem auto 0; }
 
-    /* ── Floating card ── */
+    /* ── Banner ── */
+    .hero-banner { width: 100%; display: block; }
+    .hero-banner img { width: 100%; height: auto; display: block; }
+
+    /* ── Wizard card ── */
+    .wizard-wrap { max-width: 480px; margin: 0 auto; padding: 0 1rem 4rem; }
     .wizard-card {
-      background: #fff;
-      border-radius: 1.25rem;
-      box-shadow: 0 8px 40px rgba(0,0,0,.12);
-      padding: 2rem 1.75rem;
-      margin-top: -2.5rem;
-      position: relative;
+      background: #fff; border-radius: 1.25rem;
+      box-shadow: 0 6px 32px rgba(0,0,0,.10);
+      padding: 1.75rem 1.5rem; margin-top: -1.5rem; position: relative;
     }
 
-    /* ── Progress dots ── */
-    .progress-dots { display: flex; justify-content: center; gap: .5rem; margin-bottom: 1.75rem; }
-    .dot {
-      width: 10px; height: 10px; border-radius: 50%;
-      background: #e0d0e0; transition: background .25s, transform .25s;
+    /* ── Campaign badge ── */
+    .campaign-badge {
+      display: inline-block; background: var(--brand-orange); color: #fff;
+      font-size: .78rem; font-weight: 700; letter-spacing: .04em;
+      padding: .25rem .85rem; border-radius: 99px; margin-bottom: .9rem;
     }
-    .dot.active   { background: var(--brand); transform: scale(1.25); }
-    .dot.done     { background: var(--brand-dark); }
+
+    /* ── Welcome screen ── */
+    #step-0 { text-align: center; }
+    .welcome-title {
+      font-size: 1.55rem; font-weight: 900; color: #1a1a1a;
+      line-height: 1.3; margin-bottom: .5rem; white-space: pre-line;
+    }
+    .welcome-sub { font-size: .88rem; color: #888; margin-bottom: 1.4rem; }
+
+    .feature-list { list-style: none; padding: 0; margin: 0 0 1.5rem; text-align: left; }
+    .feature-list li {
+      display: flex; align-items: flex-start; gap: .75rem;
+      padding: .65rem .75rem; border-radius: .65rem;
+      background: #fdf8f0; margin-bottom: .5rem;
+      font-size: .88rem; color: #444; line-height: 1.45;
+    }
+    .feature-list li .fi { font-size: 1.1rem; flex-shrink: 0; margin-top: .05rem; }
+
+    .welcome-note { font-size: .8rem; color: #bbb; text-align: center; margin-bottom: .9rem; }
+
+    .cta-btn {
+      width: 100%; background: var(--brand-orange); color: #fff; border: none;
+      border-radius: .8rem; padding: .9rem; font-size: 1.05rem; font-weight: 700;
+      cursor: pointer; transition: background .15s, transform .1s;
+    }
+    .cta-btn:hover { background: #d9730d; transform: translateY(-1px); }
+
+    .welcome-privacy {
+      text-align: center; font-size: .78rem; color: #bbb; margin-top: .65rem;
+    }
+    .social-row {
+      display: flex; justify-content: center; gap: 1.25rem;
+      margin-top: 1rem; font-size: 1.35rem;
+    }
+    .social-row a { color: #bbb; text-decoration: none; transition: color .2s; }
+    .social-row a:hover { color: var(--brand-orange); }
+
+    /* ── Step indicator badge ── */
+    .step-badge {
+      display: inline-block; background: var(--brand-orange); color: #fff;
+      font-size: .78rem; font-weight: 700; letter-spacing: .04em;
+      padding: .25rem .8rem; border-radius: 99px; margin-bottom: .85rem;
+    }
 
     /* ── Step heading ── */
-    .step-title  { font-size: 1.3rem; font-weight: 700; margin-bottom: .25rem; }
-    .step-sub    { color: #888; font-size: .9rem; margin-bottom: 1.5rem; }
+    .step-title { font-size: 1.45rem; font-weight: 800; color: #1a1a1a; margin-bottom: .2rem; }
+    .step-sub   { color: #999; font-size: .88rem; margin-bottom: 1.4rem; }
 
-    /* ── Form labels ── */
-    .form-label  { font-weight: 600; font-size: .9rem; color: #444; }
+    /* ── Labels ── */
+    .form-label { font-weight: 600; font-size: .88rem; color: #333; margin-bottom: .35rem; }
 
-    /* ── Pill checkboxes (regions & dealbreakers) ── */
-    .pill-group  { display: flex; flex-wrap: wrap; gap: .5rem; }
-    .pill-label  {
-      display: inline-flex; align-items: center; gap: .35rem;
-      padding: .4rem .85rem; border-radius: 99px; cursor: pointer;
-      border: 1.5px solid #ddd; font-size: .88rem; color: #555;
-      transition: all .15s;
-      user-select: none;
+    /* ── Pill toggles ── */
+    .pill-group { display: flex; flex-wrap: wrap; gap: .45rem; }
+    .pill-label {
+      display: inline-flex; align-items: center; gap: .3rem;
+      padding: .38rem .8rem; border-radius: 99px; cursor: pointer;
+      border: 1.5px solid #ddd; font-size: .85rem; color: #555;
+      transition: all .15s; user-select: none;
     }
     .pill-label input { display: none; }
-    .pill-label:hover               { border-color: var(--brand); color: var(--brand); }
-    .pill-label:has(input:checked)  {
+    .pill-label:hover { border-color: var(--brand); color: var(--brand); }
+    .pill-label:has(input:checked) {
       background: var(--brand-light); border-color: var(--brand);
       color: var(--brand); font-weight: 600;
     }
 
-    /* ── Plan cards ── */
-    .plan-grid   { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; }
-    .plan-card   {
-      position: relative; border: 2px solid #e5e5e5; border-radius: 1rem;
-      padding: 1.1rem .75rem; text-align: center; cursor: pointer;
-      transition: all .2s;
+    /* ── Photo upload ── */
+    .upload-area {
+      border: 2px dashed #ddd; border-radius: .85rem;
+      padding: 1.5rem 1rem; text-align: center; cursor: pointer;
+      transition: border-color .15s, background .15s; position: relative;
     }
-    .plan-card:hover { border-color: var(--brand); }
-    .plan-card input { position: absolute; opacity: 0; pointer-events: none; }
-    .plan-card.selected {
-      border-color: var(--brand); background: var(--brand-light);
-      box-shadow: 0 0 0 3px rgba(231,84,128,.2);
+    .upload-area:hover { border-color: var(--brand); background: #fff8fb; }
+    .upload-area input[type=file] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
     }
-    .plan-badge {
-      position: absolute; top: -.6rem; left: 50%; transform: translateX(-50%);
-      background: var(--brand); color: #fff; font-size: .7rem; font-weight: 700;
-      padding: .15rem .6rem; border-radius: 99px; white-space: nowrap;
+    .upload-icon  { font-size: 2rem; margin-bottom: .4rem; }
+    .upload-label { font-size: .88rem; color: #777; }
+    .upload-preview {
+      display: none; width: 100%; max-height: 200px;
+      object-fit: cover; border-radius: .65rem; margin-top: .75rem;
     }
-    .plan-months { font-size: 1.6rem; font-weight: 800; color: #222; }
-    .plan-unit   { font-size: .78rem; color: #888; }
-    .plan-desc   { font-size: .78rem; color: #666; margin-top: .35rem; }
 
-    /* ── Navigation ── */
-    .wizard-nav  { display: flex; gap: .75rem; margin-top: 1.75rem; }
-    .btn-back    {
-      flex: 0 0 auto; background: #f3f3f3; color: #555; border: none;
-      border-radius: .65rem; padding: .7rem 1.3rem; font-weight: 600;
+    /* ── Privacy notice ── */
+    .privacy-notice {
+      background: #f9f5ff; border-left: 3px solid #9c27b0;
+      border-radius: .5rem; padding: .65rem .9rem;
+      font-size: .78rem; color: #6a3d8f; margin-top: .85rem; line-height: 1.55;
+    }
+
+    /* ── Nav buttons ── */
+    .wizard-nav { display: flex; gap: .65rem; margin-top: 1.5rem; }
+    .btn-back {
+      flex: 0 0 auto; background: #f0f0f0; color: #666; border: none;
+      border-radius: .65rem; padding: .7rem 1.2rem; font-weight: 600;
+      cursor: pointer; transition: background .15s; font-size: .95rem;
+    }
+    .btn-back:hover { background: #e4e4e4; }
+    .btn-next {
+      flex: 1; background: var(--brand-orange); color: #fff; border: none;
+      border-radius: .65rem; padding: .75rem; font-size: 1rem; font-weight: 700;
       cursor: pointer; transition: background .15s;
     }
-    .btn-back:hover { background: #e8e8e8; }
-    .btn-next    {
-      flex: 1; background: var(--brand); color: #fff; border: none;
-      border-radius: .65rem; padding: .7rem; font-size: 1rem; font-weight: 700;
-      cursor: pointer; transition: background .15s;
-    }
-    .btn-next:hover   { background: var(--brand-dark); }
-    .btn-next:disabled { opacity: .55; cursor: not-allowed; }
+    .btn-next:hover   { background: #d9730d; }
+    .btn-next:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* ── Field-level error ── */
+    .field-error { font-size: .8rem; color: #e53935; margin-top: .35rem; }
+    .pill-group.has-error .pill-label { border-color: #e53935; }
 
     /* ── Error banner ── */
     .error-banner {
       background: #fdecea; border-left: 4px solid #e53935;
       border-radius: .5rem; padding: .75rem 1rem;
-      font-size: .9rem; color: #c62828; margin-bottom: 1.25rem;
+      font-size: .88rem; color: #c62828; margin-bottom: 1.2rem;
     }
 
-    /* ── Welcome screen ── */
-    #step-welcome .cta-btn {
-      background: #fff; color: var(--brand); border: none;
-      border-radius: .75rem; padding: .85rem 2rem; font-size: 1.05rem;
-      font-weight: 700; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,.15);
-      transition: transform .15s, box-shadow .15s;
-      width: 100%;
+    /* ── Progress bar ── */
+    .progress-bar-wrap {
+      height: 4px; background: #fde8d0; border-radius: 99px; margin-bottom: 1.25rem;
     }
-    #step-welcome .cta-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,.18); }
-
-    .feature-row { display: flex; gap: 1rem; margin: 1.25rem 0; }
-    .feature-item { flex: 1; text-align: center; }
-    .feature-item span { font-size: 1.6rem; display: block; }
-    .feature-item p { font-size: .78rem; opacity: .9; margin: .25rem 0 0; }
-
-    .lock-choice { transition: all .15s; cursor: pointer; user-select: none; }
-    .lock-choice:hover { border-color: #6c757d !important; }
-    .lock-choice-selected { border-color: #0d6efd !important; background: #eef3ff; }
-    .lock-choice-hard     { border-color: #dc3545 !important; background: #fff0f0; }
-
-    @media (max-width: 400px) {
-      .plan-grid   { grid-template-columns: 1fr; }
-      .hero h1     { font-size: 2rem; }
+    .progress-bar-fill {
+      height: 100%; background: var(--brand-orange); border-radius: 99px;
+      transition: width .3s ease;
     }
   </style>
 </head>
 <body>
 
-<div class="hero">
-  <div style="font-size:3rem; margin-bottom:.5rem;">🌟</div>
-  <h1>CityLove</h1>
-  <p>每週精心配對，遇見真正志同道合的夥伴。</p>
+<!-- Hero banner -->
+<div class="hero-banner">
+  <img src="{{ url_for('static', filename='citylove-banner.jpg') }}" alt="CityLove 城遇">
 </div>
 
-<div class="container" style="max-width:520px; padding-bottom:3rem;">
+<div class="wizard-wrap">
   <div class="wizard-card">
 
     {% if error %}
     <div class="error-banner">⚠️ {{ error }}</div>
     {% endif %}
 
-    <form method="POST" id="joinForm" novalidate>
+    <!-- ══ STEP 0: Campaign welcome ══════════════════════════════ -->
+    <div id="step-0">
+      <div class="campaign-badge">{{ campaign.badge }}</div>
+      <div class="welcome-title">{{ campaign.title }}</div>
+      <div class="welcome-sub">{{ campaign.subtitle }}</div>
 
-      <!-- ══ WELCOME ══════════════════════════════════════════════ -->
-      <div class="step" id="step-welcome">
-        <div class="feature-row">
-          <div class="feature-item"><span>🎯</span><p>精準配對演算</p></div>
-          <div class="feature-item"><span>💬</span><p>一對一輕鬆交流</p></div>
-          <div class="feature-item"><span>🔒</span><p>安全隱私保障</p></div>
-        </div>
-        <p class="text-muted small text-center mb-4">填寫約 5 分鐘，我們每週為你安排最合適的配對。</p>
-        <button type="button" class="cta-btn" onclick="goTo(1)">
-          開始填寫個人資料 →
-        </button>
+      <ul class="feature-list">
+        {% for f in campaign.features %}
+        <li><span class="fi">{{ f.icon }}</span>{{ f.text }}</li>
+        {% endfor %}
+      </ul>
+
+      <div class="welcome-note">{{ campaign.note }}</div>
+
+      <button type="button" class="cta-btn" onclick="startForm()">
+        {{ campaign.cta }} →
+      </button>
+
+      <div class="welcome-privacy">安全隱私保障</div>
+
+      <div class="social-row">
+        <a href="https://www.facebook.com/citylove.studio" aria-label="Facebook" target="_blank" rel="noopener">
+          <i class="bi bi-facebook"></i>
+        </a>
+        <a href="https://www.instagram.com/citylove_studio" aria-label="Instagram" target="_blank" rel="noopener">
+          <i class="bi bi-instagram"></i>
+        </a>
+        <a href="https://citylove.studio" aria-label="CityLove 官網" target="_blank" rel="noopener">
+          <i class="bi bi-globe2"></i>
+        </a>
       </div>
+    </div>
 
-      <!-- ══ STEP 1: 基本資料 ═════════════════════════════════════ -->
+    <!-- Progress bar (hidden on welcome screen) -->
+    <div class="progress-bar-wrap d-none" id="progress-wrap">
+      <div class="progress-bar-fill" id="progress-fill" style="width:33%"></div>
+    </div>
+
+    <form method="POST" id="joinForm" enctype="multipart/form-data" novalidate>
+      <input type="hidden" name="campaign" value="{{ campaign.slug }}">
+
+      <!-- ══ STEP 1: 先來認識你 ═══════════════════════════════════ -->
       <div class="step d-none" id="step-1">
-        <div class="progress-dots" id="dots-1"></div>
-        <div class="step-title">👤 認識你</div>
-        <div class="step-sub">先告訴我們一些基本資訊</div>
+        <div class="step-badge">步驟 1 / 3</div>
+        <div class="step-title">先來認識你</div>
+        <div class="step-sub">填寫你的基本資料，讓我們認識你</div>
 
         <div class="mb-3">
           <label class="form-label">你的名字 <span class="text-danger">*</span></label>
-          <input type="text" class="form-control" name="name" id="f-name" placeholder="請輸入你的真實姓名" required>
+          <input type="text" class="form-control" name="name" id="f-name"
+            placeholder="請輸入你的名字" required autocomplete="name">
         </div>
         <div class="mb-3">
           <label class="form-label">手機號碼 <span class="text-danger">*</span></label>
           <input type="tel" class="form-control" name="phone_number" id="f-phone"
-            placeholder="09XXXXXXXX" pattern="09\d{8}" required>
+            placeholder="09XXXXXXXX" pattern="09\d{8}" required autocomplete="tel">
           <div class="invalid-feedback">請輸入有效的台灣手機號碼（09 開頭，共 10 碼）</div>
         </div>
         <div class="row g-3 mb-3">
           <div class="col-6">
             <label class="form-label">性別 <span class="text-danger">*</span></label>
             <select class="form-select" name="gender" id="f-gender" required>
-              <option value="">— 請選擇 —</option>
+              <option value="">請選擇</option>
               <option value="M">男</option>
               <option value="F">女</option>
             </select>
@@ -203,56 +258,56 @@
           <input type="date" class="form-control" name="birthday" id="f-birthday" required>
         </div>
         <div class="mb-3">
-          <label class="form-label">Email <span class="text-muted fw-normal">（選填）</span></label>
-          <input type="email" class="form-control" name="email" placeholder="用於接收重要通知">
+          <label class="form-label">Email <span class="text-muted fw-normal small">（選填）</span></label>
+          <input type="email" class="form-control" name="email"
+            placeholder="example@email.com" autocomplete="email">
         </div>
 
         <div class="wizard-nav">
           <button type="button" class="btn-back" onclick="goTo(0)">←</button>
-          <button type="button" class="btn-next" onclick="nextStep(1)">繼續 →</button>
+          <button type="button" class="btn-next" onclick="nextStep(1)">繼續</button>
         </div>
       </div>
 
-      <!-- ══ STEP 2: 關於你 ══════════════════════════════════════ -->
+      <!-- ══ STEP 2: 關於你 ═════════════════════════════════════ -->
       <div class="step d-none" id="step-2">
-        <div class="progress-dots" id="dots-2"></div>
-        <div class="step-title">✨ 關於你</div>
-        <div class="step-sub">讓配對更精準，可全部跳過</div>
+        <div class="step-badge">步驟 2 / 3</div>
+        <div class="step-title">關於你</div>
+        <div class="step-sub">讓配對更貼近你</div>
 
         <div class="mb-3">
-          <label class="form-label">目前感情狀況</label>
-          <select class="form-select" name="marital_status">
-            <option value="">— 不填 —</option>
-            <option>單身</option><option>離婚</option><option>喪偶</option>
-          </select>
+          <label class="form-label">目前感情狀況 <span class="text-danger">*</span></label>
+          <div class="pill-group" id="g-marital">
+            {% for v in ['單身', '離婚', '喪偶'] %}
+            <label class="pill-label">
+              <input type="radio" name="marital_status" value="{{ v }}"> {{ v }}
+            </label>
+            {% endfor %}
+          </div>
+          <div class="field-error d-none" id="e-marital">請選擇目前感情狀況</div>
         </div>
+
         <div class="mb-3">
-          <label class="form-label">是否有小孩需要扶養</label>
-          <div class="d-flex gap-3">
+          <label class="form-label">是否有小孩需要扶養 <span class="text-danger">*</span></label>
+          <div class="pill-group" id="g-children">
             {% for v in ['沒有', '有'] %}
-            <label class="pill-label flex-fill justify-content-center">
+            <label class="pill-label">
               <input type="radio" name="has_children" value="{{ v }}"> {{ v }}
             </label>
             {% endfor %}
           </div>
+          <div class="field-error d-none" id="e-children">請選擇是否有小孩</div>
         </div>
+
         <div class="mb-3">
-          <label class="form-label">職業類別</label>
-          <input type="text" class="form-control" name="job_category"
+          <label class="form-label">職業類別 <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" name="job_category" id="f-job"
             placeholder="例：科技業、金融業、醫療、教育">
+          <div class="field-error d-none" id="e-job">請填寫職業類別</div>
         </div>
+
         <div class="mb-3">
-          <label class="form-label">飲食習慣</label>
-          <div class="pill-group">
-            {% for d in ['葷', '素', '葷素皆可', '純素'] %}
-            <label class="pill-label">
-              <input type="radio" name="diet" value="{{ d }}"> {{ d }}
-            </label>
-            {% endfor %}
-          </div>
-        </div>
-        <div class="mb-1">
-          <label class="form-label">宗教信仰</label>
+          <label class="form-label">宗教信仰 <span class="text-muted fw-normal small">（選填）</span></label>
           <div class="pill-group">
             {% for rel in ['無特別信仰', '佛教', '基督教', '天主教', '伊斯蘭教', '道教'] %}
             <label class="pill-label">
@@ -262,150 +317,69 @@
           </div>
         </div>
 
+        <div class="mb-3">
+          <label class="form-label">興趣 <span class="text-danger">*</span> <span class="text-muted fw-normal small">（可複選）</span></label>
+          <div class="pill-group" id="g-interests">
+            {% for interest in ['電影', '音樂', '旅行', '運動', '閱讀', '烹飪', '攝影', '藝術', '電玩', '戶外活動', '美食探索', '養寵物', '健身', '跳舞', '咖啡'] %}
+            <label class="pill-label">
+              <input type="checkbox" name="interests" value="{{ interest }}"> {{ interest }}
+            </label>
+            {% endfor %}
+          </div>
+          <div class="field-error d-none" id="e-interests">請至少選擇一項興趣</div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">簡單介紹自己 <span class="text-danger">*</span></label>
+          <textarea class="form-control" name="self_intro" id="f-intro" rows="4"
+            placeholder="說說你的個性、生活方式，或是想找什麼樣的朋友…"
+            style="resize:none; font-size:.92rem;"></textarea>
+          <div class="field-error d-none" id="e-intro">請簡單介紹自己</div>
+        </div>
+
         <div class="wizard-nav">
           <button type="button" class="btn-back" onclick="goTo(1)">←</button>
-          <button type="button" class="btn-next" onclick="goTo(3)">繼續 →</button>
+          <button type="button" class="btn-next" onclick="nextStep(2)">繼續</button>
         </div>
       </div>
 
-      <!-- ══ STEP 3: 約會地區 ════════════════════════════════════ -->
+      <!-- ══ STEP 3: 地區 + 相片 ════════════════════════════════ -->
       <div class="step d-none" id="step-3">
-        <div class="progress-dots" id="dots-3"></div>
-        <div class="step-title">📍 可以約會的地區</div>
-        <div class="step-sub">可以複選，選越多越容易配對成功</div>
+        <div class="step-badge">步驟 3 / 3</div>
+        <div class="step-title">快完成了！</div>
+        <div class="step-sub">選擇可見面地區，並上傳一張照片</div>
 
-        <div class="pill-group mb-2">
-          {% for region in ['大台北地區','桃園','新竹','台中','台南','高雄','基隆','宜蘭','花蓮','台東'] %}
-          <label class="pill-label">
-            <input type="checkbox" name="date_regions" value="{{ region }}"> {{ region }}
-          </label>
-          {% endfor %}
-        </div>
-
-        <div class="mt-3 p-3 rounded" style="background:#f8f9fa;border:1.5px solid #dee2e6;">
-          <div class="fw-semibold small mb-2">地區偏好的嚴格程度</div>
-          <div class="d-flex gap-2">
-            <label class="lock-choice flex-fill text-center py-2 rounded border lock-choice-selected" id="region-soft-label">
-              <input type="radio" name="lock_region" value="0" class="d-none" checked onchange="highlightLock('region')">
-              <div class="small fw-semibold">📉 扣分</div>
-              <div style="font-size:.75rem;color:#888;">無共同地區時降低分數</div>
-            </label>
-            <label class="lock-choice flex-fill text-center py-2 rounded border" id="region-hard-label">
-              <input type="radio" name="lock_region" value="1" class="d-none" onchange="highlightLock('region')">
-              <div class="small fw-semibold">🔒 絕對不配</div>
-              <div style="font-size:.75rem;color:#888;">無共同地區永不配對</div>
-            </label>
-          </div>
-        </div>
-
-        <div class="wizard-nav">
-          <button type="button" class="btn-back" onclick="goTo(2)">←</button>
-          <button type="button" class="btn-next" onclick="goTo(4)">繼續 →</button>
-        </div>
-      </div>
-
-      <!-- ══ STEP 4: 期望對象 ════════════════════════════════════ -->
-      <div class="step d-none" id="step-4">
-        <div class="progress-dots" id="dots-4"></div>
-        <div class="step-title">🙋 希望認識的人</div>
-        <div class="step-sub">告訴我們你希望認識什麼樣的人</div>
-
-        <div class="row g-3 mb-3">
-          <div class="col-6">
-            <label class="form-label">對象最低身高 (cm)</label>
-            <input type="number" class="form-control" name="pref_min_height" min="100" max="250" placeholder="不限則留空">
-          </div>
-          <div class="col-6">
-            <label class="form-label">對象最高身高 (cm)</label>
-            <input type="number" class="form-control" name="pref_max_height" min="100" max="250" placeholder="不限則留空">
-          </div>
-          <div class="col-6">
-            <label class="form-label">對象最早出生年</label>
-            <input type="number" class="form-control" name="pref_oldest_birth_year" min="1940" max="2010" placeholder="例：1985">
-            <div class="form-text">1985 = 最大不超過 1985 年出生</div>
-          </div>
-          <div class="col-6">
-            <label class="form-label">對象最晚出生年</label>
-            <input type="number" class="form-control" name="pref_youngest_birth_year" min="1940" max="2010" placeholder="例：2000">
-            <div class="form-text">2000 = 最小不超過 2000 年出生</div>
-          </div>
-        </div>
-
-        <div class="mt-1 mb-3 p-3 rounded" style="background:#f8f9fa;border:1.5px solid #dee2e6;">
-          <div class="fw-semibold small mb-2">身高偏好的嚴格程度</div>
-          <div class="d-flex gap-2">
-            <label class="lock-choice flex-fill text-center py-2 rounded border lock-choice-selected" id="height-soft-label">
-              <input type="radio" name="lock_height" value="0" class="d-none" checked onchange="highlightLock('height')">
-              <div class="small fw-semibold">📉 扣分</div>
-              <div style="font-size:.75rem;color:#888;">不在範圍內時降低分數</div>
-            </label>
-            <label class="lock-choice flex-fill text-center py-2 rounded border" id="height-hard-label">
-              <input type="radio" name="lock_height" value="1" class="d-none" onchange="highlightLock('height')">
-              <div class="small fw-semibold">🔒 絕對不配</div>
-              <div style="font-size:.75rem;color:#888;">超出範圍永不配對</div>
-            </label>
-          </div>
-        </div>
-
-        <div class="mb-1">
-          <label class="form-label">絕對不接受的條件 <span class="text-muted fw-normal">（可複選）</span></label>
-          <p class="text-muted small mb-2">系統將永不將符合此條件的對象配對給你</p>
+        <div class="mb-4">
+          <label class="form-label">可見面地區 <span class="text-muted fw-normal small">（可複選）</span></label>
           <div class="pill-group">
-            {% for item in ['離婚', '有小孩', '抽菸', '喝酒', '紋身'] %}
+            {% for region in ['大台北地區', '桃園', '新竹', '台中', '台南', '高雄', '基隆', '宜蘭', '花蓮', '台東'] %}
             <label class="pill-label">
-              <input type="checkbox" name="dealbreakers" value="{{ item }}"> 🚫 {{ item }}
+              <input type="checkbox" name="date_regions" value="{{ region }}"> {{ region }}
             </label>
             {% endfor %}
           </div>
         </div>
 
-        <div class="wizard-nav">
-          <button type="button" class="btn-back" onclick="goTo(3)">←</button>
-          <button type="button" class="btn-next" onclick="goTo(5)">繼續 →</button>
+        <div class="mb-1">
+          <label class="form-label">上傳個人相片 <span class="text-danger">*</span></label>
+          <div class="upload-area" id="upload-area">
+            <input type="file" name="profile_photo" id="f-photo"
+              accept="image/*" onchange="previewPhoto(this)">
+            <div class="upload-icon">📷</div>
+            <div class="upload-label">點擊選擇相片</div>
+            <div class="upload-label" style="font-size:.75rem;color:#bbb;margin-top:.2rem;">JPG、PNG，建議 5MB 以內</div>
+          </div>
+          <img id="photo-preview" class="upload-preview" alt="預覽">
+          <div class="field-error d-none" id="e-photo">請上傳一張個人相片</div>
         </div>
-      </div>
 
-      <!-- ══ STEP 5: 方案 + 密碼 ════════════════════════════════ -->
-      <div class="step d-none" id="step-5">
-        <div class="progress-dots" id="dots-5"></div>
-        <div class="step-title">🎉 選擇加入方案</div>
-        <div class="step-sub">付款方式由服務人員與你確認</div>
-
-        <div class="plan-grid mb-4">
-          <div class="plan-card" data-months="1" onclick="selectPlan(this)">
-            <input type="radio" name="plan_months" value="1">
-            <div class="plan-months">1</div>
-            <div class="plan-unit">個月</div>
-            <div class="plan-desc">體驗配對</div>
-          </div>
-          <div class="plan-card" data-months="3" onclick="selectPlan(this)">
-            <input type="radio" name="plan_months" value="3">
-            <div class="plan-badge">⭐ 推薦</div>
-            <div class="plan-months">3</div>
-            <div class="plan-unit">個月</div>
-            <div class="plan-desc">深度配對</div>
-          </div>
-          <div class="plan-card" data-months="6" onclick="selectPlan(this)">
-            <input type="radio" name="plan_months" value="6">
-            <div class="plan-months">6</div>
-            <div class="plan-unit">個月</div>
-            <div class="plan-desc">全力出發</div>
-          </div>
-        </div>
-        <div id="plan-error" class="text-danger small mb-3 d-none">請選擇一個方案</div>
-
-        <div class="mb-3">
-          <label class="form-label">設定登入密碼</label>
-          <input type="password" class="form-control" name="password" id="f-password"
-            autocomplete="new-password" placeholder="至少 6 個字元">
-          <div class="form-text">留空則以生日（YYYYMMDD）作為預設密碼，可登入後修改。</div>
+        <div class="privacy-notice">
+          🔒 您上傳的相片僅作為交友介紹之用途，將受到嚴格保密，不會對外公開或提供予第三方。
         </div>
 
         <div class="wizard-nav">
-          <button type="button" class="btn-back" onclick="goTo(4)">←</button>
-          <button type="submit" class="btn-next" id="submitBtn">
-            送出申請 🎊
-          </button>
+          <button type="button" class="btn-back" onclick="goTo(2)">←</button>
+          <button type="button" class="btn-next" id="submitBtn" onclick="submitIfValid()">送出申請 →</button>
         </div>
       </div>
 
@@ -414,27 +388,32 @@
 </div>
 
 <script>
-  const TOTAL_STEPS = 5;
   let current = 0;
+  const progressPct = { 1: 33, 2: 66, 3: 100 };
 
-  function renderDots(step) {
-    const el = document.getElementById('dots-' + step);
-    if (!el) return;
-    el.innerHTML = '';
-    for (let i = 1; i <= TOTAL_STEPS; i++) {
-      const d = document.createElement('div');
-      d.className = 'dot' + (i < step ? ' done' : i === step ? ' active' : '');
-      el.appendChild(d);
-    }
+  function startForm() {
+    document.getElementById('step-0').classList.add('d-none');
+    document.getElementById('progress-wrap').classList.remove('d-none');
+    showStep(1);
   }
 
   function goTo(step) {
+    if (step === 0) {
+      document.querySelectorAll('.step').forEach(s => s.classList.add('d-none'));
+      document.getElementById('progress-wrap').classList.add('d-none');
+      document.getElementById('step-0').classList.remove('d-none');
+      current = 0;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    showStep(step);
+  }
+
+  function showStep(step) {
     document.querySelectorAll('.step').forEach(s => s.classList.add('d-none'));
-    const target = step === 0
-      ? document.getElementById('step-welcome')
-      : document.getElementById('step-' + step);
-    if (target) target.classList.remove('d-none');
-    renderDots(step);
+    document.getElementById('step-0').classList.add('d-none');
+    document.getElementById('step-' + step).classList.remove('d-none');
+    document.getElementById('progress-fill').style.width = progressPct[step] + '%';
     current = step;
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -446,56 +425,118 @@
 
   function validateStep(step) {
     if (step === 1) {
-      const name  = document.getElementById('f-name');
-      const phone = document.getElementById('f-phone');
-      const gender = document.getElementById('f-gender');
-      const height = document.getElementById('f-height');
-      const bday  = document.getElementById('f-birthday');
+      const fields = [
+        document.getElementById('f-name'),
+        document.getElementById('f-phone'),
+        document.getElementById('f-gender'),
+        document.getElementById('f-height'),
+        document.getElementById('f-birthday'),
+      ];
       let ok = true;
-
-      [name, phone, gender, height, bday].forEach(el => {
+      fields.forEach(el => {
         el.classList.remove('is-invalid');
-        if (!el.value.trim() || (el.required && !el.checkValidity())) {
+        if (!el.value.trim() || !el.checkValidity()) {
           el.classList.add('is-invalid');
           ok = false;
         }
       });
-      if (!ok) { name.focus(); return false; }
+      if (!ok) fields.find(el => el.classList.contains('is-invalid')).focus();
+      return ok;
     }
+
+    if (step === 2) {
+      let ok = true;
+
+      function checkRadio(name, groupId, errorId) {
+        const selected = document.querySelector(`input[name="${name}"]:checked`);
+        const group = document.getElementById(groupId);
+        const err   = document.getElementById(errorId);
+        if (!selected) {
+          group.classList.add('has-error');
+          err.classList.remove('d-none');
+          ok = false;
+        } else {
+          group.classList.remove('has-error');
+          err.classList.add('d-none');
+        }
+      }
+
+      checkRadio('marital_status', 'g-marital',  'e-marital');
+      checkRadio('has_children',   'g-children', 'e-children');
+
+      const job = document.getElementById('f-job');
+      const jobErr = document.getElementById('e-job');
+      job.classList.remove('is-invalid');
+      if (!job.value.trim()) {
+        job.classList.add('is-invalid');
+        jobErr.classList.remove('d-none');
+        ok = false;
+      } else {
+        jobErr.classList.add('d-none');
+      }
+
+      const anyInterest = document.querySelector('input[name="interests"]:checked');
+      const intGroup = document.getElementById('g-interests');
+      const intErr   = document.getElementById('e-interests');
+      if (!anyInterest) {
+        intGroup.classList.add('has-error');
+        intErr.classList.remove('d-none');
+        ok = false;
+      } else {
+        intGroup.classList.remove('has-error');
+        intErr.classList.add('d-none');
+      }
+
+      const intro = document.getElementById('f-intro');
+      const introErr = document.getElementById('e-intro');
+      intro.classList.remove('is-invalid');
+      if (!intro.value.trim()) {
+        intro.classList.add('is-invalid');
+        introErr.classList.remove('d-none');
+        ok = false;
+      } else {
+        introErr.classList.add('d-none');
+      }
+
+      if (!ok) document.getElementById('step-2').scrollIntoView({ behavior: 'smooth' });
+      return ok;
+    }
+
+    if (step === 3) {
+      const photo = document.getElementById('f-photo');
+      const photoErr = document.getElementById('e-photo');
+      const uploadArea = document.getElementById('upload-area');
+      if (!photo.files || photo.files.length === 0) {
+        uploadArea.style.borderColor = '#e53935';
+        photoErr.classList.remove('d-none');
+        return false;
+      }
+      uploadArea.style.borderColor = '';
+      photoErr.classList.add('d-none');
+      return true;
+    }
+
     return true;
   }
 
-  function selectPlan(card) {
-    document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('selected'));
-    card.classList.add('selected');
-    card.querySelector('input[type=radio]').checked = true;
-    document.getElementById('plan-error').classList.add('d-none');
+  function submitIfValid() {
+    if (!validateStep(3)) return;
+    document.getElementById('joinForm').submit();
   }
 
-  document.getElementById('joinForm').addEventListener('submit', function(e) {
-    const chosen = document.querySelector('input[name=plan_months]:checked');
-    if (!chosen) {
-      e.preventDefault();
-      document.getElementById('plan-error').classList.remove('d-none');
-      return;
+  function previewPhoto(input) {
+    const file = input.files[0];
+    const preview = document.getElementById('photo-preview');
+    if (file) {
+      preview.src = URL.createObjectURL(file);
+      preview.style.display = 'block';
+      document.querySelector('.upload-icon').textContent = '✅';
+      document.querySelector('.upload-label').textContent = file.name;
     }
-  });
-
-  function highlightLock(pref) {
-    const soft = document.getElementById(pref + '-soft-label');
-    const hard = document.getElementById(pref + '-hard-label');
-    const isHard = document.querySelector(`input[name="lock_${pref}"][value="1"]`).checked;
-    soft.className = soft.className.replace(' lock-choice-selected','').replace(' lock-choice-hard','');
-    hard.className = hard.className.replace(' lock-choice-selected','').replace(' lock-choice-hard','');
-    if (isHard) hard.classList.add('lock-choice-hard');
-    else soft.classList.add('lock-choice-selected');
   }
 
-  // Init: if there's a server-side error, go straight to step 1
   {% if error %}
-  goTo(1);
-  {% else %}
-  goTo(0);
+  startForm();
   {% endif %}
 </script>
 </body>
