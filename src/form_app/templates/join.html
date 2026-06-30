@@ -117,10 +117,29 @@
     }
     .upload-icon  { font-size: 2rem; margin-bottom: .4rem; }
     .upload-label { font-size: .88rem; color: #777; }
-    .upload-preview {
-      display: none; width: 100%; max-height: 200px;
-      object-fit: cover; border-radius: .65rem; margin-top: .75rem;
+    /* ── Submit overlay ── */
+    #submit-overlay {
+      display: none;
+      position: fixed; inset: 0; z-index: 9999;
+      background: rgba(255,255,255,.92);
+      backdrop-filter: blur(4px);
+      flex-direction: column; align-items: center; justify-content: center;
+      text-align: center; padding: 2rem;
     }
+    #submit-overlay.show { display: flex; }
+    .overlay-spinner {
+      width: 56px; height: 56px;
+      border: 5px solid var(--brand-light);
+      border-top-color: var(--brand);
+      border-radius: 50%;
+      animation: spin .9s linear infinite;
+      margin-bottom: 1.5rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .overlay-title {
+      font-size: 1.15rem; font-weight: 700; color: #1a1a1a; margin-bottom: .5rem;
+    }
+    .overlay-sub { font-size: .88rem; color: #888; }
 
     /* ── Privacy notice ── */
     .privacy-notice {
@@ -365,11 +384,14 @@
           <div class="upload-area" id="upload-area">
             <input type="file" name="profile_photo" id="f-photo"
               accept="image/*" onchange="previewPhoto(this)">
-            <div class="upload-icon">📷</div>
-            <div class="upload-label">點擊選擇相片</div>
-            <div class="upload-label" style="font-size:.75rem;color:#bbb;margin-top:.2rem;">JPG、PNG，建議 5MB 以內</div>
+            <div id="upload-placeholder">
+              <div class="upload-icon">📷</div>
+              <div class="upload-label">點擊選擇相片</div>
+              <div class="upload-label" style="font-size:.75rem;color:#bbb;margin-top:.2rem;">JPG、PNG，建議 5MB 以內</div>
+            </div>
+            <img id="photo-preview" style="display:none; width:100%; max-height:220px; object-fit:cover; border-radius:.5rem; pointer-events:none;" alt="預覽">
+            <div id="photo-change-hint" style="display:none; font-size:.75rem; color:#aaa; margin-top:.4rem;">點擊更換相片</div>
           </div>
-          <img id="photo-preview" class="upload-preview" alt="預覽">
           <div class="field-error d-none" id="e-photo">請上傳一張個人相片</div>
         </div>
 
@@ -385,6 +407,12 @@
 
     </form>
   </div>
+</div>
+
+<div id="submit-overlay">
+  <div class="overlay-spinner"></div>
+  <div class="overlay-title">正在建檔，請稍候…</div>
+  <div class="overlay-sub">通常需要 15–30 秒，請勿關閉或重新整理此頁面</div>
 </div>
 
 <script>
@@ -521,18 +549,22 @@
 
   function submitIfValid() {
     if (!validateStep(3)) return;
-    document.getElementById('joinForm').submit();
+    document.getElementById('submit-overlay').classList.add('show');
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      document.getElementById('joinForm').submit();
+    }));
   }
 
   function previewPhoto(input) {
     const file = input.files[0];
+    if (!file) return;
     const preview = document.getElementById('photo-preview');
-    if (file) {
-      preview.src = URL.createObjectURL(file);
-      preview.style.display = 'block';
-      document.querySelector('.upload-icon').textContent = '✅';
-      document.querySelector('.upload-label').textContent = file.name;
-    }
+    const placeholder = document.getElementById('upload-placeholder');
+    const hint = document.getElementById('photo-change-hint');
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = 'block';
+    placeholder.style.display = 'none';
+    hint.style.display = 'block';
   }
 
   {% if error %}

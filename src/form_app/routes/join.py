@@ -2,6 +2,7 @@ from datetime import datetime
 
 import cloudinary
 import cloudinary.uploader
+from cloudinary import CloudinaryImage
 from flask import Blueprint, redirect, render_template, request, url_for
 from sqlalchemy.exc import IntegrityError
 
@@ -9,10 +10,15 @@ from form_app.campaigns import get_campaign
 from form_app.config import settings
 from form_app.database import get_db
 from form_app.models import Member
+from form_app.services.intro_card import generate_intro_card
 from form_app.services.liff_token import make_liff_token
 from form_app.services.security import hash_password
 
-cloudinary.config(cloud_name=settings.CLOUDINARY_CLOUD_NAME)
+cloudinary.config(
+    cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+    api_key=settings.CLOUDINARY_API_KEY,
+    api_secret=settings.CLOUDINARY_API_SECRET,
+)
 
 bp = Blueprint('join_bp', __name__)
 
@@ -68,13 +74,21 @@ def join(slug: str):
             user_info.setdefault('您的出生年月日', birthday.strftime('%Y/%m/%d'))
 
         photo = request.files.get('profile_photo')
+        introduction_link = None
         if photo and photo.filename:
-            result = cloudinary.uploader.unsigned_upload(
+            result = cloudinary.uploader.upload(
                 photo,
-                settings.CLOUDINARY_UPLOAD_PRESET,
+                upload_preset=settings.CLOUDINARY_UPLOAD_PRESET,
                 folder="citylove/members",
             )
-            user_info['相片網址'] = result['secure_url']
+            transformed_url = CloudinaryImage(result['public_id']).build_url(
+                width=400, height=400, crop='fill', gravity='face',
+                quality='auto', format='webp', flags='awebp',
+                secure=True,
+            )
+            user_info['相片網址'] = transformed_url
+            user_info['相片公開ID'] = result['public_id']
+            introduction_link = transformed_url
 
         password_plain = birthday.strftime('%Y%m%d') if birthday else None
 
@@ -89,12 +103,22 @@ def join(slug: str):
             fill_form_at=datetime.now(),
             join_campaign=campaign_slug,
             user_info=user_info,
+            introduction_link=introduction_link,
             password_hash=hash_password(password_plain) if password_plain else None,
         )
         db = get_db()
         db.add(member)
         try:
             db.commit()
+
+            try:
+                card_url = generate_intro_card(member)
+                member.introduction_link = card_url
+                member.user_info = {**member.user_info, '會員介紹頁網址': card_url}
+                db.commit()
+            except Exception:
+                pass  # photo URL fallback already set on introduction_link
+
             liff_url = None
             if settings.LIFF_ID:
                 token = make_liff_token(member.phone_number)
