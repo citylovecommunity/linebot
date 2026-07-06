@@ -1579,32 +1579,47 @@ let allTags = [
   {% endfor %}
 ];
 
-// Close any open tag picker when clicking elsewhere
+// Track the currently open tag-picker dropdown so we avoid querySelectorAll on every click
+let _openTagPicker = null;
+
+function _closeOpenTagPicker() {
+  if (_openTagPicker) {
+    _openTagPicker.classList.add('d-none');
+    _openTagPicker = null;
+  }
+}
+
+// Close open picker when clicking outside — cheap: no querySelectorAll needed
 document.addEventListener('click', e => {
-  if (!e.target.closest('.tag-picker-wrap')) {
-    document.querySelectorAll('.tag-picker-dropdown').forEach(d => d.classList.add('d-none'));
+  if (_openTagPicker && !e.target.closest('.tag-picker-wrap')) {
+    _closeOpenTagPicker();
   }
 });
 
-// Live preview while typing a new tag name
-document.getElementById('new-tag-name').addEventListener('input', function() {
-  const color = document.getElementById('new-tag-color').value;
-  const preview = document.getElementById('new-tag-preview');
-  preview.innerHTML = this.value.trim()
-    ? `<span class="badge bg-${color}">${this.value.trim()}</span>`
-    : '';
-});
-document.getElementById('new-tag-color').addEventListener('change', function() {
-  const name = document.getElementById('new-tag-name').value.trim();
-  const preview = document.getElementById('new-tag-preview');
-  preview.innerHTML = name ? `<span class="badge bg-${this.value}">${name}</span>` : '';
-});
+// Live preview while typing a new tag name — guarded to avoid crashing if element is absent
+const _tagNameInput  = document.getElementById('new-tag-name');
+const _tagColorInput = document.getElementById('new-tag-color');
+if (_tagNameInput && _tagColorInput) {
+  _tagNameInput.addEventListener('input', function() {
+    const preview = document.getElementById('new-tag-preview');
+    if (!preview) return;
+    preview.innerHTML = this.value.trim()
+      ? `<span class="badge bg-${_tagColorInput.value}">${this.value.trim()}</span>`
+      : '';
+  });
+  _tagColorInput.addEventListener('change', function() {
+    const preview = document.getElementById('new-tag-preview');
+    if (!preview) return;
+    preview.innerHTML = _tagNameInput.value.trim()
+      ? `<span class="badge bg-${this.value}">${_tagNameInput.value.trim()}</span>`
+      : '';
+  });
+}
 
 function toggleTagPicker(memberId, btn) {
   const dropdown = btn.nextElementSibling;
-  const isOpen = !dropdown.classList.contains('d-none');
-  // Close all others first
-  document.querySelectorAll('.tag-picker-dropdown').forEach(d => d.classList.add('d-none'));
+  const isOpen = (dropdown === _openTagPicker);
+  _closeOpenTagPicker();
   if (isOpen) return;
 
   // Find tags already on this member
@@ -1624,6 +1639,7 @@ function toggleTagPicker(memberId, btn) {
     ).join('');
   }
   dropdown.classList.remove('d-none');
+  _openTagPicker = dropdown;
 }
 
 function addMemberTag(memberId, tagId, tagName, tagColor, sourceEl) {
@@ -1644,7 +1660,7 @@ function addMemberTag(memberId, tagId, tagName, tagColor, sourceEl) {
     badge.style.cursor = 'default';
     badge.innerHTML = `${tagName}<span class="ms-1" style="cursor:pointer;opacity:.7;" onclick="removeMemberTag(${memberId}, ${tagId}, this)" title="移除">×</span>`;
     cell.insertBefore(badge, wrap);
-    cell.querySelector('.tag-picker-dropdown').classList.add('d-none');
+    _closeOpenTagPicker();
   }).catch(e => alert('標籤新增失敗：' + e.message));
 }
 
@@ -1667,7 +1683,10 @@ function createTag() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, color }),
-  }).then(r => r.json()).then(data => {
+  }).then(r => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  }).then(data => {
     if (data.error) { alert(data.error); return; }
     allTags.push({ id: data.id, name: data.name, color: data.color });
     // Add to manage list
@@ -1681,13 +1700,16 @@ function createTag() {
     document.getElementById('tag-manage-list').appendChild(row);
     document.getElementById('new-tag-name').value = '';
     document.getElementById('new-tag-preview').innerHTML = '';
-  });
+  }).catch(e => alert('建立標籤失敗：' + e.message));
 }
 
 function deleteTag(tagId, tagName) {
   if (!confirm(`確定刪除標籤「${tagName}」？所有會員的此標籤也將被移除。`)) return;
   fetch(`/admin/tags/${tagId}`, { method: 'DELETE' })
-    .then(r => r.json()).then(data => {
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    }).then(data => {
       if (data.error) { alert(data.error); return; }
       allTags = allTags.filter(t => t.id !== tagId);
       document.getElementById(`tag-row-${tagId}`)?.remove();
@@ -1700,7 +1722,7 @@ function deleteTag(tagId, tagName) {
         hint.textContent = '尚無標籤，請建立第一個標籤。';
         document.getElementById('tag-manage-list').appendChild(hint);
       }
-    });
+    }).catch(e => alert('刪除標籤失敗：' + e.message));
 }
 </script>
 {% endblock %}
