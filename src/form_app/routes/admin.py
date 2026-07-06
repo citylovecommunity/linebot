@@ -3,7 +3,7 @@ from datetime import datetime, date, timedelta, timezone
 
 from flask import Blueprint, jsonify, render_template, redirect, url_for, flash, request, session as flask_session
 from flask_login import login_required, current_user
-from sqlalchemy.orm import joinedload, defer
+from sqlalchemy.orm import joinedload, defer, selectinload
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.exc import IntegrityError
 
@@ -39,6 +39,7 @@ from form_app.models import (
     DateProposal, ProposalStatus, Line_Info,
     GroupMatching, GroupMatchingStatus, GroupMembership, GroupMessage, GroupDateProposal, GroupBadge,
     LeadSubmission, LeadSubmissionStatus,
+    Tag,
     assign_session_avatars,
 )
 from collections import defaultdict
@@ -216,6 +217,7 @@ def admin_dashboard():
         .options(
             defer(Member.user_info),
             joinedload(Member.line_info),
+            selectinload(Member.tags),
         )
         .order_by(Member.id)
         .all()
@@ -375,9 +377,12 @@ def admin_dashboard():
     unmatched_with_reasons = []
     no_candidate_users = []
 
+    all_tags = session.query(Tag).order_by(Tag.name).all()
+
     response = render_template(
         'admin_dashboard.html',
         today=date.today(),
+        all_tags=all_tags,
         match_ready_ids=match_ready_ids,
         members_by_id=members_by_id,
         matchings_by_id=matchings_by_id,
@@ -673,7 +678,8 @@ def edit_user(user_id):
         .order_by(Matching.created_at.desc())
         .all()
     )
-    return render_template('admin_user_form.html', user=user, matchings=matchings)
+    all_tags = session.query(Tag).order_by(Tag.name).all()
+    return render_template('admin_user_form.html', user=user, matchings=matchings, all_tags=all_tags)
 
 
 @bp.route('/users/<int:user_id>/delete', methods=['POST'])
@@ -1594,3 +1600,85 @@ def reject_lead(lead_id):
         session.commit()
         flash('已拒絕名單', 'info')
     return redirect(url_for('admin_bp.leads_list'))
+
+
+# ── Tag management ─────────────────────────────────────────────────────────
+
+TAG_COLORS = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'dark']
+
+
+@bp.route('/tags', methods=['GET'])
+@login_required
+@admin_required
+def list_tags():
+    session = get_db()
+    tags = session.query(Tag).order_by(Tag.name).all()
+    return jsonify([{'id': t.id, 'name': t.name, 'color': t.color} for t in tags])
+
+
+@bp.route('/tags', methods=['POST'])
+@login_required
+@admin_required
+def create_tag():
+    session = get_db()
+    data = request.get_json() or {}
+    name = (data.get('name') or '').strip()
+    color = data.get('color', 'secondary')
+    if not name:
+        return jsonify({'error': '標籤名稱不能為空'}), 400
+    if color not in TAG_COLORS:
+        color = 'secondary'
+    if session.query(Tag).filter_by(name=name).first():
+        return jsonify({'error': '標籤名稱已存在'}), 409
+    tag = Tag(name=name, color=color, created_by_id=current_user.id)
+    session.add(tag)
+    session.commit()
+    _invalidate_dashboard_cache()
+    return jsonify({'id': tag.id, 'name': tag.name, 'color': tag.color}), 201
+
+
+@bp.route('/tags/<int:tag_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def delete_tag(tag_id):
+    session = get_db()
+    tag = session.get(Tag, tag_id)
+    if not tag:
+        return jsonify({'error': '找不到標籤'}), 404
+    session.delete(tag)
+    session.commit()
+    _invalidate_dashboard_cache()
+    return jsonify({'ok': True})
+
+
+@bp.route('/members/<int:user_id>/tags', methods=['POST'])
+@login_required
+@admin_required
+def add_member_tag(user_id):
+    session = get_db()
+    member = session.query(Member).options(selectinload(Member.tags)).get(user_id)
+    data = request.get_json() or {}
+    tag = session.get(Tag, data.get('tag_id'))
+    if not member or not tag:
+        return jsonify({'error': '找不到會員或標籤'}), 404
+    if tag not in member.tags:
+        member.tags.append(tag)
+        session.commit()
+    _invalidate_dashboard_cache()
+    return jsonify({'ok': True})
+
+
+@bp.route('/members/<int:user_id>/tags/<int:tag_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def remove_member_tag(user_id, tag_id):
+    session = get_db()
+    member = session.query(Member).options(selectinload(Member.tags)).get(user_id)
+    tag = session.get(Tag, tag_id)
+    if not member or not tag:
+        return jsonify({'error': '找不到會員或標籤'}), 404
+    if tag in member.tags:
+        member.tags.remove(tag)
+        session.commit()
+    _invalidate_dashboard_cache()
+    return jsonify({'ok': True})

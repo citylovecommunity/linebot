@@ -31,6 +31,15 @@ class Base(DeclarativeBase):
     pass
 
 
+# Association table for Member <-> Tag many-to-many
+member_tag = Table(
+    'member_tag',
+    Base.metadata,
+    Column('member_id', Integer, ForeignKey('member.id', ondelete='CASCADE'), primary_key=True),
+    Column('tag_id', Integer, ForeignKey('tag.id', ondelete='CASCADE'), primary_key=True),
+)
+
+
 class GroupMatchingStatus(enum.Enum):
     ACTIVE = "ACTIVE"
     FEEDBACK = "FEEDBACK"   # Phase 4: collecting anonymous badges
@@ -299,6 +308,8 @@ class Member(Base):
         if not self.expiration_date:
             return False
         return self.expiration_date < _date.today()
+
+    tags: Mapped[list['Tag']] = relationship('Tag', secondary=member_tag, back_populates='members')
 
 
 class Line_Info(Base):
@@ -805,6 +816,16 @@ class LeadSubmission(Base):
     created_at: Mapped[datetime] = mapped_column(default=datetime.now)
     converted_member_id: Mapped[Optional[int]] = mapped_column(ForeignKey("member.id"), nullable=True)
     converted_member: Mapped[Optional["Member"]] = relationship(foreign_keys=[converted_member_id])
+
+
+class Tag(Base):
+    __tablename__ = 'tag'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(unique=True, index=True)
+    color: Mapped[str] = mapped_column(default='secondary')
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey('member.id'), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.now)
+    members: Mapped[list['Member']] = relationship('Member', secondary=member_tag, back_populates='tags')
 
 
 class UserMatchScore(Base):

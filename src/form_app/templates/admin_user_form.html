@@ -192,6 +192,39 @@
           </div>
         </div>
 
+        <!-- Tags -->
+        {% if user %}
+        <div class="card mb-3">
+          <div class="card-header fw-semibold"><i class="bi bi-tags me-1"></i>標籤</div>
+          <div class="card-body">
+            <div id="member-tag-list" class="d-flex flex-wrap gap-2 mb-2">
+              {% for tag in user.tags %}
+              <span class="badge bg-{{ tag.color }} fs-6 px-2 py-1" id="edit-tag-{{ tag.id }}">
+                {{ tag.name }}
+                <span class="ms-1" style="cursor:pointer;opacity:.7;"
+                  onclick="removeTagFromEdit({{ user.id }}, {{ tag.id }})" title="移除">×</span>
+              </span>
+              {% else %}
+              <span class="text-muted small" id="edit-tags-empty">尚無標籤</span>
+              {% endfor %}
+            </div>
+            {% if all_tags %}
+            <div class="d-flex flex-wrap gap-1">
+              {% for tag in all_tags %}
+              {% if tag not in user.tags %}
+              <button type="button" class="btn btn-sm btn-outline-{{ tag.color }}"
+                id="edit-add-tag-{{ tag.id }}"
+                onclick="addTagFromEdit({{ user.id }}, {{ tag.id }}, '{{ tag.name }}', '{{ tag.color }}')">
+                + {{ tag.name }}
+              </button>
+              {% endif %}
+              {% endfor %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+
         <!-- Profile Links -->
         <div class="card mb-3">
           <div class="card-header fw-semibold">個人連結</div>
@@ -493,4 +526,40 @@
   </form>
 
 </div>
+
+{% if user %}
+<script>
+function addTagFromEdit(memberId, tagId, tagName, tagColor) {
+  fetch(`/admin/members/${memberId}/tags`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tag_id: tagId }),
+  }).then(r => r.json()).then(data => {
+    if (data.error) { alert(data.error); return; }
+    document.getElementById('edit-tags-empty')?.remove();
+    const badge = document.createElement('span');
+    badge.className = `badge bg-${tagColor} fs-6 px-2 py-1`;
+    badge.id = `edit-tag-${tagId}`;
+    badge.innerHTML = `${tagName}<span class="ms-1" style="cursor:pointer;opacity:.7;" onclick="removeTagFromEdit(${memberId}, ${tagId})" title="移除">×</span>`;
+    document.getElementById('member-tag-list').appendChild(badge);
+    document.getElementById(`edit-add-tag-${tagId}`)?.remove();
+  });
+}
+
+function removeTagFromEdit(memberId, tagId) {
+  fetch(`/admin/members/${memberId}/tags/${tagId}`, { method: 'DELETE' })
+    .then(r => r.json()).then(data => {
+      if (data.error) { alert(data.error); return; }
+      document.getElementById(`edit-tag-${tagId}`)?.remove();
+      if (!document.querySelector('#member-tag-list .badge')) {
+        const empty = document.createElement('span');
+        empty.className = 'text-muted small';
+        empty.id = 'edit-tags-empty';
+        empty.textContent = '尚無標籤';
+        document.getElementById('member-tag-list').appendChild(empty);
+      }
+    });
+}
+</script>
+{% endif %}
 {% endblock %}

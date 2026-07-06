@@ -95,9 +95,14 @@
     <div class="tab-pane fade show active" id="members" role="tabpanel">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="mb-0">會員列表</h5>
-        <a href="{{ url_for('admin_bp.new_user') }}" class="btn btn-sm btn-success">
-          <i class="bi bi-person-plus"></i> 新增會員
-        </a>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#tagManageModal">
+            <i class="bi bi-tags"></i> 管理標籤
+          </button>
+          <a href="{{ url_for('admin_bp.new_user') }}" class="btn btn-sm btn-success">
+            <i class="bi bi-person-plus"></i> 新增會員
+          </a>
+        </div>
       </div>
 
       <!-- 篩選器 -->
@@ -137,6 +142,7 @@
             <tr>
               <th class="sortable" data-col="0" style="cursor:pointer;">編號 <i class="bi bi-arrow-down-up small"></i></th>
               <th class="sortable" data-col="1" style="cursor:pointer;">姓名 <i class="bi bi-arrow-down-up small"></i></th>
+              <th>標籤</th>
               <th>性別</th>
               <th>電話</th>
               <th>等級</th>
@@ -166,6 +172,22 @@
                 {% if member.join_campaign %}
                 <span class="badge ms-1" style="background:#f5841f;font-size:.65em;">{{ member.join_campaign }}</span>
                 {% endif %}
+              </td>
+              <td class="member-tags-cell" data-member-id="{{ member.id }}" style="white-space:nowrap;">
+                {% for tag in member.tags %}
+                <span class="badge bg-{{ tag.color }} me-1 member-tag-badge" data-tag-id="{{ tag.id }}" style="cursor:default;">
+                  {{ tag.name }}
+                  <span class="ms-1" style="cursor:pointer;opacity:.7;" onclick="removeMemberTag({{ member.id }}, {{ tag.id }}, this)" title="移除">×</span>
+                </span>
+                {% endfor %}
+                <div class="tag-picker-wrap d-inline-block position-relative">
+                  <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1 tag-add-btn"
+                    style="font-size:.7rem;line-height:1.4;"
+                    onclick="toggleTagPicker({{ member.id }}, this)">＋</button>
+                  <div class="tag-picker-dropdown d-none position-absolute bg-white border rounded shadow-sm p-1"
+                    style="z-index:1050;min-width:130px;top:100%;left:0;">
+                  </div>
+                </div>
               </td>
               <td>{{ '男' if member.gender == 'M' else '女' }}</td>
               <td>{{ member.phone_number }}</td>
@@ -1190,6 +1212,52 @@
   }
 </script>
 
+<!-- 標籤管理 Modal -->
+<div class="modal fade" id="tagManageModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-tags me-2"></i>管理標籤</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <!-- Create new tag -->
+        <div class="d-flex gap-2 mb-3">
+          <input type="text" class="form-control form-control-sm" id="new-tag-name" placeholder="標籤名稱" maxlength="20">
+          <select class="form-select form-select-sm" id="new-tag-color" style="max-width:110px;">
+            <option value="primary">藍</option>
+            <option value="secondary" selected>灰</option>
+            <option value="success">綠</option>
+            <option value="danger">紅</option>
+            <option value="warning">黃</option>
+            <option value="info">青</option>
+            <option value="dark">黑</option>
+          </select>
+          <button type="button" class="btn btn-sm btn-primary text-nowrap" onclick="createTag()">
+            <i class="bi bi-plus-lg"></i> 建立
+          </button>
+        </div>
+        <!-- Preview -->
+        <div id="new-tag-preview" class="mb-3 min-height-1"></div>
+        <!-- Existing tags -->
+        <div id="tag-manage-list">
+          {% for tag in all_tags %}
+          <div class="d-flex align-items-center justify-content-between mb-1 tag-manage-row" id="tag-row-{{ tag.id }}">
+            <span class="badge bg-{{ tag.color }} px-2 py-1">{{ tag.name }}</span>
+            <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2"
+              onclick="deleteTag({{ tag.id }}, '{{ tag.name }}')">
+              <i class="bi bi-trash3"></i>
+            </button>
+          </div>
+          {% else %}
+          <p class="text-muted small mb-0" id="tag-empty-hint">尚無標籤，請建立第一個標籤。</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- 廣播訊息 Modal -->
 <div class="modal fade" id="broadcastModal" tabindex="-1">
   <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -1498,6 +1566,137 @@ function confirmBroadcast() {
   }
   const total = document.querySelectorAll('.matching-cb').length;
   return confirm(`確定要廣播訊息至全部 ${total} 個進行中的配對嗎？`);
+}
+</script>
+
+<script>
+// ── Tag system ────────────────────────────────────────────────────────────
+
+// All tags known to the page; updated on create/delete without page reload.
+let allTags = [
+  {% for tag in all_tags %}
+  { id: {{ tag.id }}, name: {{ tag.name | tojson }}, color: {{ tag.color | tojson }} },
+  {% endfor %}
+];
+
+// Close any open tag picker when clicking elsewhere
+document.addEventListener('click', e => {
+  if (!e.target.closest('.tag-picker-wrap')) {
+    document.querySelectorAll('.tag-picker-dropdown').forEach(d => d.classList.add('d-none'));
+  }
+});
+
+// Live preview while typing a new tag name
+document.getElementById('new-tag-name').addEventListener('input', function() {
+  const color = document.getElementById('new-tag-color').value;
+  const preview = document.getElementById('new-tag-preview');
+  preview.innerHTML = this.value.trim()
+    ? `<span class="badge bg-${color}">${this.value.trim()}</span>`
+    : '';
+});
+document.getElementById('new-tag-color').addEventListener('change', function() {
+  const name = document.getElementById('new-tag-name').value.trim();
+  const preview = document.getElementById('new-tag-preview');
+  preview.innerHTML = name ? `<span class="badge bg-${this.value}">${name}</span>` : '';
+});
+
+function toggleTagPicker(memberId, btn) {
+  const dropdown = btn.nextElementSibling;
+  const isOpen = !dropdown.classList.contains('d-none');
+  // Close all others first
+  document.querySelectorAll('.tag-picker-dropdown').forEach(d => d.classList.add('d-none'));
+  if (isOpen) return;
+
+  // Find tags already on this member
+  const cell = btn.closest('.member-tags-cell');
+  const assigned = new Set(
+    [...cell.querySelectorAll('.member-tag-badge')].map(b => parseInt(b.dataset.tagId))
+  );
+  const available = allTags.filter(t => !assigned.has(t.id));
+
+  if (!available.length) {
+    dropdown.innerHTML = '<span class="text-muted small px-1">所有標籤已套用</span>';
+  } else {
+    dropdown.innerHTML = available.map(t =>
+      `<div class="px-2 py-1 rounded" style="cursor:pointer;" onmouseenter="this.style.background='#f0f0f0'" onmouseleave="this.style.background=''" onclick="addMemberTag(${memberId}, ${t.id}, '${t.name}', '${t.color}', this)">
+        <span class="badge bg-${t.color} me-1">${t.name}</span>
+      </div>`
+    ).join('');
+  }
+  dropdown.classList.remove('d-none');
+}
+
+function addMemberTag(memberId, tagId, tagName, tagColor, sourceEl) {
+  fetch(`/admin/members/${memberId}/tags`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tag_id: tagId }),
+  }).then(r => r.json()).then(data => {
+    if (data.error) { alert(data.error); return; }
+    // Insert badge before the picker wrap
+    const cell = sourceEl.closest('.member-tags-cell');
+    const wrap = cell.querySelector('.tag-picker-wrap');
+    const badge = document.createElement('span');
+    badge.className = `badge bg-${tagColor} me-1 member-tag-badge`;
+    badge.dataset.tagId = tagId;
+    badge.style.cursor = 'default';
+    badge.innerHTML = `${tagName}<span class="ms-1" style="cursor:pointer;opacity:.7;" onclick="removeMemberTag(${memberId}, ${tagId}, this)" title="移除">×</span>`;
+    cell.insertBefore(badge, wrap);
+    // Close picker
+    cell.querySelector('.tag-picker-dropdown').classList.add('d-none');
+  });
+}
+
+function removeMemberTag(memberId, tagId, xEl) {
+  fetch(`/admin/members/${memberId}/tags/${tagId}`, { method: 'DELETE' })
+    .then(r => r.json()).then(data => {
+      if (data.error) { alert(data.error); return; }
+      xEl.closest('.member-tag-badge').remove();
+    });
+}
+
+function createTag() {
+  const name = document.getElementById('new-tag-name').value.trim();
+  const color = document.getElementById('new-tag-color').value;
+  if (!name) { alert('請輸入標籤名稱'); return; }
+  fetch('/admin/tags', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, color }),
+  }).then(r => r.json()).then(data => {
+    if (data.error) { alert(data.error); return; }
+    allTags.push({ id: data.id, name: data.name, color: data.color });
+    // Add to manage list
+    document.getElementById('tag-empty-hint')?.remove();
+    const row = document.createElement('div');
+    row.className = 'd-flex align-items-center justify-content-between mb-1 tag-manage-row';
+    row.id = `tag-row-${data.id}`;
+    row.innerHTML = `<span class="badge bg-${data.color} px-2 py-1">${data.name}</span>
+      <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2"
+        onclick="deleteTag(${data.id}, '${data.name}')"><i class="bi bi-trash3"></i></button>`;
+    document.getElementById('tag-manage-list').appendChild(row);
+    document.getElementById('new-tag-name').value = '';
+    document.getElementById('new-tag-preview').innerHTML = '';
+  });
+}
+
+function deleteTag(tagId, tagName) {
+  if (!confirm(`確定刪除標籤「${tagName}」？所有會員的此標籤也將被移除。`)) return;
+  fetch(`/admin/tags/${tagId}`, { method: 'DELETE' })
+    .then(r => r.json()).then(data => {
+      if (data.error) { alert(data.error); return; }
+      allTags = allTags.filter(t => t.id !== tagId);
+      document.getElementById(`tag-row-${tagId}`)?.remove();
+      // Remove badges from member rows
+      document.querySelectorAll(`.member-tag-badge[data-tag-id="${tagId}"]`).forEach(b => b.remove());
+      if (!document.querySelector('.tag-manage-row')) {
+        const hint = document.createElement('p');
+        hint.className = 'text-muted small mb-0';
+        hint.id = 'tag-empty-hint';
+        hint.textContent = '尚無標籤，請建立第一個標籤。';
+        document.getElementById('tag-manage-list').appendChild(hint);
+      }
+    });
 }
 </script>
 {% endblock %}
