@@ -1229,7 +1229,7 @@
   style="position:fixed;z-index:1060;min-width:130px;"></div>
 
 <!-- 標籤管理 Modal -->
-<div class="modal fade" id="tagManageModal" tabindex="-1" data-bs-scroll="true">
+<div class="modal fade" id="tagManageModal" tabindex="-1" data-bs-scroll="true" data-bs-focus="false">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
@@ -1239,7 +1239,8 @@
       <div class="modal-body">
         <!-- Create new tag -->
         <div class="d-flex gap-2 mb-3">
-          <input type="text" class="form-control form-control-sm" id="new-tag-name" placeholder="標籤名稱" maxlength="20">
+          <input type="text" class="form-control form-control-sm" id="new-tag-name" placeholder="標籤名稱" maxlength="20"
+            autocomplete="off" data-form-type="other" data-lpignore="true">
           <select class="form-select form-select-sm" id="new-tag-color" style="max-width:110px;">
             <option value="primary">藍</option>
             <option value="secondary" selected>灰</option>
@@ -1747,28 +1748,5 @@ function deleteTag(tagId, tagName) {
     }).catch(e => alert('刪除標籤失敗：' + e.message));
 }
 
-// ── Freeze diagnostic (remove after fixing) ──
-(function() {
-  const modal = document.getElementById('tagManageModal');
-  const inp   = document.getElementById('new-tag-name');
-  if (!modal || !inp) return;
-  modal.addEventListener('show.bs.modal',   () => { console.time('[modal] show→shown'); });
-  modal.addEventListener('shown.bs.modal',  () => { console.timeEnd('[modal] show→shown'); console.time('[modal] shown→mousedown'); });
-  inp.addEventListener('mousedown', () => { console.timeEnd('[modal] shown→mousedown'); console.time('[input] mousedown→keydown'); }, { once: true });
-  inp.addEventListener('keydown',   () => { console.timeEnd('[input] mousedown→keydown'); }, { once: true });
-  // Track if requestIdleCallback fires near a click
-  const _origRic = window.requestIdleCallback;
-  if (_origRic) {
-    window.requestIdleCallback = function(cb, opts) {
-      return _origRic(function(deadline) {
-        console.log('[rIC] fires, timeRemaining=' + deadline.timeRemaining().toFixed(0) + 'ms');
-        const t0 = performance.now();
-        cb(deadline);
-        const dt = performance.now() - t0;
-        if (dt > 100) console.warn('[rIC] callback took ' + dt.toFixed(0) + 'ms');
-      }, opts);
-    };
-  }
-})();
 </script>
 {% endblock %}
