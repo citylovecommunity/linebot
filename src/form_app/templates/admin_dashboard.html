@@ -1631,9 +1631,11 @@ function addMemberTag(memberId, tagId, tagName, tagColor, sourceEl) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ tag_id: tagId }),
-  }).then(r => r.json()).then(data => {
+  }).then(r => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  }).then(data => {
     if (data.error) { alert(data.error); return; }
-    // Insert badge before the picker wrap
     const cell = sourceEl.closest('.member-tags-cell');
     const wrap = cell.querySelector('.tag-picker-wrap');
     const badge = document.createElement('span');
@@ -1642,17 +1644,19 @@ function addMemberTag(memberId, tagId, tagName, tagColor, sourceEl) {
     badge.style.cursor = 'default';
     badge.innerHTML = `${tagName}<span class="ms-1" style="cursor:pointer;opacity:.7;" onclick="removeMemberTag(${memberId}, ${tagId}, this)" title="移除">×</span>`;
     cell.insertBefore(badge, wrap);
-    // Close picker
     cell.querySelector('.tag-picker-dropdown').classList.add('d-none');
-  });
+  }).catch(e => alert('標籤新增失敗：' + e.message));
 }
 
 function removeMemberTag(memberId, tagId, xEl) {
   fetch(`/admin/members/${memberId}/tags/${tagId}`, { method: 'DELETE' })
-    .then(r => r.json()).then(data => {
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    }).then(data => {
       if (data.error) { alert(data.error); return; }
       xEl.closest('.member-tag-badge').remove();
-    });
+    }).catch(e => alert('標籤移除失敗：' + e.message));
 }
 
 function createTag() {

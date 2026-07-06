@@ -534,7 +534,10 @@ function addTagFromEdit(memberId, tagId, tagName, tagColor) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ tag_id: tagId }),
-  }).then(r => r.json()).then(data => {
+  }).then(r => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  }).then(data => {
     if (data.error) { alert(data.error); return; }
     document.getElementById('edit-tags-empty')?.remove();
     const badge = document.createElement('span');
@@ -543,12 +546,15 @@ function addTagFromEdit(memberId, tagId, tagName, tagColor) {
     badge.innerHTML = `${tagName}<span class="ms-1" style="cursor:pointer;opacity:.7;" onclick="removeTagFromEdit(${memberId}, ${tagId})" title="移除">×</span>`;
     document.getElementById('member-tag-list').appendChild(badge);
     document.getElementById(`edit-add-tag-${tagId}`)?.remove();
-  });
+  }).catch(e => alert('標籤新增失敗：' + e.message));
 }
 
 function removeTagFromEdit(memberId, tagId) {
   fetch(`/admin/members/${memberId}/tags/${tagId}`, { method: 'DELETE' })
-    .then(r => r.json()).then(data => {
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    }).then(data => {
       if (data.error) { alert(data.error); return; }
       document.getElementById(`edit-tag-${tagId}`)?.remove();
       if (!document.querySelector('#member-tag-list .badge')) {
@@ -558,7 +564,7 @@ function removeTagFromEdit(memberId, tagId) {
         empty.textContent = '尚無標籤';
         document.getElementById('member-tag-list').appendChild(empty);
       }
-    });
+    }).catch(e => alert('標籤移除失敗：' + e.message));
 }
 </script>
 {% endif %}

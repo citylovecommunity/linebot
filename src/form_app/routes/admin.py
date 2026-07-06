@@ -1656,7 +1656,7 @@ def delete_tag(tag_id):
 @admin_required
 def add_member_tag(user_id):
     session = get_db()
-    member = session.query(Member).options(selectinload(Member.tags)).get(user_id)
+    member = session.get(Member, user_id)
     data = request.get_json() or {}
     tag = session.get(Tag, data.get('tag_id'))
     if not member or not tag:
@@ -1673,7 +1673,7 @@ def add_member_tag(user_id):
 @admin_required
 def remove_member_tag(user_id, tag_id):
     session = get_db()
-    member = session.query(Member).options(selectinload(Member.tags)).get(user_id)
+    member = session.get(Member, user_id)
     tag = session.get(Tag, tag_id)
     if not member or not tag:
         return jsonify({'error': '找不到會員或標籤'}), 404
