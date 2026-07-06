@@ -865,17 +865,30 @@
     if (tabEl) new bootstrap.Tab(tabEl).show();
   }
 
-  // ── 草稿診斷（lazy load，永遠執行以顯示無法配對會員） ──
-  fetch('{{ url_for("admin_bp.drafts_diagnosis") }}')
-    .then(r => r.text())
-    .then(html => {
-      const panel = document.getElementById('diagnosis-panel');
-      if (panel) panel.innerHTML = html || '';
-    })
-    .catch(() => {
-      const panel = document.getElementById('diagnosis-panel');
-      if (panel) panel.innerHTML = '';
-    });
+  // ── 草稿診斷（只在草稿頁籤顯示時才載入，避免阻塞其他頁籤的操作） ──
+  let _diagnosisLoaded = false;
+  function loadDiagnosis() {
+    if (_diagnosisLoaded) return;
+    _diagnosisLoaded = true;
+    fetch('{{ url_for("admin_bp.drafts_diagnosis") }}')
+      .then(r => r.text())
+      .then(html => {
+        const panel = document.getElementById('diagnosis-panel');
+        if (panel) panel.innerHTML = html || '';
+      })
+      .catch(() => {
+        const panel = document.getElementById('diagnosis-panel');
+        if (panel) panel.innerHTML = '';
+      });
+  }
+
+  // Run immediately if landing on drafts tab, otherwise wait until user switches to it.
+  const _initialTab = new URLSearchParams(window.location.search).get('tab');
+  if (_initialTab === 'drafts') {
+    loadDiagnosis();
+  } else {
+    document.getElementById('drafts-tab')?.addEventListener('shown.bs.tab', loadDiagnosis, { once: true });
+  }
 
   // ── 診斷面板：無法配對會員的手動選擇器 ──
   // These functions are defined here (not in the AJAX partial) because script
