@@ -780,6 +780,33 @@ class GroupBadge(Base):
     to_member: Mapped["Member"] = relationship(foreign_keys=[to_member_id])
 
 
+class LeadSubmissionStatus(enum.Enum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
+class LeadSubmission(Base):
+    __tablename__ = "lead_submission"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    meta_lead_id: Mapped[str] = mapped_column(unique=True, index=True)
+    name: Mapped[Optional[str]]
+    phone_number: Mapped[Optional[str]]
+    gender: Mapped[Optional[str]]
+    age: Mapped[Optional[int]]
+    line_id: Mapped[Optional[str]]
+    raw_data: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    status: Mapped[LeadSubmissionStatus] = mapped_column(
+        SAEnum(LeadSubmissionStatus, native_enum=False, values_callable=lambda x: [e.value for e in x]),
+        default=LeadSubmissionStatus.PENDING,
+    )
+    submitted_at: Mapped[datetime]
+    created_at: Mapped[datetime] = mapped_column(default=datetime.now)
+    converted_member_id: Mapped[Optional[int]] = mapped_column(ForeignKey("member.id"), nullable=True)
+    converted_member: Mapped[Optional["Member"]] = relationship(foreign_keys=[converted_member_id])
+
+
 class UserMatchScore(Base):
     __tablename__ = 'user_match_scores'
 

@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}Meta 廣告名單{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">
+      Meta 廣告名單
+      {% if pending_count > 0 %}
+      <span class="badge bg-warning text-dark ms-2">{{ pending_count }} 待審</span>
+      {% endif %}
+    </h2>
+    <a href="{{ url_for('admin_bp.admin_dashboard') }}" class="btn btn-sm btn-outline-secondary">← 返回後台</a>
+  </div>
+
+  <ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+      <a class="nav-link {% if status_filter == 'PENDING' %}active{% endif %}"
+         href="{{ url_for('admin_bp.leads_list', status='PENDING') }}">
+        待審核
+        {% if pending_count > 0 %}<span class="badge bg-warning text-dark ms-1">{{ pending_count }}</span>{% endif %}
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if status_filter == 'APPROVED' %}active{% endif %}"
+         href="{{ url_for('admin_bp.leads_list', status='APPROVED') }}">已轉為會員</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if status_filter == 'REJECTED' %}active{% endif %}"
+         href="{{ url_for('admin_bp.leads_list', status='REJECTED') }}">已拒絕</a>
+    </li>
+  </ul>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+  {% endwith %}
+
+  {% if leads %}
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>提交時間</th>
+          <th>姓名</th>
+          <th>手機</th>
+          <th>性別</th>
+          <th>年齡</th>
+          <th>Line ID</th>
+          <th>完整資料</th>
+          {% if status_filter == 'PENDING' %}<th>操作</th>{% endif %}
+          {% if status_filter == 'APPROVED' %}<th>會員</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for lead in leads %}
+        <tr>
+          <td class="text-nowrap text-muted small">{{ lead.submitted_at.strftime('%m/%d %H:%M') }}</td>
+          <td><strong>{{ lead.name or '—' }}</strong></td>
+          <td>{{ lead.phone_number or '—' }}</td>
+          <td>{{ '女' if lead.gender == 'F' else ('男' if lead.gender == 'M' else '—') }}</td>
+          <td>{{ lead.age or '—' }}</td>
+          <td>{{ lead.line_id or '—' }}</td>
+          <td>
+            <button class="btn btn-sm btn-outline-secondary" type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#raw-{{ lead.id }}">
+              展開
+            </button>
+          </td>
+          {% if status_filter == 'PENDING' %}
+          <td>
+            <form method="POST" action="{{ url_for('admin_bp.approve_lead', lead_id=lead.id) }}"
+                  class="d-inline"
+                  onsubmit="return confirm('確定轉為會員（未啟用）？')">
+              <button type="submit" class="btn btn-sm btn-success">轉為會員</button>
+            </form>
+            <form method="POST" action="{{ url_for('admin_bp.reject_lead', lead_id=lead.id) }}"
+                  class="d-inline ms-1"
+                  onsubmit="return confirm('確定拒絕？')">
+              <button type="submit" class="btn btn-sm btn-outline-danger">拒絕</button>
+            </form>
+          </td>
+          {% endif %}
+          {% if status_filter == 'APPROVED' %}
+          <td>
+            {% if lead.converted_member %}
+            <a href="{{ url_for('admin_bp.edit_user', user_id=lead.converted_member.id) }}"
+               class="btn btn-sm btn-outline-primary">
+              #{{ lead.converted_member.id }} {{ lead.converted_member.name }}
+            </a>
+            {% else %}—{% endif %}
+          </td>
+          {% endif %}
+        </tr>
+        <tr class="collapse" id="raw-{{ lead.id }}">
+          <td colspan="8" class="bg-light">
+            <div class="p-2">
+              <small class="text-muted">Meta Lead ID: {{ lead.meta_lead_id }}</small>
+              <table class="table table-sm table-borderless mb-0 mt-1">
+                {% if lead.raw_data %}
+                  {% for key, val in lead.raw_data.items() %}
+                  <tr>
+                    <td class="text-muted pe-3" style="white-space:nowrap">{{ key }}</td>
+                    <td>{{ val }}</td>
+                  </tr>
+                  {% endfor %}
+                {% endif %}
+              </table>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center text-muted py-5">
+    <p class="mb-0">目前沒有{{ '待審核' if status_filter == 'PENDING' else ('已審核' if status_filter == 'APPROVED' else '已拒絕') }}的名單</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

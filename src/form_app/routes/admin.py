@@ -38,6 +38,7 @@ from form_app.models import (
     ActivityLabel, Invite, Member, Matching, MatchingStatus, Message, UserMatchScore,
     DateProposal, ProposalStatus, Line_Info,
     GroupMatching, GroupMatchingStatus, GroupMembership, GroupMessage, GroupDateProposal, GroupBadge,
+    LeadSubmission, LeadSubmissionStatus,
     assign_session_avatars,
 )
 from collections import defaultdict
@@ -1520,3 +1521,76 @@ def member_match_history(user_id):
             'created_at': m.created_at.strftime('%Y-%m-%d'),
         })
     return jsonify({'member_name': member.name, 'history': history})
+
+
+@bp.route('/leads')
+@login_required
+@admin_required
+def leads_list():
+    session = get_db()
+    status_filter = request.args.get('status', 'PENDING')
+    try:
+        status_enum = LeadSubmissionStatus[status_filter]
+    except KeyError:
+        status_enum = LeadSubmissionStatus.PENDING
+    leads = (
+        session.query(LeadSubmission)
+        .filter_by(status=status_enum)
+        .order_by(LeadSubmission.submitted_at.desc())
+        .all()
+    )
+    pending_count = session.query(LeadSubmission).filter_by(status=LeadSubmissionStatus.PENDING).count()
+    return render_template('admin_leads.html', leads=leads, status_filter=status_filter, pending_count=pending_count)
+
+
+@bp.route('/leads/<int:lead_id>/approve', methods=['POST'])
+@login_required
+@admin_required
+def approve_lead(lead_id):
+    session = get_db()
+    lead = session.get(LeadSubmission, lead_id)
+    if not lead or lead.status != LeadSubmissionStatus.PENDING:
+        flash('名單已處理或不存在', 'warning')
+        return redirect(url_for('admin_bp.leads_list'))
+
+    existing = session.query(Member).filter_by(phone_number=lead.phone_number).first()
+    if existing:
+        flash(f'手機 {lead.phone_number} 已是會員 #{existing.id} {existing.name}', 'danger')
+        return redirect(url_for('admin_bp.leads_list'))
+
+    member = Member(
+        name=lead.name or '待補充',
+        phone_number=lead.phone_number,
+        gender=lead.gender or 'F',
+        fill_form_at=lead.submitted_at,
+        is_member_active=False,
+        user_info={},
+        join_campaign='meta_lead',
+    )
+    session.add(member)
+    session.flush()
+
+    lead.status = LeadSubmissionStatus.APPROVED
+    lead.converted_member_id = member.id
+
+    try:
+        session.commit()
+        flash(f'已建立會員 #{member.id}，請補充詳細資料後再啟用', 'success')
+        return redirect(url_for('admin_bp.edit_user', user_id=member.id))
+    except Exception as e:
+        session.rollback()
+        flash(f'建立失敗：{e}', 'danger')
+        return redirect(url_for('admin_bp.leads_list'))
+
+
+@bp.route('/leads/<int:lead_id>/reject', methods=['POST'])
+@login_required
+@admin_required
+def reject_lead(lead_id):
+    session = get_db()
+    lead = session.get(LeadSubmission, lead_id)
+    if lead and lead.status == LeadSubmissionStatus.PENDING:
+        lead.status = LeadSubmissionStatus.REJECTED
+        session.commit()
+        flash('已拒絕名單', 'info')
+    return redirect(url_for('admin_bp.leads_list'))

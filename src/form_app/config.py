@@ -25,6 +25,9 @@ class Settings(BaseSettings):
 
     REDIS_URL: Optional[str] = None
 
+    META_VERIFY_TOKEN: Optional[str] = None
+    META_PAGE_ACCESS_TOKEN: Optional[str] = None
+
     LIFF_ID: Optional[str] = None
 
     CLOUDINARY_CLOUD_NAME: str = "ddlaiteiw"

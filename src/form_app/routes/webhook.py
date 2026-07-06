@@ -1,12 +1,16 @@
+import json as _json
+import urllib.request
+
 from flask import Blueprint, abort, current_app, request
 from linebot.v3.exceptions import InvalidSignatureError
 from linebot.v3.messaging import (ApiClient, MessagingApi, ReplyMessageRequest,
                                   TextMessage)
 from linebot.v3.webhooks import MessageEvent, TextMessageContent
 
+from form_app.config import settings
 from form_app.database import get_db
 from form_app.extensions import line_bot_helper
-from form_app.models import Line_Info, Member
+from form_app.models import LeadSubmission, LeadSubmissionStatus, Line_Info, Member
 
 bp = Blueprint('webhook_bp', __name__)
 
@@ -65,6 +69,92 @@ def check_bind_match(msg):
     pattern = r"^綁定\s*(09\d{8})$"
     match = re.match(pattern, msg)
     return match
+
+
+@bp.route("/webhook/meta-lead", methods=["GET"])
+def meta_lead_verify():
+    mode = request.args.get("hub.mode")
+    token = request.args.get("hub.verify_token")
+    challenge = request.args.get("hub.challenge")
+    if mode == "subscribe" and token and token == settings.META_VERIFY_TOKEN:
+        return challenge, 200
+    return "Forbidden", 403
+
+
+@bp.route("/webhook/meta-lead", methods=["POST"])
+def meta_lead_webhook():
+    data = request.json or {}
+    if data.get("object") != "page":
+        return "OK", 200
+    for entry in data.get("entry", []):
+        for change in entry.get("changes", []):
+            if change.get("field") != "leadgen":
+                continue
+            lead_id = change.get("value", {}).get("leadgen_id")
+            if lead_id:
+                try:
+                    _save_lead(lead_id)
+                except Exception as e:
+                    current_app.logger.error(f"Error processing lead {lead_id}: {e}")
+    return "OK", 200
+
+
+def _save_lead(lead_id: str):
+    from datetime import datetime as _dt
+    session = get_db()
+
+    if session.query(LeadSubmission).filter_by(meta_lead_id=lead_id).first():
+        return
+
+    if not settings.META_PAGE_ACCESS_TOKEN:
+        current_app.logger.warning("META_PAGE_ACCESS_TOKEN not set")
+        return
+
+    url = f"https://graph.facebook.com/v20.0/{lead_id}?access_token={settings.META_PAGE_ACCESS_TOKEN}"
+    with urllib.request.urlopen(url, timeout=10) as resp:
+        lead_data = _json.loads(resp.read())
+
+    fields = {}
+    for f in lead_data.get("field_data", []):
+        vals = f.get("values", [])
+        fields[f["name"]] = vals[0] if vals else ""
+
+    name = fields.get("full_name") or fields.get("name", "")
+    phone = (fields.get("phone_number") or fields.get("phone", "")).replace(" ", "")
+
+    gender = ""
+    age = None
+    line_id = ""
+    for key, val in fields.items():
+        lk = key.lower()
+        if "性別" in key or lk == "gender":
+            gender = "F" if "女" in val else ("M" if "男" in val else "")
+        elif "年齡" in key or lk == "age":
+            try:
+                age = int(val)
+            except (ValueError, TypeError):
+                pass
+        elif "line" in lk:
+            line_id = val
+
+    try:
+        submitted_at = _dt.fromisoformat(lead_data.get("created_time", "").replace("Z", "+00:00"))
+    except Exception:
+        submitted_at = _dt.now()
+
+    lead = LeadSubmission(
+        meta_lead_id=lead_id,
+        name=name or None,
+        phone_number=phone or None,
+        gender=gender or None,
+        age=age,
+        line_id=line_id or None,
+        raw_data=fields,
+        submitted_at=submitted_at,
+    )
+    session.add(lead)
+    session.commit()
+    current_app.logger.info(f"Saved Meta lead {lead_id}: {name}")
 
 
 def run_binding(match, line_user_id):
