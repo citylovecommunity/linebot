@@ -28,6 +28,12 @@
     background: #f8f9fa;
     border-top: 1px solid #dee2e6;
   }
+  /* Placeholder for contenteditable tag-name field */
+  #new-tag-name:empty::before {
+    content: attr(data-placeholder);
+    color: #6c757d;
+    pointer-events: none;
+  }
 </style>
 {% endblock %}
 
@@ -1241,8 +1247,9 @@
         <form autocomplete="off" novalidate onsubmit="createTag(); return false;">
         <!-- Create new tag -->
         <div class="d-flex gap-2 mb-3">
-          <input type="text" class="form-control form-control-sm" id="new-tag-name" placeholder="標籤名稱" maxlength="20"
-            autocomplete="off" data-form-type="other" data-lpignore="true">
+          <div id="new-tag-name" contenteditable="true" spellcheck="false"
+            class="form-control form-control-sm" style="overflow:hidden;white-space:nowrap;min-width:6rem;"
+            data-placeholder="標籤名稱"></div>
           <select class="form-select form-select-sm" id="new-tag-color" style="max-width:110px;">
             <option value="primary">藍</option>
             <option value="secondary" selected>灰</option>
@@ -1618,23 +1625,31 @@ document.addEventListener('click', e => {
   _closeOpenTagPicker();
 });
 
-// Live preview while typing a new tag name — guarded to avoid crashing if element is absent
+// Live preview for the contenteditable tag-name div
 const _tagNameInput  = document.getElementById('new-tag-name');
 const _tagColorInput = document.getElementById('new-tag-color');
 if (_tagNameInput && _tagColorInput) {
-  _tagNameInput.addEventListener('input', function() {
+  const _updateTagPreview = () => {
     const preview = document.getElementById('new-tag-preview');
     if (!preview) return;
-    preview.innerHTML = this.value.trim()
-      ? `<span class="badge bg-${_tagColorInput.value}">${this.value.trim()}</span>`
-      : '';
+    const val = _tagNameInput.textContent.trim();
+    preview.innerHTML = val ? `<span class="badge bg-${_tagColorInput.value}">${val}</span>` : '';
+  };
+  _tagNameInput.addEventListener('input', _updateTagPreview);
+  _tagColorInput.addEventListener('change', _updateTagPreview);
+
+  // Enter key submits; strip newlines on paste so no multi-line text sneaks in
+  _tagNameInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); createTag(); }
   });
-  _tagColorInput.addEventListener('change', function() {
-    const preview = document.getElementById('new-tag-preview');
-    if (!preview) return;
-    preview.innerHTML = _tagNameInput.value.trim()
-      ? `<span class="badge bg-${this.value}">${_tagNameInput.value.trim()}</span>`
-      : '';
+  _tagNameInput.addEventListener('paste', e => {
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData('text/plain').replace(/\s+/g, ' ').slice(0, 20);
+    document.execCommand('insertText', false, text);
+  });
+  // Clear any stray <br> left by the browser when the field is emptied
+  _tagNameInput.addEventListener('blur', function() {
+    if (!this.textContent.trim()) this.innerHTML = '';
   });
 }
 
@@ -1702,7 +1717,8 @@ function removeMemberTag(memberId, tagId, xEl) {
 }
 
 function createTag() {
-  const name = document.getElementById('new-tag-name').value.trim();
+  const nameEl = document.getElementById('new-tag-name');
+  const name = nameEl.textContent.trim();
   const color = document.getElementById('new-tag-color').value;
   if (!name) { alert('請輸入標籤名稱'); return; }
   fetch('/admin/tags', {
@@ -1710,12 +1726,10 @@ function createTag() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, color }),
   }).then(r => {
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    if (!r.ok) return r.json().then(d => Promise.reject(d.error || `HTTP ${r.status}`));
     return r.json();
   }).then(data => {
-    if (data.error) { alert(data.error); return; }
     allTags.push({ id: data.id, name: data.name, color: data.color });
-    // Add to manage list
     document.getElementById('tag-empty-hint')?.remove();
     const row = document.createElement('div');
     row.className = 'd-flex align-items-center justify-content-between mb-1 tag-manage-row';
@@ -1724,9 +1738,9 @@ function createTag() {
       <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2"
         onclick="deleteTag(${data.id}, '${data.name}')"><i class="bi bi-trash3"></i></button>`;
     document.getElementById('tag-manage-list').appendChild(row);
-    document.getElementById('new-tag-name').value = '';
+    nameEl.innerHTML = '';
     document.getElementById('new-tag-preview').innerHTML = '';
-  }).catch(e => alert('建立標籤失敗：' + e.message));
+  }).catch(e => alert('建立標籤失敗：' + e));
 }
 
 function deleteTag(tagId, tagName) {
@@ -1751,15 +1765,5 @@ function deleteTag(tagId, tagName) {
     }).catch(e => alert('刪除標籤失敗：' + e.message));
 }
 
-// When any modal is open, mark the main page content as inert so Chrome's
-// credential-detection content script cannot traverse the 200-row member table.
-(function() {
-  const main = document.getElementById('admin-main-content');
-  if (!main) return;
-  document.querySelectorAll('.modal').forEach(m => {
-    m.addEventListener('show.bs.modal',   () => { main.inert = true;  });
-    m.addEventListener('hidden.bs.modal', () => { main.inert = false; });
-  });
-})();
 </script>
 {% endblock %}
