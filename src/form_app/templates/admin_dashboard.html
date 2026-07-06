@@ -32,7 +32,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-4">
+<div class="container-fluid mt-4" id="admin-main-content">
   <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="mb-0">管理後台 <span class="badge bg-danger ms-2">Admin</span></h2>
   </div>
@@ -1237,6 +1237,8 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
+        <!-- form wrapper gives Chrome a form context so its credential scan exits early -->
+        <form autocomplete="off" novalidate onsubmit="createTag(); return false;">
         <!-- Create new tag -->
         <div class="d-flex gap-2 mb-3">
           <input type="text" class="form-control form-control-sm" id="new-tag-name" placeholder="標籤名稱" maxlength="20"
@@ -1250,12 +1252,13 @@
             <option value="info">青</option>
             <option value="dark">黑</option>
           </select>
-          <button type="button" class="btn btn-sm btn-primary text-nowrap" onclick="createTag()">
+          <button type="submit" class="btn btn-sm btn-primary text-nowrap">
             <i class="bi bi-plus-lg"></i> 建立
           </button>
         </div>
         <!-- Preview -->
         <div id="new-tag-preview" class="mb-3 min-height-1"></div>
+        </form>
         <!-- Existing tags -->
         <div id="tag-manage-list">
           {% for tag in all_tags %}
@@ -1748,5 +1751,15 @@ function deleteTag(tagId, tagName) {
     }).catch(e => alert('刪除標籤失敗：' + e.message));
 }
 
+// When any modal is open, mark the main page content as inert so Chrome's
+// credential-detection content script cannot traverse the 200-row member table.
+(function() {
+  const main = document.getElementById('admin-main-content');
+  if (!main) return;
+  document.querySelectorAll('.modal').forEach(m => {
+    m.addEventListener('show.bs.modal',   () => { main.inert = true;  });
+    m.addEventListener('hidden.bs.modal', () => { main.inert = false; });
+  });
+})();
 </script>
 {% endblock %}
