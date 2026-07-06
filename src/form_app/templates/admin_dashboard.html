@@ -180,14 +180,9 @@
                   <span class="ms-1" style="cursor:pointer;opacity:.7;" onclick="removeMemberTag({{ member.id }}, {{ tag.id }}, this)" title="移除">×</span>
                 </span>
                 {% endfor %}
-                <div class="tag-picker-wrap d-inline-block position-relative">
-                  <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1 tag-add-btn"
-                    style="font-size:.7rem;line-height:1.4;"
-                    onclick="toggleTagPicker({{ member.id }}, this)">＋</button>
-                  <div class="tag-picker-dropdown d-none position-absolute bg-white border rounded shadow-sm p-1"
-                    style="z-index:1050;min-width:130px;top:100%;left:0;">
-                  </div>
-                </div>
+                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1 tag-add-btn"
+                  style="font-size:.7rem;line-height:1.4;"
+                  onclick="toggleTagPicker({{ member.id }}, this)">＋</button>
               </td>
               <td>{{ '男' if member.gender == 'M' else '女' }}</td>
               <td>{{ member.phone_number }}</td>
@@ -874,7 +869,11 @@
       .then(r => r.text())
       .then(html => {
         const panel = document.getElementById('diagnosis-panel');
-        if (panel) panel.innerHTML = html || '';
+        if (!panel) return;
+        // Use requestIdleCallback so this large innerHTML assignment never runs
+        // in the middle of a user interaction (click, keydown, etc.)
+        const apply = () => { panel.innerHTML = html || ''; };
+        window.requestIdleCallback ? requestIdleCallback(apply, { timeout: 8000 }) : setTimeout(apply, 0);
       })
       .catch(() => {
         const panel = document.getElementById('diagnosis-panel');
@@ -1224,6 +1223,10 @@
       });
   }
 </script>
+
+<!-- Shared tag picker popup (one for the whole page, avoids 200× position:absolute nodes) -->
+<div id="shared-tag-picker" class="d-none bg-white border rounded shadow-sm p-1"
+  style="position:fixed;z-index:1060;min-width:130px;"></div>
 
 <!-- 標籤管理 Modal -->
 <div class="modal fade" id="tagManageModal" tabindex="-1">
@@ -1592,21 +1595,23 @@ let allTags = [
   {% endfor %}
 ];
 
-// Track the currently open tag-picker dropdown so we avoid querySelectorAll on every click
-let _openTagPicker = null;
+// Single shared tag picker popup — avoids 200× position:absolute nodes in the table
+const _sharedPicker = document.getElementById('shared-tag-picker');
+let _openTagPickerBtn = null;
 
 function _closeOpenTagPicker() {
-  if (_openTagPicker) {
-    _openTagPicker.classList.add('d-none');
-    _openTagPicker = null;
+  if (_openTagPickerBtn) {
+    _sharedPicker.classList.add('d-none');
+    _openTagPickerBtn = null;
   }
 }
 
-// Close open picker when clicking outside — cheap: no querySelectorAll needed
+// Close picker when clicking outside it or outside a ＋ button
 document.addEventListener('click', e => {
-  if (_openTagPicker && !e.target.closest('.tag-picker-wrap')) {
-    _closeOpenTagPicker();
-  }
+  if (!_openTagPickerBtn) return;
+  if (e.target.closest('#shared-tag-picker')) return;
+  if (e.target.closest('.tag-add-btn')) return; // toggleTagPicker handles this case
+  _closeOpenTagPicker();
 });
 
 // Live preview while typing a new tag name — guarded to avoid crashing if element is absent
@@ -1630,8 +1635,7 @@ if (_tagNameInput && _tagColorInput) {
 }
 
 function toggleTagPicker(memberId, btn) {
-  const dropdown = btn.nextElementSibling;
-  const isOpen = (dropdown === _openTagPicker);
+  const isOpen = (btn === _openTagPickerBtn);
   _closeOpenTagPicker();
   if (isOpen) return;
 
@@ -1643,19 +1647,25 @@ function toggleTagPicker(memberId, btn) {
   const available = allTags.filter(t => !assigned.has(t.id));
 
   if (!available.length) {
-    dropdown.innerHTML = '<span class="text-muted small px-1">所有標籤已套用</span>';
+    _sharedPicker.innerHTML = '<span class="text-muted small px-1">所有標籤已套用</span>';
   } else {
-    dropdown.innerHTML = available.map(t =>
-      `<div class="px-2 py-1 rounded" style="cursor:pointer;" onmouseenter="this.style.background='#f0f0f0'" onmouseleave="this.style.background=''" onclick="addMemberTag(${memberId}, ${t.id}, '${t.name}', '${t.color}', this)">
+    _sharedPicker.innerHTML = available.map(t =>
+      `<div class="px-2 py-1 rounded" style="cursor:pointer;" onmouseenter="this.style.background='#f0f0f0'" onmouseleave="this.style.background=''" onclick="addMemberTag(${memberId}, ${t.id}, '${t.name}', '${t.color}')">
         <span class="badge bg-${t.color} me-1">${t.name}</span>
       </div>`
     ).join('');
   }
-  dropdown.classList.remove('d-none');
-  _openTagPicker = dropdown;
+
+  // Position below the ＋ button using fixed coords (no reflow needed)
+  const rect = btn.getBoundingClientRect();
+  _sharedPicker.style.top  = `${rect.bottom + 4}px`;
+  _sharedPicker.style.left = `${rect.left}px`;
+  _sharedPicker.classList.remove('d-none');
+  _openTagPickerBtn = btn;
 }
 
-function addMemberTag(memberId, tagId, tagName, tagColor, sourceEl) {
+function addMemberTag(memberId, tagId, tagName, tagColor) {
+  const btn = _openTagPickerBtn;
   fetch(`/admin/members/${memberId}/tags`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1665,14 +1675,13 @@ function addMemberTag(memberId, tagId, tagName, tagColor, sourceEl) {
     return r.json();
   }).then(data => {
     if (data.error) { alert(data.error); return; }
-    const cell = sourceEl.closest('.member-tags-cell');
-    const wrap = cell.querySelector('.tag-picker-wrap');
+    const cell = btn.closest('.member-tags-cell');
     const badge = document.createElement('span');
     badge.className = `badge bg-${tagColor} me-1 member-tag-badge`;
     badge.dataset.tagId = tagId;
     badge.style.cursor = 'default';
     badge.innerHTML = `${tagName}<span class="ms-1" style="cursor:pointer;opacity:.7;" onclick="removeMemberTag(${memberId}, ${tagId}, this)" title="移除">×</span>`;
-    cell.insertBefore(badge, wrap);
+    cell.insertBefore(badge, btn);
     _closeOpenTagPicker();
   }).catch(e => alert('標籤新增失敗：' + e.message));
 }
