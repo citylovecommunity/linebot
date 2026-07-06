@@ -15,9 +15,7 @@
     padding: 6px 10px;
     cursor: pointer;
     border-bottom: 1px solid #f0f0f0;
-    display: flex;
-    align-items: baseline;
-    flex-wrap: wrap;
+    contain: layout style;
   }
   .member-pick-card:last-child { border-bottom: none; }
   .member-pick-card:hover { background: #f8f9fa; }
@@ -1035,7 +1033,8 @@
   }
 
   function selectPickCard(memberId, memberName, gender, containerId) {
-    const hiddenEl = document.getElementById(gender === 'M' ? 'edit-male-id' : 'edit-female-id');
+    const side = gender === 'M' ? 'male' : 'female';
+    const hiddenEl = document.getElementById(`edit-${side}-id`);
     const selClass = gender === 'M' ? 'selected-m' : 'selected-f';
     document.querySelectorAll('#' + containerId + ' .member-pick-card').forEach(c => {
       c.classList.remove('selected-m', 'selected-f');
@@ -1043,6 +1042,9 @@
     const card = document.querySelector('#' + containerId + ' [data-id="' + memberId + '"]');
     if (card) card.classList.add(selClass);
     hiddenEl.value = memberId;
+    // Update the badge to reflect the newly selected person
+    const badge = document.getElementById(`edit-${side}-current-name`);
+    if (badge) badge.textContent = memberName;
   }
 
   function filterPickCards(inputEl, containerId) {
@@ -1053,20 +1055,62 @@
   }
 
   let editDraftAction = '';
+  let _editDraftMaleId = null, _editDraftFemaleId = null;
+  let _pickerBuilt = { male: false, female: false };
+
   function openDraftEdit(matchingId, maleId, femaleId, coolName) {
     editDraftAction = `/admin/matchings/${matchingId}/edit-draft`;
+    _editDraftMaleId = maleId;
+    _editDraftFemaleId = femaleId;
+    _pickerBuilt = { male: false, female: false };
+
     document.getElementById('edit-draft-form').action = editDraftAction;
     document.getElementById('edit-cool-name').value = coolName;
     document.getElementById('edit-male-id').value   = maleId;
     document.getElementById('edit-female-id').value = femaleId;
 
-    buildPickCards(males,   maleId,   femaleId, 'edit-male-list',   'M');
-    buildPickCards(females, femaleId, maleId,   'edit-female-list', 'F');
+    // Show current names; hide pickers — they build lazily on "更換" click
+    const maleData   = males.find(m => m.id === maleId);
+    const femaleData = females.find(m => m.id === femaleId);
+    document.getElementById('edit-male-current-name').textContent   = maleData   ? maleData.name   : '—';
+    document.getElementById('edit-female-current-name').textContent = femaleData ? femaleData.name : '—';
 
+    document.getElementById('edit-male-replace-area').classList.add('d-none');
+    document.getElementById('edit-female-replace-area').classList.add('d-none');
     document.getElementById('edit-male-search').value   = '';
     document.getElementById('edit-female-search').value = '';
+    document.getElementById('edit-male-list').innerHTML   = '';
+    document.getElementById('edit-female-list').innerHTML = '';
 
     new bootstrap.Modal(document.getElementById('editDraftModal')).show();
+  }
+
+  function toggleDraftReplace(side) {
+    const area = document.getElementById(`edit-${side}-replace-area`);
+    const isOpening = area.classList.contains('d-none');
+    area.classList.toggle('d-none');
+
+    if (!isOpening) return;
+
+    if (_pickerBuilt[side]) {
+      document.getElementById(`edit-${side}-search`).focus();
+      return;
+    }
+
+    // Set spinner first, then defer the heavy build AND focus() into a setTimeout.
+    // focus() forces a synchronous layout which blocks the paint; deferring both
+    // ensures the browser has a chance to render the spinner before the thread freezes.
+    const listEl = document.getElementById(`edit-${side}-list`);
+    listEl.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-secondary" role="status"><span class="visually-hidden">載入中…</span></div></div>';
+    setTimeout(() => {
+      if (side === 'male') {
+        buildPickCards(males,   _editDraftMaleId,   _editDraftFemaleId, 'edit-male-list',   'M');
+      } else {
+        buildPickCards(females, _editDraftFemaleId, _editDraftMaleId,   'edit-female-list', 'F');
+      }
+      _pickerBuilt[side] = true;
+      document.getElementById(`edit-${side}-search`).focus();
+    }, 50);
   }
 
   // ── 會員資訊 Modal ──
@@ -1294,10 +1338,19 @@
                 <i class="bi bi-gender-male"></i> 男生
               </label>
               <input type="hidden" name="male_id" id="edit-male-id">
-              <input type="text" class="form-control form-control-sm mb-1" id="edit-male-search"
-                placeholder="搜尋姓名…"
-                oninput="filterPickCards(this, 'edit-male-list')">
-              <div id="edit-male-list" class="member-pick-list"></div>
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-primary fs-6 px-3 py-2" id="edit-male-current-name">—</span>
+                <button type="button" class="btn btn-sm btn-outline-primary"
+                  onclick="toggleDraftReplace('male')">
+                  <i class="bi bi-arrow-left-right"></i> 更換
+                </button>
+              </div>
+              <div id="edit-male-replace-area" class="d-none">
+                <input type="text" class="form-control form-control-sm mb-1" id="edit-male-search"
+                  placeholder="搜尋姓名…"
+                  oninput="filterPickCards(this, 'edit-male-list')">
+                <div id="edit-male-list" class="member-pick-list"></div>
+              </div>
             </div>
 
             <!-- Female -->
@@ -1306,10 +1359,19 @@
                 <i class="bi bi-gender-female"></i> 女生
               </label>
               <input type="hidden" name="female_id" id="edit-female-id">
-              <input type="text" class="form-control form-control-sm mb-1" id="edit-female-search"
-                placeholder="搜尋姓名…"
-                oninput="filterPickCards(this, 'edit-female-list')">
-              <div id="edit-female-list" class="member-pick-list"></div>
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-danger fs-6 px-3 py-2" id="edit-female-current-name">—</span>
+                <button type="button" class="btn btn-sm btn-outline-danger"
+                  onclick="toggleDraftReplace('female')">
+                  <i class="bi bi-arrow-left-right"></i> 更換
+                </button>
+              </div>
+              <div id="edit-female-replace-area" class="d-none">
+                <input type="text" class="form-control form-control-sm mb-1" id="edit-female-search"
+                  placeholder="搜尋姓名…"
+                  oninput="filterPickCards(this, 'edit-female-list')">
+                <div id="edit-female-list" class="member-pick-list"></div>
+              </div>
             </div>
 
             <!-- Cool name -->
