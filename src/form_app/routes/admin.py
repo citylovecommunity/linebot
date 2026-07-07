@@ -372,6 +372,26 @@ def admin_dashboard():
     ).all()
     job_by_id = {r[0]: (r[1] or '') for r in _job_rows}
 
+    # Region lookup for group pairing modal (single query, no user_info eager-load)
+    from form_app.services.group_matching import compute_region_from_places_str
+    _region_rows = session.execute(
+        _sql_text("SELECT id, user_info->>'可約會地區 (可複選)' FROM member")
+    ).all()
+    member_regions = {r[0]: compute_region_from_places_str(r[1] or '') for r in _region_rows}
+
+    # Days-since-last-seen for activity index in group pairing modal
+    from datetime import timezone as _tz
+    _now_aware = datetime.now(_tz.utc)
+    member_last_seen_days: dict[int, int | None] = {}
+    for m in all_members:
+        if m.last_seen_at:
+            ls = m.last_seen_at
+            if ls.tzinfo is None:
+                ls = ls.replace(tzinfo=_tz.utc)
+            member_last_seen_days[m.id] = max(0, (_now_aware - ls).days)
+        else:
+            member_last_seen_days[m.id] = None
+
     # Diagnosis (no_candidate_users / unmatched_with_reasons) is deferred to
     # /admin/drafts/diagnosis and loaded via AJAX after the page renders.
     unmatched_with_reasons = []
@@ -410,6 +430,8 @@ def admin_dashboard():
         weeks_unmatched_by_id=weeks_unmatched_by_id,
         group_matchings=all_group_matchings,
         job_by_id=job_by_id,
+        member_regions=member_regions,
+        member_last_seen_days=member_last_seen_days,
     )
     if cache and not has_flash:
         cache.setex(_DASHBOARD_CACHE_KEY, _DASHBOARD_CACHE_TTL, response)

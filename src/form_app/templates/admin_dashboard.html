@@ -157,6 +157,7 @@
               <th>資格</th>
               <th class="sortable" data-col="7" style="cursor:pointer;">未配對 <i class="bi bi-arrow-down-up small"></i></th>
               <th class="sortable" data-col="8" style="cursor:pointer;">到期日 <i class="bi bi-arrow-down-up small"></i></th>
+              <th class="sortable" data-col="11" style="cursor:pointer;">加入日期 <i class="bi bi-arrow-down-up small"></i></th>
             </tr>
           </thead>
           <tbody>
@@ -242,6 +243,7 @@
                 <span class="text-muted">—</span>
                 {% endif %}
               </td>
+              <td class="small text-muted" data-val="{{ member.fill_form_at.strftime('%Y-%m-%d') }}">{{ member.fill_form_at.strftime('%Y-%m-%d') }}</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -336,7 +338,7 @@
               <td class="text-muted small">{{ loop.index }}{% if has_dealbreaker %} <span class="badge bg-danger" title="硬排除條件">⚠</span>{% endif %}</td>
               <td><a href="{{ url_for('admin_bp.matching_detail', matching_id=matching.id) }}" class="fw-semibold">{{ matching.cool_name }}</a></td>
               <td>
-                {% if male %}<a href="{{ url_for('admin_bp.edit_user', user_id=male.id) }}" class="text-primary fw-semibold text-decoration-none">{{ male.name }}</a>{% else %}<span class="text-primary fw-semibold">—</span>{% endif %}
+                {% if male %}<a href="{{ url_for('admin_bp.edit_user', user_id=male.id) }}" class="text-primary fw-semibold text-decoration-none">{{ male.name }}</a>{% if male.join_campaign %}<span class="badge ms-1" style="background:#f5841f;font-size:.65em;">{{ male.join_campaign }}</span>{% endif %}{% else %}<span class="text-primary fw-semibold">—</span>{% endif %}
                 {% if male %}{% set mw = weeks_unmatched_by_id.get(male.id) %}
                 {% if mw is none %}<span class="badge bg-secondary ms-1" style="font-size:.65em">從未</span>
                 {% elif mw >= 4 %}<span class="badge bg-danger ms-1" style="font-size:.65em">{{ mw }}w</span>
@@ -354,7 +356,7 @@
                 {% endif %}
               </td>
               <td>
-                {% if female %}<a href="{{ url_for('admin_bp.edit_user', user_id=female.id) }}" class="text-danger fw-semibold text-decoration-none">{{ female.name }}</a>{% else %}<span class="text-danger fw-semibold">—</span>{% endif %}
+                {% if female %}<a href="{{ url_for('admin_bp.edit_user', user_id=female.id) }}" class="text-danger fw-semibold text-decoration-none">{{ female.name }}</a>{% if female.join_campaign %}<span class="badge ms-1" style="background:#f5841f;font-size:.65em;">{{ female.join_campaign }}</span>{% endif %}{% else %}<span class="text-danger fw-semibold">—</span>{% endif %}
                 {% if female %}{% set fw = weeks_unmatched_by_id.get(female.id) %}
                 {% if fw is none %}<span class="badge bg-secondary ms-1" style="font-size:.65em">從未</span>
                 {% elif fw >= 4 %}<span class="badge bg-danger ms-1" style="font-size:.65em">{{ fw }}w</span>
@@ -451,8 +453,8 @@
             <tr>
               <td class="text-muted small">{{ matching.id }}</td>
               <td><a href="{{ url_for('admin_bp.matching_detail', matching_id=matching.id) }}" class="fw-semibold">{{ matching.cool_name }}</a></td>
-              <td>{% if subj %}<a href="{{ url_for('admin_bp.edit_user', user_id=subj.id) }}" class="text-decoration-none">{{ subj.name }}</a>{% else %}—{% endif %}</td>
-              <td>{% if obj %}<a href="{{ url_for('admin_bp.edit_user', user_id=obj.id) }}" class="text-decoration-none">{{ obj.name }}</a>{% else %}—{% endif %}</td>
+              <td>{% if subj %}<a href="{{ url_for('admin_bp.edit_user', user_id=subj.id) }}" class="text-decoration-none">{{ subj.name }}</a>{% if subj.join_campaign %}<span class="badge ms-1" style="background:#f5841f;font-size:.65em;">{{ subj.join_campaign }}</span>{% endif %}{% else %}—{% endif %}</td>
+              <td>{% if obj %}<a href="{{ url_for('admin_bp.edit_user', user_id=obj.id) }}" class="text-decoration-none">{{ obj.name }}</a>{% if obj.join_campaign %}<span class="badge ms-1" style="background:#f5841f;font-size:.65em;">{{ obj.join_campaign }}</span>{% endif %}{% else %}—{% endif %}</td>
               <td>
                 {% if matching.status.value == 'ACTIVE' %}
                 <span class="badge bg-success">進行中</span>
@@ -509,8 +511,9 @@
         <h5 class="mb-0">群組配對</h5>
         <div class="d-flex gap-2">
           <form method="POST" action="{{ url_for('admin_bp.auto_form_groups') }}"
-                onsubmit="return confirm('確定要自動生成群組？系統會依照配對條件自動分組並發送 LINE 通知。')">
-            <button type="submit" class="btn btn-sm btn-outline-primary">
+                id="auto-form-groups-form"
+                onsubmit="return startAutoForm(this)">
+            <button type="submit" id="auto-form-btn" class="btn btn-sm btn-outline-primary">
               <i class="bi bi-magic me-1"></i> 自動生成
             </button>
           </form>
@@ -1360,56 +1363,127 @@
 <!-- 草稿編輯 Modal -->
 <!-- 建立群組 Modal -->
 <div class="modal fade" id="createGroupModal" tabindex="-1" data-bs-scroll="true">
-  <div class="modal-dialog modal-dialog-centered">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title"><i class="bi bi-people-fill me-2"></i>建立群組配對</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <form method="POST" action="{{ url_for('admin_bp.create_group') }}">
-        <div class="modal-body">
-          <p class="text-muted small mb-3">請選擇 2 位男性與 2 位女性組成群組。</p>
+      <form method="POST" action="{{ url_for('admin_bp.create_group') }}" id="create-group-form">
+        <input type="hidden" name="male_ids" id="cg-male-1-id">
+        <input type="hidden" name="male_ids" id="cg-male-2-id">
+        <input type="hidden" name="female_ids" id="cg-female-1-id">
+        <input type="hidden" name="female_ids" id="cg-female-2-id">
 
-          <div class="mb-3">
-            <label class="form-label fw-semibold">男性成員 1</label>
-            <select name="male_ids" class="form-select" required>
-              <option value="">請選擇…</option>
-              {% for m in members %}{% if m.gender == 'M' %}
-              <option value="{{ m.id }}">{{ m.name }}{% if m.is_test %} [測試]{% endif %}</option>
-              {% endif %}{% endfor %}
-            </select>
+        <div class="modal-body p-3">
+          <!-- Selection summary bar -->
+          <div class="d-flex flex-wrap gap-2 align-items-center mb-3 p-2 bg-light rounded border" id="cg-summary">
+            <span class="text-muted small">已選：</span>
+            <span class="badge border text-dark bg-white" id="cg-label-m1">♂ 男生 1</span>
+            <span class="badge border text-dark bg-white" id="cg-label-m2">♂ 男生 2</span>
+            <span class="text-muted">·</span>
+            <span class="badge border text-dark bg-white" id="cg-label-f1">♀ 女生 1</span>
+            <span class="badge border text-dark bg-white" id="cg-label-f2">♀ 女生 2</span>
           </div>
-          <div class="mb-3">
-            <label class="form-label fw-semibold">男性成員 2</label>
-            <select name="male_ids" class="form-select" required>
-              <option value="">請選擇…</option>
-              {% for m in members %}{% if m.gender == 'M' %}
-              <option value="{{ m.id }}">{{ m.name }}{% if m.is_test %} [測試]{% endif %}</option>
-              {% endif %}{% endfor %}
-            </select>
-          </div>
-          <div class="mb-3">
-            <label class="form-label fw-semibold">女性成員 1</label>
-            <select name="female_ids" class="form-select" required>
-              <option value="">請選擇…</option>
-              {% for m in members %}{% if m.gender == 'F' %}
-              <option value="{{ m.id }}">{{ m.name }}{% if m.is_test %} [測試]{% endif %}</option>
-              {% endif %}{% endfor %}
-            </select>
-          </div>
-          <div class="mb-3">
-            <label class="form-label fw-semibold">女性成員 2</label>
-            <select name="female_ids" class="form-select" required>
-              <option value="">請選擇…</option>
-              {% for m in members %}{% if m.gender == 'F' %}
-              <option value="{{ m.id }}">{{ m.name }}{% if m.is_test %} [測試]{% endif %}</option>
-              {% endif %}{% endfor %}
-            </select>
+
+          <div class="row g-2">
+            <!-- Males -->
+            <div class="col-md-6">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="bi bi-gender-male text-primary"></i>
+                <span class="fw-semibold small">男生（點選最多 2 位）</span>
+              </div>
+              <input type="text" class="form-control form-control-sm mb-2"
+                     placeholder="搜尋…" oninput="cgFilter(this,'cg-males')">
+              <div id="cg-males" style="max-height:380px;overflow-y:auto;">
+                {% for m in members %}{% if m.gender == 'M' %}
+                {% set age = (2026 - m.birthday.year) if m.birthday else none %}
+                {% set region = member_regions.get(m.id) %}
+                {% set days = member_last_seen_days.get(m.id) %}
+                <div class="cg-card card mb-2 p-2" style="cursor:pointer;border:2px solid transparent;"
+                     data-id="{{ m.id }}" data-gender="M" data-name="{{ m.name }}"
+                     onclick="cgSelectCard(this)">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                      <span class="fw-semibold">{{ m.name }}</span>
+                      {% if m.is_test %}<span class="badge bg-warning text-dark ms-1" style="font-size:.65em">測試</span>{% endif %}
+                    </div>
+                    <span class="text-muted" style="font-size:.72em;">ID {{ m.id }}</span>
+                  </div>
+                  <div class="d-flex flex-wrap gap-1 mt-1">
+                    {% if age %}<span class="badge bg-light text-dark border" style="font-size:.7em;">{{ age }}歲</span>{% endif %}
+                    {% if region %}<span class="badge bg-info text-dark" style="font-size:.7em;">{{ region }}</span>{% endif %}
+                    <!-- 活躍度 -->
+                    {% if days is none %}
+                      <span class="badge bg-secondary" style="font-size:.7em;" title="從未登入">⚫ 未登入</span>
+                    {% elif days <= 7 %}
+                      <span class="badge bg-success" style="font-size:.7em;" title="最近 {{ days }} 天登入">🟢 {{ days }}天前</span>
+                    {% elif days <= 30 %}
+                      <span class="badge bg-warning text-dark" style="font-size:.7em;" title="最近 {{ days }} 天登入">🟡 {{ days }}天前</span>
+                    {% else %}
+                      <span class="badge bg-danger" style="font-size:.7em;" title="最近 {{ days }} 天登入">🔴 {{ days }}天前</span>
+                    {% endif %}
+                    <span class="badge bg-light text-dark border" style="font-size:.7em;" title="{{ m.label_name }}">
+                      {{ m.label_emoji }} {{ m.companion_score }}分
+                    </span>
+                  </div>
+                </div>
+                {% endif %}{% endfor %}
+              </div>
+            </div>
+
+            <!-- Females -->
+            <div class="col-md-6">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="bi bi-gender-female text-danger"></i>
+                <span class="fw-semibold small">女生（點選最多 2 位）</span>
+              </div>
+              <input type="text" class="form-control form-control-sm mb-2"
+                     placeholder="搜尋…" oninput="cgFilter(this,'cg-females')">
+              <div id="cg-females" style="max-height:380px;overflow-y:auto;">
+                {% for m in members %}{% if m.gender == 'F' %}
+                {% set age = (2026 - m.birthday.year) if m.birthday else none %}
+                {% set region = member_regions.get(m.id) %}
+                {% set days = member_last_seen_days.get(m.id) %}
+                <div class="cg-card card mb-2 p-2" style="cursor:pointer;border:2px solid transparent;"
+                     data-id="{{ m.id }}" data-gender="F" data-name="{{ m.name }}"
+                     onclick="cgSelectCard(this)">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                      <span class="fw-semibold">{{ m.name }}</span>
+                      {% if m.is_test %}<span class="badge bg-warning text-dark ms-1" style="font-size:.65em">測試</span>{% endif %}
+                    </div>
+                    <span class="text-muted" style="font-size:.72em;">ID {{ m.id }}</span>
+                  </div>
+                  <div class="d-flex flex-wrap gap-1 mt-1">
+                    {% if age %}<span class="badge bg-light text-dark border" style="font-size:.7em;">{{ age }}歲</span>{% endif %}
+                    {% if region %}<span class="badge bg-info text-dark" style="font-size:.7em;">{{ region }}</span>{% endif %}
+                    {% if days is none %}
+                      <span class="badge bg-secondary" style="font-size:.7em;" title="從未登入">⚫ 未登入</span>
+                    {% elif days <= 7 %}
+                      <span class="badge bg-success" style="font-size:.7em;" title="最近 {{ days }} 天登入">🟢 {{ days }}天前</span>
+                    {% elif days <= 30 %}
+                      <span class="badge bg-warning text-dark" style="font-size:.7em;" title="最近 {{ days }} 天登入">🟡 {{ days }}天前</span>
+                    {% else %}
+                      <span class="badge bg-danger" style="font-size:.7em;" title="最近 {{ days }} 天登入">🔴 {{ days }}天前</span>
+                    {% endif %}
+                    <span class="badge bg-light text-dark border" style="font-size:.7em;" title="{{ m.label_name }}">
+                      {{ m.label_emoji }} {{ m.companion_score }}分
+                    </span>
+                  </div>
+                </div>
+                {% endif %}{% endfor %}
+              </div>
+            </div>
           </div>
         </div>
+
         <div class="modal-footer">
+          <div class="me-auto small text-muted" id="cg-validation-msg">請選擇 2 男 + 2 女</div>
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-          <button type="submit" class="btn btn-success">建立群組</button>
+          <button type="submit" class="btn btn-success" id="cg-submit-btn" disabled>
+            <i class="bi bi-people-fill me-1"></i> 建立群組
+          </button>
         </div>
       </form>
     </div>
@@ -1764,6 +1838,96 @@ function deleteTag(tagId, tagName) {
       }
     }).catch(e => alert('刪除標籤失敗：' + e.message));
 }
+
+// ── 自動生成 spinner ───────────────────────────────────────────────────────────
+function startAutoForm(form) {
+  if (!confirm('確定要自動生成群組？系統會依照配對條件自動分組並發送 LINE 通知。')) return false;
+  const btn = document.getElementById('auto-form-btn');
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> 生成中…';
+  btn.disabled = true;
+  return true;
+}
+
+// ── 手動建立群組 card picker ───────────────────────────────────────────────────
+(function() {
+  // Track selections: [card|null, card|null] for each gender
+  const sel = { M: [null, null], F: [null, null] };
+  const COLORS = { M: '#0d6efd', F: '#d63384' };
+
+  window.cgFilter = function(input, panelId) {
+    const q = input.value.toLowerCase();
+    document.querySelectorAll('#' + panelId + ' .cg-card').forEach(c => {
+      c.style.display = c.dataset.name.toLowerCase().includes(q) ? '' : 'none';
+    });
+  };
+
+  window.cgSelectCard = function(card) {
+    const id   = card.dataset.id;
+    const g    = card.dataset.gender;
+    const name = card.querySelector('.fw-semibold').textContent.trim();
+    const slots = sel[g];
+
+    // If already selected in either slot, deselect
+    for (let i = 0; i < 2; i++) {
+      if (slots[i] && slots[i].dataset.id === id) {
+        slots[i].style.borderColor = 'transparent';
+        slots[i].style.backgroundColor = '';
+        slots[i] = null;
+        cgUpdateState();
+        return;
+      }
+    }
+
+    // Fill first empty slot
+    const emptySlot = slots[0] === null ? 0 : (slots[1] === null ? 1 : -1);
+    if (emptySlot === -1) return; // both slots full
+
+    slots[emptySlot] = card;
+    card.style.borderColor = COLORS[g];
+    card.style.backgroundColor = g === 'M' ? '#f0f5ff' : '#fff0f7';
+    cgUpdateState();
+  };
+
+  function cgUpdateState() {
+    const [m1, m2] = sel.M;
+    const [f1, f2] = sel.F;
+
+    document.getElementById('cg-male-1-id').value   = m1 ? m1.dataset.id : '';
+    document.getElementById('cg-male-2-id').value   = m2 ? m2.dataset.id : '';
+    document.getElementById('cg-female-1-id').value = f1 ? f1.dataset.id : '';
+    document.getElementById('cg-female-2-id').value = f2 ? f2.dataset.id : '';
+
+    document.getElementById('cg-label-m1').textContent = m1 ? '♂ ' + m1.querySelector('.fw-semibold').textContent.trim() : '♂ 男生 1';
+    document.getElementById('cg-label-m2').textContent = m2 ? '♂ ' + m2.querySelector('.fw-semibold').textContent.trim() : '♂ 男生 2';
+    document.getElementById('cg-label-f1').textContent = f1 ? '♀ ' + f1.querySelector('.fw-semibold').textContent.trim() : '♀ 女生 1';
+    document.getElementById('cg-label-f2').textContent = f2 ? '♀ ' + f2.querySelector('.fw-semibold').textContent.trim() : '♀ 女生 2';
+
+    const ready = m1 && m2 && f1 && f2;
+    document.getElementById('cg-submit-btn').disabled = !ready;
+    document.getElementById('cg-validation-msg').textContent = ready
+      ? '✓ 已選好 2 男 + 2 女'
+      : `請選擇 2 男 + 2 女（男 ${sel.M.filter(Boolean).length}/2，女 ${sel.F.filter(Boolean).length}/2）`;
+  }
+
+  // Reset state when modal closes
+  document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('createGroupModal');
+    if (modal) {
+      modal.addEventListener('hidden.bs.modal', function() {
+        for (const g of ['M', 'F']) {
+          for (let i = 0; i < 2; i++) {
+            if (sel[g][i]) {
+              sel[g][i].style.borderColor = 'transparent';
+              sel[g][i].style.backgroundColor = '';
+              sel[g][i] = null;
+            }
+          }
+        }
+        cgUpdateState();
+      });
+    }
+  });
+})();
 
 </script>
 {% endblock %}

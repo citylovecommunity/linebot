@@ -22,8 +22,16 @@
     border-color: #d63384;
     background-color: #fff0f7;
   }
+  .member-card.selected-ff-a {
+    border-color: #d63384;
+    background-color: #fff0f7;
+  }
+  .member-card.selected-ff-b {
+    border-color: #9c27b0;
+    background-color: #fdf4ff;
+  }
   .panel-col {
-    height: calc(100vh - 270px);
+    height: calc(100vh - 310px);
     overflow-y: auto;
   }
   .confirm-bar {
@@ -56,168 +64,352 @@
       <i class="bi bi-arrow-left"></i> Back
     </a>
     <h4 class="mb-0">Manual Pair</h4>
-    <span class="text-muted small">Click one male and one female to pair them.</span>
   </div>
+
+  <!-- Mode tabs -->
+  <ul class="nav nav-tabs mb-3" id="pairModeTabs">
+    <li class="nav-item">
+      <button class="nav-link active" id="tab-cross-btn" type="button" onclick="switchMode('cross')">
+        <i class="bi bi-gender-male text-primary"></i>
+        <i class="bi bi-gender-female text-danger"></i>
+        異性配對
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" id="tab-ff-btn" type="button" onclick="switchMode('ff')">
+        <i class="bi bi-gender-female text-danger"></i>
+        <i class="bi bi-gender-female text-danger"></i>
+        女女配對
+      </button>
+    </li>
+  </ul>
 
   <form method="POST" id="pair-form">
     <input type="hidden" name="subject_id" id="subject_id">
     <input type="hidden" name="object_id" id="object_id">
 
-    <div class="row g-3">
+    <!-- ── CROSS-GENDER PANEL ── -->
+    <div id="panel-cross">
+      <p class="text-muted small mb-2">Click one male and one female to pair them.</p>
+      <div class="row g-3">
 
-      <!-- ── MALE PANEL ── -->
-      <div class="col-md-6">
-        <div class="d-flex align-items-center mb-2 gap-2">
-          <i class="bi bi-gender-male text-primary fs-5"></i>
-          <span class="fw-semibold">Males ({{ males|length }})</span>
-        </div>
-        <input type="text" class="form-control form-control-sm mb-2"
-               placeholder="Search males…" oninput="filterPanel(this, 'panel-male')">
-        <div class="panel-col pe-1" id="panel-male">
-          {% for m in males %}
-          {% set prev_partners = past_partners.get(m.id, []) %}
-          <div class="member-card card mb-2 p-2"
-               data-id="{{ m.id }}"
-               data-gender="male"
-               data-name="{{ m.name }}"
-               data-prev-partners="{{ prev_partners | join(',') }}"
-               onclick="selectMember(this)">
-            <div class="d-flex justify-content-between align-items-start">
-              <div>
-                <span class="fw-semibold">{{ m.name }}</span>
-                {% if m.is_test %}
-                <span class="badge bg-warning text-dark ms-1 badge-line">測試</span>
+        <!-- MALE -->
+        <div class="col-md-6">
+          <div class="d-flex align-items-center mb-2 gap-2">
+            <i class="bi bi-gender-male text-primary fs-5"></i>
+            <span class="fw-semibold">Males ({{ males|length }})</span>
+          </div>
+          <input type="text" class="form-control form-control-sm mb-2"
+                 placeholder="Search males…" oninput="filterPanel(this, 'panel-male')">
+          <div class="panel-col pe-1" id="panel-male">
+            {% for m in males %}
+            {% set prev_partners = past_partners.get(m.id, []) %}
+            <div class="member-card card mb-2 p-2"
+                 data-id="{{ m.id }}"
+                 data-gender="male"
+                 data-name="{{ m.name }}"
+                 data-prev-partners="{{ prev_partners | join(',') }}"
+                 onclick="selectCross(this)">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <span class="fw-semibold">{{ m.name }}</span>
+                  {% if m.is_test %}
+                  <span class="badge bg-warning text-dark ms-1 badge-line">測試</span>
+                  {% endif %}
+                  {% if m.rank %}
+                  <span class="badge bg-secondary ms-1 badge-line">{{ m.rank }}</span>
+                  {% endif %}
+                  {% if m.line_info %}
+                  <span class="badge bg-success ms-1 badge-line"><i class="bi bi-check2"></i> LINE</span>
+                  {% else %}
+                  <span class="badge bg-warning text-dark ms-1 badge-line">No LINE</span>
+                  {% endif %}
+                  {% if m.join_campaign %}<span class="badge ms-1 badge-line" style="background:#f5841f;">{{ m.join_campaign }}</span>{% endif %}
+                </div>
+                <span class="text-muted small">ID {{ m.id }}</span>
+              </div>
+              <div class="mt-1 text-muted small d-flex flex-wrap gap-2">
+                {% if m.birthday %}
+                <span><i class="bi bi-calendar3"></i> {{ 2026 - m.birthday.year }}歲</span>
                 {% endif %}
-                {% if m.rank %}
-                <span class="badge bg-secondary ms-1 badge-line">{{ m.rank }}</span>
+                {% if m.height %}
+                <span><i class="bi bi-rulers"></i> {{ m.height }}cm</span>
                 {% endif %}
-                {% if m.line_info %}
-                <span class="badge bg-success ms-1 badge-line"><i class="bi bi-check2"></i> LINE</span>
-                {% else %}
-                <span class="badge bg-warning text-dark ms-1 badge-line">No LINE</span>
+                {% if m.marital_status %}
+                <span><i class="bi bi-person"></i> {{ m.marital_status }}</span>
                 {% endif %}
               </div>
-              <span class="text-muted small">ID {{ m.id }}</span>
-            </div>
-            <div class="mt-1 text-muted small d-flex flex-wrap gap-2">
-              {% if m.birthday %}
-              <span><i class="bi bi-calendar3"></i> {{ 2026 - m.birthday.year }}歲</span>
+              {% set hobbies = m.user_info.get('您的休閒興趣 (可複選)', '') if m.user_info else '' %}
+              {% if hobbies and hobbies != '無' %}
+              <div class="mt-1 d-flex flex-wrap gap-1">
+                {% for h in hobbies.replace('、', ',').split(',')[:4] %}
+                <span class="badge bg-light text-dark border tag">{{ h.strip() }}</span>
+                {% endfor %}
+              </div>
               {% endif %}
-              {% if m.height %}
-              <span><i class="bi bi-rulers"></i> {{ m.height }}cm</span>
+              {% if m.introduction_link %}
+              <div class="mt-1">
+                <a href="{{ m.introduction_link }}" target="_blank" class="small text-primary"
+                   onclick="event.stopPropagation()">
+                  <i class="bi bi-box-arrow-up-right"></i> 介紹頁
+                </a>
+              </div>
               {% endif %}
-              {% if m.marital_status %}
-              <span><i class="bi bi-person"></i> {{ m.marital_status }}</span>
-              {% endif %}
+              <div class="prev-match-warning mt-1">
+                <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> 曾配對過</span>
+              </div>
             </div>
-            {% set hobbies = m.user_info.get('您的休閒興趣 (可複選)', '') if m.user_info else '' %}
-            {% if hobbies and hobbies != '無' %}
-            <div class="mt-1 d-flex flex-wrap gap-1">
-              {% for h in hobbies.replace('、', ',').split(',')[:4] %}
-              <span class="badge bg-light text-dark border tag">{{ h.strip() }}</span>
-              {% endfor %}
-            </div>
-            {% endif %}
-            {% if m.introduction_link %}
-            <div class="mt-1">
-              <a href="{{ m.introduction_link }}" target="_blank" class="small text-primary"
-                 onclick="event.stopPropagation()">
-                <i class="bi bi-box-arrow-up-right"></i> 介紹頁
-              </a>
-            </div>
-            {% endif %}
-            <div class="prev-match-warning mt-1">
-              <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> 曾配對過</span>
-            </div>
+            {% else %}
+            <p class="text-muted">No active male members.</p>
+            {% endfor %}
           </div>
-          {% else %}
-          <p class="text-muted">No active male members.</p>
-          {% endfor %}
         </div>
-      </div>
 
-      <!-- ── FEMALE PANEL ── -->
-      <div class="col-md-6">
-        <div class="d-flex align-items-center mb-2 gap-2">
-          <i class="bi bi-gender-female text-danger fs-5"></i>
-          <span class="fw-semibold">Females ({{ females|length }})</span>
-        </div>
-        <input type="text" class="form-control form-control-sm mb-2"
-               placeholder="Search females…" oninput="filterPanel(this, 'panel-female')">
-        <div class="panel-col pe-1" id="panel-female">
-          {% for m in females %}
-          {% set prev_partners = past_partners.get(m.id, []) %}
-          <div class="member-card card mb-2 p-2"
-               data-id="{{ m.id }}"
-               data-gender="female"
-               data-name="{{ m.name }}"
-               data-prev-partners="{{ prev_partners | join(',') }}"
-               onclick="selectMember(this)">
-            <div class="d-flex justify-content-between align-items-start">
-              <div>
-                <span class="fw-semibold">{{ m.name }}</span>
-                {% if m.is_test %}
-                <span class="badge bg-warning text-dark ms-1 badge-line">測試</span>
+        <!-- FEMALE -->
+        <div class="col-md-6">
+          <div class="d-flex align-items-center mb-2 gap-2">
+            <i class="bi bi-gender-female text-danger fs-5"></i>
+            <span class="fw-semibold">Females ({{ females|length }})</span>
+          </div>
+          <input type="text" class="form-control form-control-sm mb-2"
+                 placeholder="Search females…" oninput="filterPanel(this, 'panel-female')">
+          <div class="panel-col pe-1" id="panel-female">
+            {% for m in females %}
+            {% set prev_partners = past_partners.get(m.id, []) %}
+            <div class="member-card card mb-2 p-2"
+                 data-id="{{ m.id }}"
+                 data-gender="female"
+                 data-name="{{ m.name }}"
+                 data-prev-partners="{{ prev_partners | join(',') }}"
+                 onclick="selectCross(this)">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <span class="fw-semibold">{{ m.name }}</span>
+                  {% if m.is_test %}
+                  <span class="badge bg-warning text-dark ms-1 badge-line">測試</span>
+                  {% endif %}
+                  {% if m.rank %}
+                  <span class="badge bg-secondary ms-1 badge-line">{{ m.rank }}</span>
+                  {% endif %}
+                  {% if m.line_info %}
+                  <span class="badge bg-success ms-1 badge-line"><i class="bi bi-check2"></i> LINE</span>
+                  {% else %}
+                  <span class="badge bg-warning text-dark ms-1 badge-line">No LINE</span>
+                  {% endif %}
+                  {% if m.join_campaign %}<span class="badge ms-1 badge-line" style="background:#f5841f;">{{ m.join_campaign }}</span>{% endif %}
+                </div>
+                <span class="text-muted small">ID {{ m.id }}</span>
+              </div>
+              <div class="mt-1 text-muted small d-flex flex-wrap gap-2">
+                {% if m.birthday %}
+                <span><i class="bi bi-calendar3"></i> {{ 2026 - m.birthday.year }}歲</span>
                 {% endif %}
-                {% if m.rank %}
-                <span class="badge bg-secondary ms-1 badge-line">{{ m.rank }}</span>
+                {% if m.height %}
+                <span><i class="bi bi-rulers"></i> {{ m.height }}cm</span>
                 {% endif %}
-                {% if m.line_info %}
-                <span class="badge bg-success ms-1 badge-line"><i class="bi bi-check2"></i> LINE</span>
-                {% else %}
-                <span class="badge bg-warning text-dark ms-1 badge-line">No LINE</span>
+                {% if m.marital_status %}
+                <span><i class="bi bi-person"></i> {{ m.marital_status }}</span>
                 {% endif %}
               </div>
-              <span class="text-muted small">ID {{ m.id }}</span>
-            </div>
-            <div class="mt-1 text-muted small d-flex flex-wrap gap-2">
-              {% if m.birthday %}
-              <span><i class="bi bi-calendar3"></i> {{ 2026 - m.birthday.year }}歲</span>
+              {% set hobbies = m.user_info.get('您的休閒興趣 (可複選)', '') if m.user_info else '' %}
+              {% if hobbies and hobbies != '無' %}
+              <div class="mt-1 d-flex flex-wrap gap-1">
+                {% for h in hobbies.replace('、', ',').split(',')[:4] %}
+                <span class="badge bg-light text-dark border tag">{{ h.strip() }}</span>
+                {% endfor %}
+              </div>
               {% endif %}
-              {% if m.height %}
-              <span><i class="bi bi-rulers"></i> {{ m.height }}cm</span>
+              {% if m.introduction_link %}
+              <div class="mt-1">
+                <a href="{{ m.introduction_link }}" target="_blank" class="small text-primary"
+                   onclick="event.stopPropagation()">
+                  <i class="bi bi-box-arrow-up-right"></i> 介紹頁
+                </a>
+              </div>
               {% endif %}
-              {% if m.marital_status %}
-              <span><i class="bi bi-person"></i> {{ m.marital_status }}</span>
-              {% endif %}
+              <div class="prev-match-warning mt-1">
+                <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> 曾配對過</span>
+              </div>
             </div>
-            {% set hobbies = m.user_info.get('您的休閒興趣 (可複選)', '') if m.user_info else '' %}
-            {% if hobbies and hobbies != '無' %}
-            <div class="mt-1 d-flex flex-wrap gap-1">
-              {% for h in hobbies.replace('、', ',').split(',')[:4] %}
-              <span class="badge bg-light text-dark border tag">{{ h.strip() }}</span>
-              {% endfor %}
-            </div>
-            {% endif %}
-            {% if m.introduction_link %}
-            <div class="mt-1">
-              <a href="{{ m.introduction_link }}" target="_blank" class="small text-primary"
-                 onclick="event.stopPropagation()">
-                <i class="bi bi-box-arrow-up-right"></i> 介紹頁
-              </a>
-            </div>
-            {% endif %}
-            <div class="prev-match-warning mt-1">
-              <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> 曾配對過</span>
-            </div>
+            {% else %}
+            <p class="text-muted">No active female members.</p>
+            {% endfor %}
           </div>
-          {% else %}
-          <p class="text-muted">No active female members.</p>
-          {% endfor %}
         </div>
-      </div>
 
-    </div><!-- /row -->
+      </div>
+    </div><!-- /panel-cross -->
+
+    <!-- ── FEMALE-FEMALE PANEL ── -->
+    <div id="panel-ff" style="display:none">
+      <p class="text-muted small mb-2">選擇兩位女生進行配對（女女聊天室）。</p>
+      <div class="row g-3">
+
+        <!-- FEMALE A -->
+        <div class="col-md-6">
+          <div class="d-flex align-items-center mb-2 gap-2">
+            <i class="bi bi-gender-female text-danger fs-5"></i>
+            <span class="fw-semibold">女生 A ({{ females|length }})</span>
+          </div>
+          <input type="text" class="form-control form-control-sm mb-2"
+                 placeholder="Search…" oninput="filterPanel(this, 'panel-ff-a')">
+          <div class="panel-col pe-1" id="panel-ff-a">
+            {% for m in females %}
+            {% set prev_partners = past_partners.get(m.id, []) %}
+            <div class="member-card card mb-2 p-2"
+                 data-id="{{ m.id }}"
+                 data-name="{{ m.name }}"
+                 data-prev-partners="{{ prev_partners | join(',') }}"
+                 onclick="selectFF(this, 'a')">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <span class="fw-semibold">{{ m.name }}</span>
+                  {% if m.is_test %}
+                  <span class="badge bg-warning text-dark ms-1 badge-line">測試</span>
+                  {% endif %}
+                  {% if m.rank %}
+                  <span class="badge bg-secondary ms-1 badge-line">{{ m.rank }}</span>
+                  {% endif %}
+                  {% if m.line_info %}
+                  <span class="badge bg-success ms-1 badge-line"><i class="bi bi-check2"></i> LINE</span>
+                  {% else %}
+                  <span class="badge bg-warning text-dark ms-1 badge-line">No LINE</span>
+                  {% endif %}
+                  {% if m.join_campaign %}<span class="badge ms-1 badge-line" style="background:#f5841f;">{{ m.join_campaign }}</span>{% endif %}
+                </div>
+                <span class="text-muted small">ID {{ m.id }}</span>
+              </div>
+              <div class="mt-1 text-muted small d-flex flex-wrap gap-2">
+                {% if m.birthday %}
+                <span><i class="bi bi-calendar3"></i> {{ 2026 - m.birthday.year }}歲</span>
+                {% endif %}
+                {% if m.height %}
+                <span><i class="bi bi-rulers"></i> {{ m.height }}cm</span>
+                {% endif %}
+                {% if m.marital_status %}
+                <span><i class="bi bi-person"></i> {{ m.marital_status }}</span>
+                {% endif %}
+              </div>
+              {% set hobbies = m.user_info.get('您的休閒興趣 (可複選)', '') if m.user_info else '' %}
+              {% if hobbies and hobbies != '無' %}
+              <div class="mt-1 d-flex flex-wrap gap-1">
+                {% for h in hobbies.replace('、', ',').split(',')[:4] %}
+                <span class="badge bg-light text-dark border tag">{{ h.strip() }}</span>
+                {% endfor %}
+              </div>
+              {% endif %}
+              {% if m.introduction_link %}
+              <div class="mt-1">
+                <a href="{{ m.introduction_link }}" target="_blank" class="small text-primary"
+                   onclick="event.stopPropagation()">
+                  <i class="bi bi-box-arrow-up-right"></i> 介紹頁
+                </a>
+              </div>
+              {% endif %}
+              <div class="prev-match-warning mt-1">
+                <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> 曾配對過</span>
+              </div>
+            </div>
+            {% else %}
+            <p class="text-muted">No active female members.</p>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- FEMALE B -->
+        <div class="col-md-6">
+          <div class="d-flex align-items-center mb-2 gap-2">
+            <i class="bi bi-gender-female text-danger fs-5"></i>
+            <span class="fw-semibold">女生 B ({{ females|length }})</span>
+          </div>
+          <input type="text" class="form-control form-control-sm mb-2"
+                 placeholder="Search…" oninput="filterPanel(this, 'panel-ff-b')">
+          <div class="panel-col pe-1" id="panel-ff-b">
+            {% for m in females %}
+            {% set prev_partners = past_partners.get(m.id, []) %}
+            <div class="member-card card mb-2 p-2"
+                 data-id="{{ m.id }}"
+                 data-name="{{ m.name }}"
+                 data-prev-partners="{{ prev_partners | join(',') }}"
+                 onclick="selectFF(this, 'b')">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <span class="fw-semibold">{{ m.name }}</span>
+                  {% if m.is_test %}
+                  <span class="badge bg-warning text-dark ms-1 badge-line">測試</span>
+                  {% endif %}
+                  {% if m.rank %}
+                  <span class="badge bg-secondary ms-1 badge-line">{{ m.rank }}</span>
+                  {% endif %}
+                  {% if m.line_info %}
+                  <span class="badge bg-success ms-1 badge-line"><i class="bi bi-check2"></i> LINE</span>
+                  {% else %}
+                  <span class="badge bg-warning text-dark ms-1 badge-line">No LINE</span>
+                  {% endif %}
+                  {% if m.join_campaign %}<span class="badge ms-1 badge-line" style="background:#f5841f;">{{ m.join_campaign }}</span>{% endif %}
+                </div>
+                <span class="text-muted small">ID {{ m.id }}</span>
+              </div>
+              <div class="mt-1 text-muted small d-flex flex-wrap gap-2">
+                {% if m.birthday %}
+                <span><i class="bi bi-calendar3"></i> {{ 2026 - m.birthday.year }}歲</span>
+                {% endif %}
+                {% if m.height %}
+                <span><i class="bi bi-rulers"></i> {{ m.height }}cm</span>
+                {% endif %}
+                {% if m.marital_status %}
+                <span><i class="bi bi-person"></i> {{ m.marital_status }}</span>
+                {% endif %}
+              </div>
+              {% set hobbies = m.user_info.get('您的休閒興趣 (可複選)', '') if m.user_info else '' %}
+              {% if hobbies and hobbies != '無' %}
+              <div class="mt-1 d-flex flex-wrap gap-1">
+                {% for h in hobbies.replace('、', ',').split(',')[:4] %}
+                <span class="badge bg-light text-dark border tag">{{ h.strip() }}</span>
+                {% endfor %}
+              </div>
+              {% endif %}
+              {% if m.introduction_link %}
+              <div class="mt-1">
+                <a href="{{ m.introduction_link }}" target="_blank" class="small text-primary"
+                   onclick="event.stopPropagation()">
+                  <i class="bi bi-box-arrow-up-right"></i> 介紹頁
+                </a>
+              </div>
+              {% endif %}
+              <div class="prev-match-warning mt-1">
+                <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> 曾配對過</span>
+              </div>
+            </div>
+            {% else %}
+            <p class="text-muted">No active female members.</p>
+            {% endfor %}
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /panel-ff -->
 
     <!-- ── CONFIRM BAR ── -->
     <div class="confirm-bar mt-3 rounded shadow-sm">
       <div class="d-flex align-items-center gap-3 flex-wrap">
-        <div class="d-flex align-items-center gap-2 flex-grow-1">
-          <i class="bi bi-gender-male text-primary"></i>
-          <span id="label-male" class="text-muted">— select male —</span>
-          <i class="bi bi-arrow-right text-muted"></i>
-          <i class="bi bi-gender-female text-danger"></i>
-          <span id="label-female" class="text-muted">— select female —</span>
+        <div class="flex-grow-1" id="confirm-labels">
+          <!-- cross-gender labels -->
+          <div id="cross-labels" style="display:flex;align-items:center;gap:.5rem;">
+            <i class="bi bi-gender-male text-primary"></i>
+            <span id="label-male" class="text-muted">— select male —</span>
+            <i class="bi bi-arrow-right text-muted"></i>
+            <i class="bi bi-gender-female text-danger"></i>
+            <span id="label-female" class="text-muted">— select female —</span>
+          </div>
+          <!-- ff labels -->
+          <div id="ff-labels" style="display:none;align-items:center;gap:.5rem;">
+            <i class="bi bi-gender-female text-danger"></i>
+            <span id="label-ff-a" class="text-muted">— 選擇女生 A —</span>
+            <i class="bi bi-arrow-right text-muted"></i>
+            <i class="bi bi-gender-female text-danger"></i>
+            <span id="label-ff-b" class="text-muted">— 選擇女生 B —</span>
+          </div>
         </div>
         <button type="submit" id="submit-btn" class="btn btn-success" disabled
                 onclick="return confirmPair()">
@@ -234,8 +426,57 @@
 
 {% block extra_js %}
 <script>
+  let currentMode = 'cross';
+
+  // Cross-gender state
   let selectedMale = null;
   let selectedFemale = null;
+
+  // FF state
+  let selectedFFA = null;
+  let selectedFFB = null;
+
+  function switchMode(mode) {
+    currentMode = mode;
+
+    document.getElementById('panel-cross').style.display = mode === 'cross' ? '' : 'none';
+    document.getElementById('panel-ff').style.display   = mode === 'ff'    ? '' : 'none';
+    document.getElementById('cross-labels').style.display = mode === 'cross' ? 'flex' : 'none';
+    document.getElementById('ff-labels').style.display    = mode === 'ff'    ? 'flex' : 'none';
+
+    document.getElementById('tab-cross-btn').classList.toggle('active', mode === 'cross');
+    document.getElementById('tab-ff-btn').classList.toggle('active', mode === 'ff');
+
+    // Reset form state when switching tabs
+    document.getElementById('subject_id').value = '';
+    document.getElementById('object_id').value = '';
+    document.getElementById('submit-btn').disabled = true;
+    document.getElementById('prev-match-warn')?.remove();
+
+    if (mode === 'cross') {
+      if (selectedMale)   selectedMale.classList.remove('selected-male');
+      if (selectedFemale) selectedFemale.classList.remove('selected-female');
+      selectedMale = null;
+      selectedFemale = null;
+      document.getElementById('label-male').textContent = '— select male —';
+      document.getElementById('label-male').className = 'text-muted';
+      document.getElementById('label-female').textContent = '— select female —';
+      document.getElementById('label-female').className = 'text-muted';
+      clearPrevMatches('panel-male');
+      clearPrevMatches('panel-female');
+    } else {
+      if (selectedFFA) selectedFFA.classList.remove('selected-ff-a');
+      if (selectedFFB) selectedFFB.classList.remove('selected-ff-b');
+      selectedFFA = null;
+      selectedFFB = null;
+      document.getElementById('label-ff-a').textContent = '— 選擇女生 A —';
+      document.getElementById('label-ff-a').className = 'text-muted';
+      document.getElementById('label-ff-b').textContent = '— 選擇女生 B —';
+      document.getElementById('label-ff-b').className = 'text-muted';
+      clearPrevMatches('panel-ff-a');
+      clearPrevMatches('panel-ff-b');
+    }
+  }
 
   function filterPanel(input, panelId) {
     const query = input.value.toLowerCase();
@@ -251,11 +492,7 @@
         .split(',').filter(Boolean)
     );
     document.querySelectorAll('#' + panelId + ' .member-card').forEach(c => {
-      if (prevPartners.has(c.dataset.id)) {
-        c.classList.add('prev-matched');
-      } else {
-        c.classList.remove('prev-matched');
-      }
+      c.classList.toggle('prev-matched', prevPartners.has(c.dataset.id));
     });
   }
 
@@ -265,7 +502,7 @@
     });
   }
 
-  function selectMember(card) {
+  function selectCross(card) {
     const id = card.dataset.id;
     const gender = card.dataset.gender;
     const name = card.querySelector('.fw-semibold').textContent.trim();
@@ -277,7 +514,6 @@
       document.getElementById('subject_id').value = id;
       document.getElementById('label-male').textContent = name + ' (#' + id + ')';
       document.getElementById('label-male').className = 'fw-semibold text-primary';
-      // Highlight previously matched females
       highlightPrevMatches(id, 'panel-female');
     } else {
       if (selectedFemale) selectedFemale.classList.remove('selected-female');
@@ -286,36 +522,69 @@
       document.getElementById('object_id').value = id;
       document.getElementById('label-female').textContent = name + ' (#' + id + ')';
       document.getElementById('label-female').className = 'fw-semibold text-danger';
-      // Highlight previously matched males
       highlightPrevMatches(id, 'panel-male');
     }
 
     document.getElementById('submit-btn').disabled = !(selectedMale && selectedFemale);
+    _checkPrevMatchWarn(selectedMale, selectedFemale, 'label-female');
+  }
 
-    // Warn if this pair has been matched before
-    if (selectedMale && selectedFemale) {
-      const malePrev = new Set(
-        (selectedMale.dataset.prevPartners || '').split(',').filter(Boolean)
-      );
-      if (malePrev.has(selectedFemale.dataset.id)) {
-        document.getElementById('label-female').className += ' text-warning';
-        if (!document.getElementById('prev-match-warn')) {
-          const warn = document.createElement('span');
-          warn.id = 'prev-match-warn';
-          warn.className = 'badge bg-warning text-dark ms-2';
-          warn.innerHTML = '<i class="bi bi-exclamation-triangle"></i> 此兩人曾配對過';
-          document.getElementById('label-female').after(warn);
-        }
-      } else {
-        document.getElementById('prev-match-warn')?.remove();
-      }
+  function selectFF(card, slot) {
+    const id = card.dataset.id;
+    const name = card.querySelector('.fw-semibold').textContent.trim();
+
+    // Prevent selecting the same person in both slots
+    const otherId = slot === 'a'
+      ? (selectedFFB ? selectedFFB.dataset.id : null)
+      : (selectedFFA ? selectedFFA.dataset.id : null);
+    if (id === otherId) return;
+
+    if (slot === 'a') {
+      if (selectedFFA) selectedFFA.classList.remove('selected-ff-a');
+      selectedFFA = card;
+      card.classList.add('selected-ff-a');
+      document.getElementById('subject_id').value = id;
+      document.getElementById('label-ff-a').textContent = name + ' (#' + id + ')';
+      document.getElementById('label-ff-a').className = 'fw-semibold text-danger';
+      highlightPrevMatches(id, 'panel-ff-b');
+    } else {
+      if (selectedFFB) selectedFFB.classList.remove('selected-ff-b');
+      selectedFFB = card;
+      card.classList.add('selected-ff-b');
+      document.getElementById('object_id').value = id;
+      document.getElementById('label-ff-b').textContent = name + ' (#' + id + ')';
+      document.getElementById('label-ff-b').className = 'fw-semibold text-purple';
+      highlightPrevMatches(id, 'panel-ff-a');
+    }
+
+    document.getElementById('submit-btn').disabled = !(selectedFFA && selectedFFB);
+    _checkPrevMatchWarn(selectedFFA, selectedFFB, 'label-ff-b');
+  }
+
+  function _checkPrevMatchWarn(cardA, cardB, labelId) {
+    document.getElementById('prev-match-warn')?.remove();
+    if (!cardA || !cardB) return;
+    const prevA = new Set((cardA.dataset.prevPartners || '').split(',').filter(Boolean));
+    if (prevA.has(cardB.dataset.id)) {
+      document.getElementById(labelId).className += ' text-warning';
+      const warn = document.createElement('span');
+      warn.id = 'prev-match-warn';
+      warn.className = 'badge bg-warning text-dark ms-2';
+      warn.innerHTML = '<i class="bi bi-exclamation-triangle"></i> 此兩人曾配對過';
+      document.getElementById(labelId).after(warn);
     }
   }
 
   function confirmPair() {
-    const male = document.getElementById('label-male').textContent;
-    const female = document.getElementById('label-female').textContent;
-    return confirm(`Pair ${male} ♂ with ${female} ♀?`);
+    if (currentMode === 'cross') {
+      const male = document.getElementById('label-male').textContent;
+      const female = document.getElementById('label-female').textContent;
+      return confirm(`Pair ${male} ♂ with ${female} ♀?`);
+    } else {
+      const a = document.getElementById('label-ff-a').textContent;
+      const b = document.getElementById('label-ff-b').textContent;
+      return confirm(`配對 ${a} ♀ 與 ${b} ♀？`);
+    }
   }
 </script>
 {% endblock %}

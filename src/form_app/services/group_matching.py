@@ -77,6 +77,22 @@ def compute_activity_label(score: int) -> ActivityLabel:
 
 # ── Region helpers ────────────────────────────────────────────────────────────
 
+def compute_region_from_places_str(places_str: str) -> Optional[str]:
+    """Derive a macro-region label from a raw '可約會地區' comma/、separated string."""
+    if not places_str or places_str.strip() in ('', '不設限', '不限'):
+        return None
+    region_counts: dict[str, int] = {}
+    for place in places_str.replace('、', ',').split(','):
+        place = place.strip()
+        for keyword, region in _PLACE_TO_REGION.items():
+            if keyword in place:
+                region_counts[region] = region_counts.get(region, 0) + 1
+                break
+    if not region_counts:
+        return None
+    return max(region_counts, key=lambda r: region_counts[r])
+
+
 def get_member_region(member: Member) -> Optional[str]:
     """
     Derive the primary region from a member's datable_place list.
@@ -154,21 +170,6 @@ def _group_score(females: list[Member], males: list[Member]) -> float:
 
 # ── Eligibility ───────────────────────────────────────────────────────────────
 
-def _recent_session_count(member_id: int, days: int, session: Session) -> int:
-    """Count non-referral sessions created for a member in the last `days` days."""
-    cutoff = datetime.now() - timedelta(days=days)
-    return (
-        session.query(GroupMembership)
-        .join(GroupMatching)
-        .filter(
-            GroupMembership.member_id == member_id,
-            GroupMembership.is_referral == False,
-            GroupMatching.created_at >= cutoff,
-        )
-        .count()
-    )
-
-
 def get_eligible_group_pool(session: Session) -> tuple[list[Member], list[Member]]:
     """
     Return (females, males) eligible for group formation this cycle.
@@ -180,9 +181,13 @@ def get_eligible_group_pool(session: Session) -> tuple[list[Member], list[Member
     - Male cadence: < 1 session in last 7 days
     """
     from sqlalchemy.sql.expression import exists
+    from sqlalchemy import func
     from datetime import date
 
     today = date.today()
+    now = datetime.now()
+    cutoff_f = now - timedelta(days=14)
+    cutoff_m = now - timedelta(days=7)
 
     base = (
         session.query(Member)
@@ -200,16 +205,45 @@ def get_eligible_group_pool(session: Session) -> tuple[list[Member], list[Member
         .all()
     )
 
-    females: list[Member] = []
-    males: list[Member] = []
+    if not base:
+        return [], []
 
-    for member in base:
-        if member.gender == 'F':
-            if _recent_session_count(member.id, 14, session) < 3:
-                females.append(member)
-        elif member.gender == 'M':
-            if _recent_session_count(member.id, 7, session) < 1:
-                males.append(member)
+    female_ids = {m.id for m in base if m.gender == 'F'}
+    male_ids   = {m.id for m in base if m.gender == 'M'}
+
+    # Batch-query session counts — 2 queries instead of one per member
+    f_counts: dict[int, int] = {}
+    if female_ids:
+        rows = (
+            session.query(GroupMembership.member_id, func.count())
+            .join(GroupMatching)
+            .filter(
+                GroupMembership.member_id.in_(female_ids),
+                GroupMembership.is_referral == False,
+                GroupMatching.created_at >= cutoff_f,
+            )
+            .group_by(GroupMembership.member_id)
+            .all()
+        )
+        f_counts = {mid: cnt for mid, cnt in rows}
+
+    m_counts: dict[int, int] = {}
+    if male_ids:
+        rows = (
+            session.query(GroupMembership.member_id, func.count())
+            .join(GroupMatching)
+            .filter(
+                GroupMembership.member_id.in_(male_ids),
+                GroupMembership.is_referral == False,
+                GroupMatching.created_at >= cutoff_m,
+            )
+            .group_by(GroupMembership.member_id)
+            .all()
+        )
+        m_counts = {mid: cnt for mid, cnt in rows}
+
+    females = [m for m in base if m.gender == 'F' and f_counts.get(m.id, 0) < 3]
+    males   = [m for m in base if m.gender == 'M' and m_counts.get(m.id, 0) < 1]
 
     return females, males
 

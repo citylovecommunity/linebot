@@ -183,9 +183,12 @@ def generate_intro_card(member) -> str:
             )
     draw = ImageDraw.Draw(card)
 
-    # 5. Name
+    # 5. Name — display surname + 先生/小姐, not the full real name
+    surname = (member.name or "")[0] if member.name else ""
+    honorific = "先生" if member.gender == "M" else "小姐"
+    display_name = f"{surname}{honorific}" if surname else honorific
     NAME_Y = CY + PHOTO_D // 2 + 80
-    draw.text((W // 2, NAME_Y), member.name or "—",
+    draw.text((W // 2, NAME_Y), display_name,
               font=_font("bold", 52), fill=DARK, anchor="mm")
 
     # 6. Divider

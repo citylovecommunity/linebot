@@ -120,6 +120,7 @@
              class="fw-semibold text-decoration-none {{ 'text-primary' if member.gender == 'M' else 'text-danger' }}">
             {{ member.name }}
           </a>
+          {% if member.join_campaign %}<span class="badge ms-1" style="background:#f5841f;font-size:.65em;">{{ member.join_campaign }}</span>{% endif %}
           {% else %}<span class="text-muted">— 已刪除 —</span>{% endif %}
           <span class="badge bg-dark">給對方 {{ grading }} 分</span>
         </div>

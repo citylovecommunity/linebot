@@ -21,6 +21,7 @@
       <div class="d-flex align-items-center gap-2 flex-wrap">
         <div style="min-width:120px">
           <span class="fw-semibold">{{ u.name }}</span>
+          {% if u.join_campaign %}<span class="badge ms-1" style="background:#f5841f;font-size:.65em;">{{ u.join_campaign }}</span>{% endif %}
           <span class="text-muted small ms-1">{{ '男' if u.gender == 'M' else '女' }}</span>
           <div>
             {% if w is none %}<span class="badge bg-secondary">從未配對</span>
