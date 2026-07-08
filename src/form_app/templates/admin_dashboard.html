@@ -69,6 +69,9 @@
       <button class="nav-link" id="groups-tab" data-bs-toggle="tab" data-bs-target="#groups"
         type="button" role="tab">
         群組 <span class="badge bg-primary ms-1">{{ group_matchings|length }}</span>
+        {% if draft_group_matchings %}
+        <span class="badge bg-warning text-dark ms-1">{{ draft_group_matchings|length }}</span>
+        {% endif %}
       </button>
     </li>
     <li class="nav-item" role="presentation">
@@ -83,6 +86,12 @@
       <button class="nav-link" id="actions-tab" data-bs-toggle="tab" data-bs-target="#actions"
         type="button" role="tab">
         操作
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="stats-tab" data-bs-toggle="tab" data-bs-target="#stats"
+        type="button" role="tab">
+        <i class="bi bi-bar-chart-line me-1"></i> 統計
       </button>
     </li>
     {% if current_user.is_developer %}
@@ -523,6 +532,72 @@
         </div>
       </div>
 
+      {% if draft_group_matchings %}
+      <div class="card border-warning mb-4">
+        <div class="card-header bg-warning bg-opacity-25 d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-hourglass-split me-1"></i> 草稿群組待審核（{{ draft_group_matchings|length }}）</span>
+          <div class="d-flex gap-2">
+            <form method="POST" action="{{ url_for('admin_bp.discard_all_group_drafts') }}"
+              onsubmit="return confirm('確定捨棄全部草稿群組？')">
+              <button type="submit" class="btn btn-sm btn-outline-danger">全部捨棄</button>
+            </form>
+            <form method="POST" action="{{ url_for('admin_bp.approve_all_group_drafts') }}"
+              onsubmit="return confirm('確定核准全部草稿群組並發送 LINE 通知？')">
+              <button type="submit" class="btn btn-sm btn-success">全部核准並通知</button>
+            </form>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>編號</th>
+                <th>代號</th>
+                <th>成員</th>
+                <th>地區</th>
+                <th>來源</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for g in draft_group_matchings %}
+              <tr>
+                <td class="text-muted small">{{ g.id }}</td>
+                <td>{{ g.cool_name }}</td>
+                <td>
+                  {% for m in g.members %}
+                  <span class="badge {{ 'bg-primary' if m.gender == 'M' else 'bg-danger' }} bg-opacity-75 me-1">
+                    {{ m.name }}
+                  </span>
+                  {% endfor %}
+                </td>
+                <td class="small">{{ g.region or '不限' }}</td>
+                <td>
+                  {% if g.source_campaign %}
+                  <span class="badge bg-info text-dark">{{ g.source_campaign }}</span>
+                  {% else %}
+                  <span class="text-muted small">一般</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <form method="POST" action="{{ url_for('admin_bp.approve_group_draft', group_id=g.id) }}"
+                    class="d-inline">
+                    <button type="submit" class="btn btn-sm btn-outline-success me-1">核准</button>
+                  </form>
+                  <form method="POST" action="{{ url_for('admin_bp.discard_group_draft', group_id=g.id) }}"
+                    class="d-inline"
+                    onsubmit="return confirm('確定捨棄群組「{{ g.cool_name }}」？')">
+                    <button type="submit" class="btn btn-sm btn-outline-danger">捨棄</button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
       {% if group_matchings %}
       <div class="table-responsive">
         <table class="table table-hover table-sm align-middle">
@@ -751,6 +826,182 @@
       </div>
     </div>
 
+    <!-- 統計頁籤 -->
+    {% macro render_member_stats(s) %}
+      <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+          <div class="card text-center border-secondary h-100">
+            <div class="card-body">
+              <h2 class="card-title mb-0">{{ s.member_count }}</h2>
+              <p class="card-text text-muted mb-0 small">總會員數</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="card text-center border-primary h-100">
+            <div class="card-body">
+              <h2 class="card-title text-primary mb-0">{{ s.gender_counts.M }} / {{ s.gender_counts.F }}</h2>
+              <p class="card-text text-muted mb-0 small">男 / 女</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="card text-center border-success h-100">
+            <div class="card-body">
+              <h2 class="card-title text-success mb-0">{{ s.active_count }}</h2>
+              <p class="card-text text-muted mb-0 small">啟用中會員</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="card text-center border-info h-100">
+            <div class="card-body">
+              <h2 class="card-title text-info mb-0">{{ s.signups_this_month }}</h2>
+              <p class="card-text text-muted mb-0 small">本月新增會員</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <div class="card h-100">
+            <div class="card-body">
+              <h6 class="card-title"><i class="bi bi-person text-primary me-1"></i>男會員年齡分布</h6>
+              {% for bucket, count in s.age_stats.M %}
+              <div class="d-flex align-items-center mb-2">
+                <div style="width:80px;" class="small text-muted">{{ bucket }}</div>
+                <div class="flex-grow-1 mx-2">
+                  <div class="progress" style="height:16px;">
+                    <div class="progress-bar bg-primary"
+                      style="width: {{ (count / s.age_stats_max * 100) if s.age_stats_max else 0 }}%"></div>
+                  </div>
+                </div>
+                <div style="width:30px;" class="text-end small fw-semibold">{{ count }}</div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card h-100">
+            <div class="card-body">
+              <h6 class="card-title"><i class="bi bi-person text-danger me-1"></i>女會員年齡分布</h6>
+              {% for bucket, count in s.age_stats.F %}
+              <div class="d-flex align-items-center mb-2">
+                <div style="width:80px;" class="small text-muted">{{ bucket }}</div>
+                <div class="flex-grow-1 mx-2">
+                  <div class="progress" style="height:16px;">
+                    <div class="progress-bar bg-danger"
+                      style="width: {{ (count / s.age_stats_max * 100) if s.age_stats_max else 0 }}%"></div>
+                  </div>
+                </div>
+                <div style="width:30px;" class="text-end small fw-semibold">{{ count }}</div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <div class="card h-100">
+            <div class="card-body">
+              <h6 class="card-title"><i class="bi bi-geo-alt me-1"></i>可約會地區分布</h6>
+              {% for region, counts in s.region_stats %}
+              <div class="d-flex align-items-center mb-2">
+                <div style="width:70px;" class="small text-muted">{{ region }}</div>
+                <div class="flex-grow-1 mx-2">
+                  <div class="progress" style="height:16px;">
+                    <div class="progress-bar bg-primary"
+                      style="width: {{ (counts.M / s.region_stats_max * 100) if s.region_stats_max else 0 }}%"></div>
+                    <div class="progress-bar bg-danger"
+                      style="width: {{ (counts.F / s.region_stats_max * 100) if s.region_stats_max else 0 }}%"></div>
+                  </div>
+                </div>
+                <div style="width:60px;" class="text-end small fw-semibold">{{ counts.M + counts.F }}</div>
+              </div>
+              {% endfor %}
+              <p class="text-muted small mb-0 mt-2">
+                <span class="badge bg-primary">&nbsp;</span> 男
+                <span class="badge bg-danger">&nbsp;</span> 女
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card h-100">
+            <div class="card-body">
+              <h6 class="card-title"><i class="bi bi-megaphone me-1"></i>會員來源</h6>
+              {% if s.campaign_stats %}
+              {% for source, count in s.campaign_stats %}
+              <div class="d-flex align-items-center mb-2">
+                <div style="width:150px;" class="small text-muted text-truncate" title="{{ source }}">{{ source }}</div>
+                <div class="flex-grow-1 mx-2">
+                  <div class="progress" style="height:16px;">
+                    <div class="progress-bar bg-secondary"
+                      style="width: {{ (count / s.campaign_stats_max * 100) if s.campaign_stats_max else 0 }}%"></div>
+                  </div>
+                </div>
+                <div style="width:30px;" class="text-end small fw-semibold">{{ count }}</div>
+              </div>
+              {% endfor %}
+              {% else %}
+              <p class="text-muted small mb-0">尚無資料</p>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <div class="card h-100">
+            <div class="card-body">
+              <h6 class="card-title"><i class="bi bi-briefcase me-1"></i>熱門職業（前 8 名）</h6>
+              {% if s.top_jobs %}
+              {% for job, count in s.top_jobs %}
+              <div class="d-flex align-items-center mb-2">
+                <div style="width:150px;" class="small text-muted text-truncate" title="{{ job }}">{{ job }}</div>
+                <div class="flex-grow-1 mx-2">
+                  <div class="progress" style="height:16px;">
+                    <div class="progress-bar bg-info"
+                      style="width: {{ (count / s.top_jobs_max * 100) if s.top_jobs_max else 0 }}%"></div>
+                  </div>
+                </div>
+                <div style="width:30px;" class="text-end small fw-semibold">{{ count }}</div>
+              </div>
+              {% endfor %}
+              {% else %}
+              <p class="text-muted small mb-0">尚無資料</p>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endmacro %}
+
+    <div class="tab-pane fade" id="stats" role="tabpanel">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">會員統計</h5>
+        <div class="btn-group btn-group-sm" role="group">
+          <button type="button" class="btn btn-outline-secondary active" id="stats-filter-all"
+            onclick="setStatsFilter('all', this)">全部會員</button>
+          <button type="button" class="btn btn-outline-success" id="stats-filter-eligible"
+            onclick="setStatsFilter('eligible', this)">僅合格會員</button>
+        </div>
+      </div>
+      <p class="text-muted small">「僅合格會員」= 啟用中、非測試帳號、已綁定 LINE、已產生介紹頁連結、會員未到期、且在配對期間內。</p>
+
+      <div id="stats-panel-all">
+        {{ render_member_stats(stats_all) }}
+      </div>
+      <div id="stats-panel-eligible" style="display:none;">
+        {{ render_member_stats(stats_eligible) }}
+      </div>
+    </div>
+
     <!-- Dev 頁籤 -->
     {% if current_user.is_developer %}
     <div class="tab-pane fade" id="dev" role="tabpanel">
@@ -817,6 +1068,14 @@
     btn.closest('.btn-group').querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     applyFiltersAndSort();
+  }
+
+  // ── 統計頁籤篩選 ──
+  function setStatsFilter(which, btn) {
+    btn.closest('.btn-group').querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('stats-panel-all').style.display = which === 'all' ? '' : 'none';
+    document.getElementById('stats-panel-eligible').style.display = which === 'eligible' ? '' : 'none';
   }
 
   function applyFiltersAndSort() {
@@ -1841,7 +2100,7 @@ function deleteTag(tagId, tagName) {
 
 // ── 自動生成 spinner ───────────────────────────────────────────────────────────
 function startAutoForm(form) {
-  if (!confirm('確定要自動生成群組？系統會依照配對條件自動分組並發送 LINE 通知。')) return false;
+  if (!confirm('確定要自動生成群組？系統會依照配對條件自動分組為草稿，待您審核核准後才會發送 LINE 通知。')) return false;
   const btn = document.getElementById('auto-form-btn');
   btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> 生成中…';
   btn.disabled = true;

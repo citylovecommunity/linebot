@@ -41,6 +41,7 @@ member_tag = Table(
 
 
 class GroupMatchingStatus(enum.Enum):
+    DRAFT = "DRAFT"         # awaiting admin approval, not yet notified
     ACTIVE = "ACTIVE"
     FEEDBACK = "FEEDBACK"   # Phase 4: collecting anonymous badges
     CLOSED = "CLOSED"       # Day 15: archived
@@ -669,6 +670,7 @@ class GroupMatching(Base):
 
     # Grouping metadata
     region: Mapped[Optional[str]]  # e.g. "北區", "中區", "南區"
+    source_campaign: Mapped[Optional[str]]  # slug from campaigns.py; None = general pool
     opener_member_id: Mapped[Optional[int]] = mapped_column(ForeignKey("member.id"))
     opener: Mapped[Optional["Member"]] = relationship(foreign_keys=[opener_member_id])
 
@@ -719,6 +721,10 @@ class GroupMatching(Base):
     )
 
     @property
+    def is_draft(self):
+        return self.status is GroupMatchingStatus.DRAFT
+
+    @property
     def is_active(self):
         return self.status is GroupMatchingStatus.ACTIVE
 
@@ -737,6 +743,12 @@ class GroupMatching(Base):
     @property
     def active_proposals(self):
         return [p for p in self.proposals if not p.is_deleted]
+
+    def approve_draft(self):
+        """Promote a DRAFT group to ACTIVE, reset notification flag and restart the 15-day clock."""
+        self.status = GroupMatchingStatus.ACTIVE
+        self.is_notified = False
+        self.expires_at = datetime.now() + timedelta(days=15)
 
 
 class GroupMessage(Base):

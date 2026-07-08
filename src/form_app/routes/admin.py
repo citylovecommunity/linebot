@@ -265,7 +265,15 @@ def admin_dashboard():
 
     all_group_matchings = (
         session.query(GroupMatching)
+        .filter(GroupMatching.status != GroupMatchingStatus.DRAFT)
         .order_by(GroupMatching.id.desc())
+        .all()
+    )
+
+    draft_group_matchings = (
+        session.query(GroupMatching)
+        .filter(GroupMatching.status == GroupMatchingStatus.DRAFT)
+        .order_by(GroupMatching.id.asc())
         .all()
     )
 
@@ -399,6 +407,95 @@ def admin_dashboard():
 
     all_tags = session.query(Tag).order_by(Tag.name).all()
 
+    # ── 統計頁籤 ──────────────────────────────────────────────────────────
+    _today = date.today()
+
+    def _age_bucket(birthday):
+        if not birthday:
+            return None
+        age = _today.year - birthday.year - ((_today.month, _today.day) < (birthday.month, birthday.day))
+        if age < 25:
+            return "25歲以下"
+        if age < 30:
+            return "25-29歲"
+        if age < 35:
+            return "30-34歲"
+        if age < 40:
+            return "35-39歲"
+        if age < 45:
+            return "40-44歲"
+        if age < 50:
+            return "45-49歲"
+        return "50歲以上"
+
+    AGE_BUCKET_ORDER = ["25歲以下", "25-29歲", "30-34歲", "35-39歲", "40-44歲", "45-49歲", "50歲以上"]
+    REGION_ORDER = ["北區", "中區", "南區", "東區", "未填寫"]
+
+    def _compute_member_stats(members):
+        gender_counts = {"M": 0, "F": 0}
+        age_counts = {"M": defaultdict(int), "F": defaultdict(int)}
+        region_counts = {r: {"M": 0, "F": 0} for r in REGION_ORDER}
+        job_counter = defaultdict(int)
+        campaign_counter = defaultdict(int)
+        signups_this_month = 0
+
+        for m in members:
+            if m.gender in gender_counts:
+                gender_counts[m.gender] += 1
+
+            bucket = _age_bucket(m.birthday)
+            if bucket and m.gender in age_counts:
+                age_counts[m.gender][bucket] += 1
+
+            if m.gender in ("M", "F"):
+                region = member_regions.get(m.id) or "未填寫"
+                region_counts[region][m.gender] += 1
+
+            job = (job_by_id.get(m.id) or "").strip()
+            if job:
+                job_counter[job] += 1
+
+            campaign_counter[m.join_campaign or "直接註冊／後台建立"] += 1
+
+            if m.fill_form_at and m.fill_form_at.year == _today.year and m.fill_form_at.month == _today.month:
+                signups_this_month += 1
+
+        age_stats = {
+            gender: [(b, age_counts[gender].get(b, 0)) for b in AGE_BUCKET_ORDER]
+            for gender in ("M", "F")
+        }
+        age_stats_max = max((c for pairs in age_stats.values() for _, c in pairs), default=0)
+
+        region_stats = [(r, region_counts[r]) for r in REGION_ORDER]
+        region_stats_max = max((v["M"] + v["F"] for _, v in region_stats), default=0)
+
+        top_jobs = sorted(job_counter.items(), key=lambda kv: -kv[1])[:8]
+        top_jobs_max = max((c for _, c in top_jobs), default=0)
+
+        campaign_stats = sorted(campaign_counter.items(), key=lambda kv: -kv[1])
+        campaign_stats_max = max((c for _, c in campaign_stats), default=0)
+
+        return {
+            "member_count": len(members),
+            "active_count": sum(1 for m in members if m.is_member_active),
+            "gender_counts": gender_counts,
+            "age_stats": age_stats,
+            "age_stats_max": age_stats_max,
+            "region_stats": region_stats,
+            "region_stats_max": region_stats_max,
+            "top_jobs": top_jobs,
+            "top_jobs_max": top_jobs_max,
+            "campaign_stats": campaign_stats,
+            "campaign_stats_max": campaign_stats_max,
+            "signups_this_month": signups_this_month,
+        }
+
+    real_members = [m for m in all_members if not m.is_test]
+    eligible_members = [m for m in real_members if m.id not in non_eligible_map]
+
+    stats_all = _compute_member_stats(real_members)
+    stats_eligible = _compute_member_stats(eligible_members)
+
     response = render_template(
         'admin_dashboard.html',
         today=date.today(),
@@ -429,9 +526,12 @@ def admin_dashboard():
         no_candidate_candidates={m.id: candidates for m, _, candidates in unmatched_with_reasons},
         weeks_unmatched_by_id=weeks_unmatched_by_id,
         group_matchings=all_group_matchings,
+        draft_group_matchings=draft_group_matchings,
         job_by_id=job_by_id,
         member_regions=member_regions,
         member_last_seen_days=member_last_seen_days,
+        stats_all=stats_all,
+        stats_eligible=stats_eligible,
     )
     if cache and not has_flash:
         cache.setex(_DASHBOARD_CACHE_KEY, _DASHBOARD_CACHE_TTL, response)
@@ -1042,14 +1142,89 @@ def create_group():
 def auto_form_groups():
     session = get_db()
     from form_app.services.group_matching import form_groups
-    created = form_groups(session)
+
+    existing_drafts = session.query(GroupMatching).filter(
+        GroupMatching.status == GroupMatchingStatus.DRAFT
+    ).count()
+    if existing_drafts:
+        flash(f'已有 {existing_drafts} 個草稿群組待審核，請先核准或捨棄後再產生新的。', 'warning')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+
+    created = form_groups(session, is_draft=True)
+    session.commit()
+    _invalidate_dashboard_cache()
+    if created:
+        flash(f'已產生 {len(created)} 個草稿群組，請於下方審核後再發送通知', 'success')
+    else:
+        flash('目前沒有符合條件的會員可以分組', 'warning')
+    return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+
+
+@bp.route('/groups/drafts/approve-all', methods=['POST'])
+@login_required
+@admin_required
+def approve_all_group_drafts():
+    session = get_db()
+    drafts = session.query(GroupMatching).filter(
+        GroupMatching.status == GroupMatchingStatus.DRAFT
+    ).all()
+    for group in drafts:
+        group.approve_draft()
     session.commit()
     process_all_notifications(session)
     _invalidate_dashboard_cache()
-    if created:
-        flash(f'自動生成了 {len(created)} 個群組', 'success')
-    else:
-        flash('目前沒有符合條件的會員可以分組', 'warning')
+    flash(f'已核准 {len(drafts)} 個群組並發送 LINE 通知', 'success')
+    return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+
+
+@bp.route('/groups/drafts/discard-all', methods=['POST'])
+@login_required
+@admin_required
+def discard_all_group_drafts():
+    session = get_db()
+    drafts = session.query(GroupMatching).filter(
+        GroupMatching.status == GroupMatchingStatus.DRAFT
+    ).all()
+    count = len(drafts)
+    for group in drafts:
+        session.delete(group)
+    session.commit()
+    _invalidate_dashboard_cache()
+    flash(f'已捨棄 {count} 個草稿群組', 'success')
+    return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+
+
+@bp.route('/groups/<int:group_id>/approve-draft', methods=['POST'])
+@login_required
+@admin_required
+def approve_group_draft(group_id):
+    session = get_db()
+    group = session.get(GroupMatching, group_id)
+    if group is None or not group.is_draft:
+        flash('找不到該草稿群組', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+    group.approve_draft()
+    session.commit()
+    process_all_notifications(session)
+    _invalidate_dashboard_cache()
+    flash(f'已核准群組「{group.cool_name}」並發送 LINE 通知', 'success')
+    return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+
+
+@bp.route('/groups/<int:group_id>/discard-draft', methods=['POST'])
+@login_required
+@admin_required
+def discard_group_draft(group_id):
+    session = get_db()
+    group = session.get(GroupMatching, group_id)
+    if group is None or not group.is_draft:
+        flash('找不到該草稿群組', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+    cool_name = group.cool_name
+    session.delete(group)
+    session.commit()
+    _invalidate_dashboard_cache()
+    flash(f'已捨棄群組「{cool_name}」', 'success')
     return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
 
 

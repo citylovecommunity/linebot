@@ -8,7 +8,7 @@ from flask_login import current_user, login_required
 from form_app.database import get_db
 from form_app.models import (
     ActivityLabel, BadgeType, DateProposal, GroupBadge, Matching, Member, Message,
-    GroupMatching, GroupMembership, GroupMessage, GroupDateProposal,
+    GroupMatching, GroupMatchingStatus, GroupMembership, GroupMessage, GroupDateProposal,
 )
 from form_app.services.security import verify_password, hash_password
 from form_app.services.liff_token import make_liff_token, load_member_token
@@ -63,6 +63,7 @@ def dashboard():
     group_matchings = (
         db.query(GroupMatching)
         .filter(GroupMatching.memberships.any(GroupMembership.member_id == current_user.id))
+        .filter(GroupMatching.status != GroupMatchingStatus.DRAFT)
         .order_by(GroupMatching.id.desc())
         .all()
     )
@@ -287,7 +288,7 @@ def _get_group_and_membership(group_id):
     """Returns (group, my_membership) or (None, None) if not found / not a member."""
     db = get_db()
     group = db.get(GroupMatching, group_id)
-    if not group:
+    if not group or group.is_draft:
         return None, None
     membership = db.query(GroupMembership).filter_by(
         group_id=group_id, member_id=current_user.id

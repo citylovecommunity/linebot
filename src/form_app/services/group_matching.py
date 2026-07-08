@@ -58,6 +58,14 @@ _NEIGHBOR_REGIONS: dict[str, list[str]] = {
     "東區": ["東區", "南區"],
 }
 
+# ── Campaign priority rules ─────────────────────────────────────────────────────
+
+# Campaign whose signups get a priority group-formation pass before the general pool.
+PICKLE_BALL_CAMPAIGN = "pickle_ball"
+
+# "Enough activity" bar for the male side of a pickle_ball group.
+_PICKLE_BALL_ACTIVE_LABELS = (ActivityLabel.ACTIVE_TRAVELER, ActivityLabel.SUPER_TRAVELER)
+
 # ── Label thresholds ──────────────────────────────────────────────────────────
 
 LABEL_THRESHOLDS = [
@@ -168,6 +176,15 @@ def _group_score(females: list[Member], males: list[Member]) -> float:
     return sum(age_compat_score(f, m) for f, m in pairs) / len(pairs)
 
 
+def _pairwise_score_matrix(
+    females: list[Member], males: list[Member]
+) -> dict[tuple[int, int], int]:
+    """Precompute age_compat_score for every (female, male) pair once — avoids
+    recomputing the same score millions of times inside _best_2f2m's nested
+    combinations search."""
+    return {(f.id, m.id): age_compat_score(f, m) for f in females for m in males}
+
+
 # ── Eligibility ───────────────────────────────────────────────────────────────
 
 def get_eligible_group_pool(session: Session) -> tuple[list[Member], list[Member]]:
@@ -254,15 +271,28 @@ def _best_2f2m(
     females: list[Member], males: list[Member]
 ) -> tuple[list[Member], list[Member]]:
     """Return the (2 females, 2 males) combination with the highest group score."""
+    if not females or not males:
+        return females[:2], males[:2]
+
+    # Precompute every pairwise score once — the search below evaluates
+    # O(|females|^2 * |males|^2) quartets, so recomputing age_compat_score()
+    # per quartet (as the naive version did) is millions of redundant calls
+    # on large pools. A lookup table turns each quartet check into 4 dict
+    # lookups + a sum, which is what makes this search tractable at scale.
+    matrix = _pairwise_score_matrix(females, males)
+
     best_score = -1.0
     best: tuple[list[Member], list[Member]] = (females[:2], males[:2])
 
-    for f_pair in combinations(females, 2):
-        for m_pair in combinations(males, 2):
-            score = _group_score(list(f_pair), list(m_pair))
+    for f1, f2 in combinations(females, 2):
+        for m1, m2 in combinations(males, 2):
+            score = (
+                matrix[(f1.id, m1.id)] + matrix[(f1.id, m2.id)] +
+                matrix[(f2.id, m1.id)] + matrix[(f2.id, m2.id)]
+            )
             if score > best_score:
                 best_score = score
-                best = (list(f_pair), list(m_pair))
+                best = ([f1, f2], [m1, m2])
 
     return best
 
@@ -364,6 +394,63 @@ def _bucket_by_region(
     return buckets, unrestricted
 
 
+def _form_pickleball_groups(
+    females: list[Member], males: list[Member]
+) -> tuple[list[tuple[list[Member], list[Member], Optional[str]]], set[int], set[int]]:
+    """
+    Priority pass, run before the general region loop: pair pickle_ball-campaign
+    females with sufficiently active males (ACTIVE_TRAVELER+), region-compatible,
+    strictly as 2F+2M groups (no 1F/female-only fallback here — any pickle_ball
+    leftovers simply flow into the general pass like any other member).
+
+    Returns (groups, consumed_female_ids, consumed_male_ids) where each group is
+    a (females, males, region) tuple.
+    """
+    pickle_f = [f for f in females if f.join_campaign == PICKLE_BALL_CAMPAIGN]
+    active_m = [m for m in males if m.activity_label in _PICKLE_BALL_ACTIVE_LABELS]
+
+    if len(pickle_f) < 2 or len(active_m) < 2:
+        return [], set(), set()
+
+    f_buckets, unrestricted_f = _bucket_by_region(pickle_f)
+    m_buckets, unrestricted_m = _bucket_by_region(active_m)
+
+    groups: list[tuple[list[Member], list[Member], Optional[str]]] = []
+    consumed_f: set[int] = set()
+    consumed_m: set[int] = set()
+
+    for region in ("北區", "中區", "南區", "東區"):
+        region_f = f_buckets[region] + unrestricted_f
+        region_m = m_buckets[region] + unrestricted_m
+        for neighbor in _NEIGHBOR_REGIONS.get(region, []):
+            if neighbor != region:
+                region_f = region_f + f_buckets.get(neighbor, [])
+                region_m = region_m + m_buckets.get(neighbor, [])
+
+        seen_f: set[int] = set()
+        seen_m: set[int] = set()
+        avail_f = [
+            f for f in region_f
+            if f.id not in consumed_f and f.id not in seen_f and not seen_f.add(f.id)  # type: ignore[func-returns-value]
+        ]
+        avail_m = [
+            m for m in region_m
+            if m.id not in consumed_m and m.id not in seen_m and not seen_m.add(m.id)  # type: ignore[func-returns-value]
+        ]
+
+        while len(avail_f) >= 2 and len(avail_m) >= 2:
+            f_pair, m_pair = _best_2f2m(avail_f, avail_m)
+            groups.append((f_pair, m_pair, region))
+            for f in f_pair:
+                avail_f.remove(f)
+                consumed_f.add(f.id)
+            for m in m_pair:
+                avail_m.remove(m)
+                consumed_m.add(m.id)
+
+    return groups, consumed_f, consumed_m
+
+
 def _pick_opener(females: list[Member], session: Session) -> Optional[Member]:
     """Pick the female in the group who has been opener least recently."""
     if not females:
@@ -387,6 +474,8 @@ def _create_group(
     males: list[Member],
     region: Optional[str],
     session: Session,
+    source_campaign: Optional[str] = None,
+    is_draft: bool = False,
 ) -> GroupMatching:
     """Persist one GroupMatching with memberships and return it."""
     all_members = females + males
@@ -396,6 +485,11 @@ def _create_group(
     group = GroupMatching(
         cool_name=generate_funny_name(),
         region=region,
+        source_campaign=source_campaign,
+        status=GroupMatchingStatus.DRAFT if is_draft else GroupMatchingStatus.ACTIVE,
+        # Drafts stay silent (is_notified=True) until an admin approves them,
+        # mirroring Matching.is_match_notified for DRAFT 1-on-1 matches.
+        is_notified=is_draft,
         expires_at=datetime.now() + timedelta(days=15),
         opener_member_id=opener.id if opener else None,
         memberships=[
@@ -461,21 +555,38 @@ def _notify_group_formed(group: GroupMatching, session: Session) -> None:
 
 # ── Public entry point ────────────────────────────────────────────────────────
 
-def form_groups(session: Session) -> list[GroupMatching]:
+def form_groups(session: Session, is_draft: bool = False) -> list[GroupMatching]:
     """
     Main entry point. Forms groups for this cycle and persists them.
     Does NOT commit — caller is responsible for session.commit().
     Returns the list of newly created GroupMatching objects.
+
+    When is_draft is True, groups are created with status=DRAFT and stay
+    silent (no LINE notification) until an admin approves them.
     """
     females, males = get_eligible_group_pool(session)
 
     if not females:
         return []
 
+    created: list[GroupMatching] = []
+
+    # Priority pass: pickle_ball-campaign females + sufficiently active males,
+    # region-compatible, formed before the general pool so campaign members
+    # get first pick. Any pickle_ball leftovers simply flow into the general pass.
+    pb_groups, consumed_f_ids, consumed_m_ids = _form_pickleball_groups(females, males)
+    for group_f, group_m, region in pb_groups:
+        group = _create_group(
+            group_f, group_m, region, session,
+            source_campaign=PICKLE_BALL_CAMPAIGN, is_draft=is_draft,
+        )
+        created.append(group)
+
+    females = [f for f in females if f.id not in consumed_f_ids]
+    males = [m for m in males if m.id not in consumed_m_ids]
+
     female_buckets, unrestricted_f = _bucket_by_region(females)
     male_buckets, unrestricted_m = _bucket_by_region(males)
-
-    created: list[GroupMatching] = []
 
     for region in ("北區", "中區", "南區", "東區"):
         region_f = female_buckets[region] + unrestricted_f
@@ -496,7 +607,7 @@ def form_groups(session: Session) -> list[GroupMatching]:
         groups_this_region = _form_groups_from_pool(deduped_f, deduped_m, region)
 
         for group_f, group_m in groups_this_region:
-            group = _create_group(group_f, group_m, region, session)
+            group = _create_group(group_f, group_m, region, session, is_draft=is_draft)
             created.append(group)
 
             # Remove used members from unrestricted pool so they aren't reused

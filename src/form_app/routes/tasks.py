@@ -171,13 +171,34 @@ def task_form_groups():
     if request.headers.get('X-Task-Secret') != settings.TASK_SECRET:
         return "Unauthorized", 401
 
-    from form_app.services.group_matching import form_groups
+    # ?save_as_draft=true: insert groups as DRAFT status so admin can review
+    # before notifications are sent. Admin approves via the admin dashboard.
+    save_as_draft = request.args.get('save_as_draft', 'false').lower() == 'true'
 
+    from form_app.models import GroupMatching, GroupMatchingStatus
+    from form_app.services.group_matching import form_groups
     from form_app.services.messaging import process_all_notifications
 
     session = get_db()
-    created = form_groups(session)
+
+    if save_as_draft:
+        # Block if drafts already exist to prevent duplicates / member double-booking
+        existing_drafts = session.query(GroupMatching).filter(
+            GroupMatching.status == GroupMatchingStatus.DRAFT
+        ).count()
+        if existing_drafts > 0:
+            return f"草稿群組已存在（{existing_drafts} 筆），請先在管理後台處理後再重新生成。", 409
+
+    created = form_groups(session, is_draft=save_as_draft)
     session.commit()
+
+    if save_as_draft:
+        from form_app.routes.admin import _invalidate_dashboard_cache
+        _invalidate_dashboard_cache()
+        msg = f"已生成 {len(created)} 個草稿同行局，等待管理員審核" if created else "本次無新同行局草稿"
+        current_app.logger.info(msg)
+        return msg, 200
+
     process_all_notifications(session)
     session.commit()
 
