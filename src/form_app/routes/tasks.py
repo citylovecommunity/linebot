@@ -211,6 +211,62 @@ def task_form_groups():
     return msg, 200
 
 
+@bp.route('/approve-stale-drafts', methods=['POST'])
+def task_approve_stale_drafts():
+    if request.headers.get('X-Task-Secret') != settings.TASK_SECRET:
+        return "Unauthorized", 401
+
+    from datetime import datetime, timedelta
+
+    from form_app.models import Matching, MatchingStatus, GroupMatching, GroupMatchingStatus
+    from form_app.services.matching import update_unmatched_counters
+    from form_app.services.messaging import process_all_notifications
+    from form_app.services.scoring import get_eligible_matching_pool
+
+    # ?hours=N: drafts created more than N hours ago get auto-approved and
+    # notified. Safety net for when admin can't review the queue in time —
+    # members shouldn't wait indefinitely on a busy admin.
+    hours = int(request.args.get('hours', 72))
+    cutoff = datetime.now() - timedelta(hours=hours)
+
+    session = get_db()
+
+    stale_matchings = session.query(Matching).filter(
+        Matching.status == MatchingStatus.DRAFT,
+        Matching.created_at <= cutoff,
+    ).all()
+    matched_ids = set()
+    for m in stale_matchings:
+        m.approve_draft()
+        matched_ids.add(m.subject_id)
+        matched_ids.add(m.object_id)
+    if matched_ids:
+        eligible_pool = get_eligible_matching_pool(session)
+        update_unmatched_counters(eligible_pool, matched_ids, session)
+
+    stale_groups = session.query(GroupMatching).filter(
+        GroupMatching.status == GroupMatchingStatus.DRAFT,
+        GroupMatching.created_at <= cutoff,
+    ).all()
+    for g in stale_groups:
+        g.approve_draft()
+
+    session.commit()
+
+    if stale_matchings or stale_groups:
+        process_all_notifications(session)
+        session.commit()
+        from form_app.routes.admin import _invalidate_dashboard_cache
+        _invalidate_dashboard_cache()
+
+    msg = (
+        f"自動核准了 {len(stale_matchings)} 筆配對草稿、"
+        f"{len(stale_groups)} 個群組草稿（超過 {hours} 小時未審核）"
+    )
+    current_app.logger.info(msg)
+    return msg, 200
+
+
 @bp.route('/close-expired-groups', methods=['POST'])
 def task_close_expired_groups():
     if request.headers.get('X-Task-Secret') != settings.TASK_SECRET:
