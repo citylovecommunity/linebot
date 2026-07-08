@@ -23,8 +23,8 @@ class Campaign:
 
 
 CAMPAIGNS: dict[str, Campaign] = {
-    "pickleball": Campaign(
-        slug="pickleball",
+    "pickle_ball": Campaign(
+        slug="pickle_ball",
         badge="本季活動",
         title="一起相約打皮克球\n一起抽機票",
         subtitle="參加活動集章，即可獲得來回頭等艙機票資格",
