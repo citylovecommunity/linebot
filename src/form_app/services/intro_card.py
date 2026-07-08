@@ -82,14 +82,10 @@ def _wrap(text: str, font: ImageFont.FreeTypeFont, max_w: int) -> list[str]:
     return lines
 
 
-def _age(birthday: date | None) -> str:
+def _birth(birthday: date | None) -> str:
     if not birthday:
         return "—"
-    today = date.today()
-    years = today.year - birthday.year - (
-        (today.month, today.day) < (birthday.month, birthday.day)
-    )
-    return f"{years}歲"
+    return f"{birthday.year}年{birthday.month}月"
 
 
 # ── Main generator ────────────────────────────────────────────────────────────
@@ -126,12 +122,12 @@ def generate_intro_card(member) -> str:
         draw.rectangle([BOX_X0, BOX_Y0, BOX_X1, BOX_Y1], fill=PLACEHOLD)
     draw = ImageDraw.Draw(card)
 
-    # 4. Info fields — age / job, height / city (plain values, no captions)
+    # 4. Info fields — birth date / job, height / city (plain values, no captions)
     city_raw = user_info.get("可約會地區 (可複選)", "")
     city = city_raw.split(",")[0].strip() if city_raw else "—"
 
     fn_value = _font("medium", 34)
-    draw.text((LEFT_COL_X,  ROW1_Y), _age(member.birthday),               font=fn_value, fill=DARK, anchor="lm")
+    draw.text((LEFT_COL_X,  ROW1_Y), _birth(member.birthday),             font=fn_value, fill=DARK, anchor="lm")
     draw.text((RIGHT_COL_X, ROW1_Y), user_info.get("會員之職業類別", "—"), font=fn_value, fill=DARK, anchor="lm")
     draw.text((LEFT_COL_X,  ROW2_Y), f"{member.height} cm" if member.height else "—", font=fn_value, fill=DARK, anchor="lm")
     draw.text((RIGHT_COL_X, ROW2_Y), city,                                font=fn_value, fill=DARK, anchor="lm")
