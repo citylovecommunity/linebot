@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+from datetime import date
 from pathlib import Path
 
 import cloudinary
@@ -17,26 +18,29 @@ cloudinary.config(
 )
 
 # ── Canvas & colour palette ───────────────────────────────────────────────────
+# Matches the CityLove intro-card template: warm cream background with
+# hand-drawn blue doodles / yellow sparkle accents (baked into DOODLES_PNG).
 W, H = 900, 1600
 
-BG         = (249, 246, 241)   # warm cream
-GRAD_TOP   = (255, 168,  72)   # warm amber
-GRAD_BOT   = (210, 100,  25)   # burnt orange
-WHITE      = (255, 255, 255)
-DARK       = ( 35,  30,  25)   # warm near-black
-MUTED      = (148, 135, 120)   # warm grey
-ACCENT     = (115,  95,  75)   # warm brown (pills)
-PILL_BG    = (240, 234, 224)   # warm cream
-BIO_BG     = (242, 236, 226)   # warm cream
-DIVIDER    = (215, 207, 196)   # warm divider
-SHADOW     = (182, 172, 160)   # warm shadow
+BG        = (225, 212, 204)   # warm cream/taupe
+PLACEHOLD = (238, 238, 238)   # photo placeholder fill
+DARK      = ( 82,  78,  74)   # warm dark grey (name / values)
+MUTED     = (150, 140, 131)   # warm muted grey (footer)
+BIO_COLOR = ( 92,  86,  82)   # warm grey (bio text)
 
-HEADER_H   = 530
-PHOTO_D    = 340               # photo circle diameter
-RING       = 8                 # white ring thickness around photo
-OUTER_D    = PHOTO_D + RING * 2
+BOX_X0, BOX_Y0, BOX_X1, BOX_Y1 = 62, 154, 826, 853   # photo rectangle
+BOX_W, BOX_H = BOX_X1 - BOX_X0, BOX_Y1 - BOX_Y0
 
-FONTS_DIR = Path(__file__).parent.parent / "static" / "fonts"
+LEFT_COL_X  = 197
+RIGHT_COL_X = 509
+ROW1_Y      = 912
+ROW2_Y      = 1010
+INTERESTS_Y = 1090
+TEXT_RIGHT  = 820             # right-hand wrap boundary for interests/bio
+LINE_H      = 42
+
+FONTS_DIR   = Path(__file__).parent.parent / "static" / "fonts"
+DOODLES_PNG = Path(__file__).parent.parent / "static" / "images" / "intro_card_doodles.png"
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -50,28 +54,18 @@ def _font(weight: str, size: int) -> ImageFont.FreeTypeFont:
     return ImageFont.truetype(str(FONTS_DIR / names[weight]), size)
 
 
-def _gradient(draw: ImageDraw.ImageDraw, y0: int, y1: int) -> None:
-    for y in range(y0, y1):
-        t = (y - y0) / max(y1 - y0 - 1, 1)
-        r = int(GRAD_TOP[0] + (GRAD_BOT[0] - GRAD_TOP[0]) * t)
-        g = int(GRAD_TOP[1] + (GRAD_BOT[1] - GRAD_TOP[1]) * t)
-        b = int(GRAD_TOP[2] + (GRAD_BOT[2] - GRAD_TOP[2]) * t)
-        draw.line([(0, y), (W, y)], fill=(r, g, b))
-
-
-def _circle_crop(img: Image.Image, size: int) -> Image.Image:
-    img  = img.convert("RGBA")
-    side = min(img.width, img.height)
-    img  = img.crop((
-        (img.width  - side) // 2,
-        (img.height - side) // 2,
-        (img.width  + side) // 2,
-        (img.height + side) // 2,
-    )).resize((size, size), Image.LANCZOS)
-    mask = Image.new("L", (size, size), 0)
-    ImageDraw.Draw(mask).ellipse([0, 0, size - 1, size - 1], fill=255)
-    img.putalpha(mask)
-    return img
+def _cover_crop(img: Image.Image, w: int, h: int) -> Image.Image:
+    img = img.convert("RGB")
+    src_ratio, dst_ratio = img.width / img.height, w / h
+    if src_ratio > dst_ratio:
+        new_w = round(img.height * dst_ratio)
+        x0 = (img.width - new_w) // 2
+        img = img.crop((x0, 0, x0 + new_w, img.height))
+    else:
+        new_h = round(img.width / dst_ratio)
+        y0 = (img.height - new_h) // 2
+        img = img.crop((0, y0, img.width, y0 + new_h))
+    return img.resize((w, h), Image.LANCZOS)
 
 
 def _wrap(text: str, font: ImageFont.FreeTypeFont, max_w: int) -> list[str]:
@@ -88,17 +82,14 @@ def _wrap(text: str, font: ImageFont.FreeTypeFont, max_w: int) -> list[str]:
     return lines
 
 
-def _pill(draw: ImageDraw.ImageDraw, x: int, y: int, text: str,
-          font: ImageFont.FreeTypeFont) -> int:
-    bbox   = font.getbbox(text)
-    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
-    px, py = 20, 10
-    pw     = tw + px * 2
-    ph     = th + py * 2
-    draw.rounded_rectangle([x, y, x + pw, y + ph],
-                            radius=ph // 2, fill=PILL_BG, outline=ACCENT, width=2)
-    draw.text((x + px, y + py - bbox[1]), text, font=font, fill=ACCENT)
-    return x + pw + 14
+def _age(birthday: date | None) -> str:
+    if not birthday:
+        return "—"
+    today = date.today()
+    years = today.year - birthday.year - (
+        (today.month, today.day) < (birthday.month, birthday.day)
+    )
+    return f"{years}歲"
 
 
 # ── Main generator ────────────────────────────────────────────────────────────
@@ -106,157 +97,69 @@ def _pill(draw: ImageDraw.ImageDraw, x: int, y: int, text: str,
 def generate_intro_card(member) -> str:
     user_info = member.user_info or {}
 
-    # 1. Base canvas
+    # 1. Base canvas + decorative doodle/sparkle overlay
     card = Image.new("RGB", (W, H), BG)
+    doodles = Image.open(DOODLES_PNG).convert("RGBA")
+    card.paste(doodles, (0, 0), mask=doodles)
     draw = ImageDraw.Draw(card)
 
-    # 2. Gradient header
-    _gradient(draw, 0, HEADER_H)
-
-    # Texture layer
-    texture = Image.new("RGBA", (W, HEADER_H), (0, 0, 0, 0))
-    td = ImageDraw.Draw(texture)
-
-    # Fine diagonal lines — linen-like weave
-    for x in range(-HEADER_H, W + HEADER_H, 7):
-        td.line([(x, 0), (x + HEADER_H, HEADER_H)], fill=(255, 255, 255, 9), width=1)
-
-    # Soft highlight orb — top-right corner
-    for i in range(18, 0, -1):
-        a = int(20 * (i / 18) ** 2)
-        r = int(200 * i / 18)
-        td.ellipse([W - r, -r // 2, W + r // 2, r], fill=(255, 255, 255, a))
-
-    # Soft secondary orb — bottom-left
-    for i in range(12, 0, -1):
-        a = int(14 * (i / 12) ** 2)
-        r = int(160 * i / 12)
-        td.ellipse([-r // 2, HEADER_H - r // 2, r, HEADER_H + r // 2],
-                   fill=(255, 255, 255, a))
-
-    # Diagonal shine sweep across left side
-    td.polygon(
-        [(0, 0), (int(W * 0.50), 0), (int(W * 0.22), HEADER_H), (0, HEADER_H)],
-        fill=(255, 255, 255, 16),
-    )
-
-    header_region = card.crop((0, 0, W, HEADER_H)).convert("RGBA")
-    header_region = Image.alpha_composite(header_region, texture)
-    card.paste(header_region.convert("RGB"), (0, 0))
-    draw = ImageDraw.Draw(card)
-
-    # 3. Profile photo (centred, spanning header bottom)
-    CX = W // 2
-    CY = HEADER_H     # photo centre sits right at the header boundary
-
-    # Shadow (offset downward, soft grey ellipse steps)
-    for i in range(14, 0, -1):
-        gray = int(SHADOW[0] + (BG[0] - SHADOW[0]) * (1 - i / 14))
-        draw.ellipse([
-            CX - OUTER_D // 2 - i + 5,
-            CY - OUTER_D // 2 - i + 8,
-            CX + OUTER_D // 2 + i + 5,
-            CY + OUTER_D // 2 + i + 8,
-        ], fill=(gray, gray - 4, gray - 2))
-
-    # White ring
-    draw.ellipse(
-        [CX - OUTER_D // 2, CY - OUTER_D // 2,
-         CX + OUTER_D // 2, CY + OUTER_D // 2],
-        fill=WHITE,
-    )
-
-    # Photo itself
-    photo_url = user_info.get("相片網址") or member.introduction_link
-    if photo_url:
-        try:
-            resp  = requests.get(photo_url, timeout=12)
-            resp.raise_for_status()
-            photo = _circle_crop(Image.open(io.BytesIO(resp.content)), PHOTO_D)
-            card.paste(photo, (CX - PHOTO_D // 2, CY - PHOTO_D // 2),
-                       mask=photo.getchannel("A"))
-        except Exception:
-            draw.ellipse(
-                [CX - PHOTO_D // 2, CY - PHOTO_D // 2,
-                 CX + PHOTO_D // 2, CY + PHOTO_D // 2],
-                fill=(210, 200, 205),
-            )
-    draw = ImageDraw.Draw(card)
-
-    # 5. Name — display surname + 先生/小姐, not the full real name
+    # 2. Name — display surname + 先生/小姐, not the full real name
     surname = (member.name or "")[0] if member.name else ""
     honorific = "先生" if member.gender == "M" else "小姐"
     display_name = f"{surname}{honorific}" if surname else honorific
-    NAME_Y = CY + PHOTO_D // 2 + 80
-    draw.text((W // 2, NAME_Y), display_name,
-              font=_font("bold", 52), fill=DARK, anchor="mm")
+    draw.text((W // 2, 102), display_name,
+              font=_font("bold", 50), fill=DARK, anchor="mm")
 
-    # 6. Divider
-    DIV1_Y = NAME_Y + 58
-    draw.line([(80, DIV1_Y), (W - 80, DIV1_Y)], fill=DIVIDER, width=1)
+    # 3. Profile photo — flush rectangle, no ring/shadow (matches template)
+    photo_url = user_info.get("相片網址") or member.introduction_link
+    pasted = False
+    if photo_url:
+        try:
+            resp = requests.get(photo_url, timeout=12)
+            resp.raise_for_status()
+            photo = _cover_crop(Image.open(io.BytesIO(resp.content)), BOX_W, BOX_H)
+            card.paste(photo, (BOX_X0, BOX_Y0))
+            pasted = True
+        except Exception:
+            pasted = False
+    if not pasted:
+        draw.rectangle([BOX_X0, BOX_Y0, BOX_X1, BOX_Y1], fill=PLACEHOLD)
+    draw = ImageDraw.Draw(card)
 
-    # 7. Info grid  (出生年月 / 職業)  (身高 / 城市)
-    birth = (f"{member.birthday.year}年{member.birthday.month}月"
-             if member.birthday else "—")
+    # 4. Info fields — age / job, height / city (plain values, no captions)
     city_raw = user_info.get("可約會地區 (可複選)", "")
     city = city_raw.split(",")[0].strip() if city_raw else "—"
 
-    rows = [
-        [("出生年月", birth),               ("職業", user_info.get("會員之職業類別", "—"))],
-        [("身高",     f"{member.height} cm" if member.height else "—"),
-                                             ("城市", city)],
-    ]
+    fn_value = _font("medium", 34)
+    draw.text((LEFT_COL_X,  ROW1_Y), _age(member.birthday),               font=fn_value, fill=DARK, anchor="lm")
+    draw.text((RIGHT_COL_X, ROW1_Y), user_info.get("會員之職業類別", "—"), font=fn_value, fill=DARK, anchor="lm")
+    draw.text((LEFT_COL_X,  ROW2_Y), f"{member.height} cm" if member.height else "—", font=fn_value, fill=DARK, anchor="lm")
+    draw.text((RIGHT_COL_X, ROW2_Y), city,                                font=fn_value, fill=DARK, anchor="lm")
 
-    fn_label = _font("regular", 22)
-    fn_value = _font("medium",  31)
-    ROW_H    = 110
-    INFO_Y   = DIV1_Y + 48
-    COL_X    = [90, 480]
-
-    for row_i, row in enumerate(rows):
-        for col_i, (label, value) in enumerate(row):
-            y = INFO_Y + row_i * ROW_H
-            x = COL_X[col_i]
-            draw.text((x, y),      label, font=fn_label, fill=MUTED)
-            draw.text((x, y + 28), value, font=fn_value, fill=DARK)
-
-    # 8. Divider
-    DIV2_Y = INFO_Y + len(rows) * ROW_H + 20
-    draw.line([(80, DIV2_Y), (W - 80, DIV2_Y)], fill=DIVIDER, width=1)
-
-    # 9. Interests pills
+    # 5. Interests — plain wrapped line(s)
+    cursor_y = INTERESTS_Y
     interests = [i.strip() for i in user_info.get("興趣", "").split(",") if i.strip()]
-    fn_pill   = _font("medium", 24)
-    PIL_Y     = DIV2_Y + 48
-    px        = 80
-    for interest in interests:
-        bbox = fn_pill.getbbox(interest)
-        pw   = bbox[2] - bbox[0] + 40 + 14
-        if px + pw > W - 80:
-            px    = 80
-            PIL_Y += 56
-        px = _pill(draw, px, PIL_Y, interest, fn_pill)
+    if interests:
+        fn_interests = _font("medium", 28)
+        lines = _wrap("、".join(interests), fn_interests, TEXT_RIGHT - LEFT_COL_X)
+        for line in lines:
+            draw.text((LEFT_COL_X, cursor_y), line, font=fn_interests, fill=DARK, anchor="la")
+            cursor_y += LINE_H
 
-    # 10. Bio card
+    # 6. Bio — plain wrapped text
     bio = user_info.get("簡單介紹自己", "").strip()
-    BIO_Y = PIL_Y + 88
     if bio:
-        fn_bio  = _font("regular", 27)
-        lines   = _wrap(bio, fn_bio, W - 200)
-        line_h  = 42
-        bio_h   = len(lines) * line_h + 52
-        draw.rounded_rectangle([80, BIO_Y, W - 80, BIO_Y + bio_h],
-                                radius=16, fill=BIO_BG)
-        for j, line in enumerate(lines):
-            draw.text((80 + 28, BIO_Y + 26 + j * line_h), line,
-                      font=fn_bio, fill=(95, 80, 88))
-        BIO_Y += bio_h
+        bio_y = cursor_y + 40
+        fn_bio = _font("regular", 27)
+        for line in _wrap(bio, fn_bio, TEXT_RIGHT - LEFT_COL_X):
+            draw.text((LEFT_COL_X, bio_y), line, font=fn_bio, fill=BIO_COLOR, anchor="la")
+            bio_y += LINE_H
 
-    # 11. Footer
-    draw.text((W // 2, H - 72), "CityLove 城遇",
-              font=_font("medium", 28), fill=MUTED, anchor="mm")
+    # 7. Footer wordmark (sparkle mark is already baked into the doodle overlay)
+    draw.text((W // 2, 1546), "CityLove 城遇",
+              font=_font("medium", 26), fill=MUTED, anchor="mm")
 
-    # 12. Upload to Cloudinary
+    # 8. Upload to Cloudinary
     buf = io.BytesIO()
     card.save(buf, format="JPEG", quality=92)
     buf.seek(0)
