@@ -372,8 +372,10 @@ def _form_groups_from_pool(
         avail_f.clear()
         avail_m.clear()
 
-    # Priority 4: remaining females → all-female groups (2–4 people)
-    while len(avail_f) >= 2:
+    # Priority 4: remaining females → all-female groups (3–4 people).
+    # A leftover pair of exactly 2 isn't a real hangout group — discard it
+    # rather than force a match; those 2 stay unmatched and re-enter next cycle.
+    while len(avail_f) >= 3:
         size = min(4, len(avail_f))
         group_f = avail_f[:size]
         groups.append((group_f, []))

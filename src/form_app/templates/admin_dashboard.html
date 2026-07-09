@@ -538,12 +538,12 @@
           <span><i class="bi bi-hourglass-split me-1"></i> 草稿群組待審核（{{ draft_group_matchings|length }}）</span>
           <div class="d-flex gap-2">
             <form method="POST" action="{{ url_for('admin_bp.discard_all_group_drafts') }}"
-              onsubmit="return confirm('確定捨棄全部草稿群組？')">
-              <button type="submit" class="btn btn-sm btn-outline-danger">全部捨棄</button>
+              onsubmit="return confirmAndLockGroupDrafts(this, '確定捨棄全部草稿群組？', '捨棄中…')">
+              <button type="submit" id="discard-all-group-drafts-btn" class="btn btn-sm btn-outline-danger">全部捨棄</button>
             </form>
             <form method="POST" action="{{ url_for('admin_bp.approve_all_group_drafts') }}"
-              onsubmit="return confirm('確定核准全部草稿群組並發送 LINE 通知？')">
-              <button type="submit" class="btn btn-sm btn-success">全部核准並通知</button>
+              onsubmit="return confirmAndLockGroupDrafts(this, '確定核准全部草稿群組並發送 LINE 通知？', '發送中，請稍候…')">
+              <button type="submit" id="approve-all-group-drafts-btn" class="btn btn-sm btn-success">全部核准並通知</button>
             </form>
           </div>
         </div>
@@ -573,10 +573,12 @@
                 </td>
                 <td class="small">{{ g.region or '不限' }}</td>
                 <td>
-                  {% if g.source_campaign %}
+                  {% if g.source_campaign == 'pickle_ball' %}
+                  <span class="badge bg-info text-dark">🏓 匹克球</span>
+                  {% elif g.source_campaign %}
                   <span class="badge bg-info text-dark">{{ g.source_campaign }}</span>
                   {% else %}
-                  <span class="text-muted small">一般</span>
+                  <span class="badge bg-light text-dark border">一般</span>
                   {% endif %}
                 </td>
                 <td>
@@ -1899,6 +1901,19 @@ function confirmAndLockApprove(form) {
   const btn = document.getElementById('approve-all-btn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> 發送中，請稍候…';
+
+  // Disable sibling buttons so nothing else can be clicked while processing
+  form.closest('.d-flex').querySelectorAll('button').forEach(b => { b.disabled = true; });
+
+  return true;
+}
+
+function confirmAndLockGroupDrafts(form, confirmMsg, spinnerLabel) {
+  if (!confirm(confirmMsg)) return false;
+
+  const btn = form.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status"></span> ${spinnerLabel}`;
 
   // Disable sibling buttons so nothing else can be clicked while processing
   form.closest('.d-flex').querySelectorAll('button').forEach(b => { b.disabled = true; });
