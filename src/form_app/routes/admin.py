@@ -1204,20 +1204,84 @@ def discard_all_group_drafts():
     return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
 
 
-@bp.route('/groups/<int:group_id>/approve-draft', methods=['POST'])
+@bp.route('/groups/<int:group_id>/edit-draft', methods=['POST'])
 @login_required
 @admin_required
-def approve_group_draft(group_id):
+def edit_group_draft(group_id):
     session = get_db()
     group = session.get(GroupMatching, group_id)
     if group is None or not group.is_draft:
-        flash('找不到該草稿群組', 'danger')
+        flash('找不到草稿群組', 'danger')
         return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
-    group.approve_draft()
+
+    from sqlalchemy import or_
+
+    memberships = group.memberships
+    new_assignments = {}  # membership.id -> new member_id
+    for gm in memberships:
+        new_id = request.form.get(f'member_id_{gm.id}', type=int)
+        if new_id and new_id != gm.member_id:
+            new_assignments[gm.id] = new_id
+
+    if new_assignments:
+        final_ids = [new_assignments.get(gm.id, gm.member_id) for gm in memberships]
+        if len(set(final_ids)) != len(final_ids):
+            flash('群組成員不可重複', 'danger')
+            return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+
+        for gm in memberships:
+            if gm.id not in new_assignments:
+                continue
+            new_member = session.get(Member, new_assignments[gm.id])
+            old_member = session.get(Member, gm.member_id)
+            if not new_member:
+                flash('找不到指定會員', 'danger')
+                return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+            if old_member and new_member.gender != old_member.gender:
+                flash(f'「{new_member.name}」性別與原成員不符，無法替換', 'danger')
+                return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+
+            matching_conflict = session.query(Matching).filter(
+                or_(Matching.subject_id == new_member.id, Matching.object_id == new_member.id),
+                Matching.status.in_([MatchingStatus.ACTIVE, MatchingStatus.DRAFT]),
+            ).first()
+            if matching_conflict:
+                flash(f'「{new_member.name}」已有進行中的一對一配對，無法加入群組', 'danger')
+                return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+
+            group_conflict = (
+                session.query(GroupMembership)
+                .join(GroupMatching)
+                .filter(
+                    GroupMembership.member_id == new_member.id,
+                    GroupMatching.status.in_([GroupMatchingStatus.ACTIVE, GroupMatchingStatus.DRAFT]),
+                    GroupMatching.id != group_id,
+                )
+                .first()
+            )
+            if group_conflict:
+                flash(f'「{new_member.name}」已在其他進行中的群組，無法加入', 'danger')
+                return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+
+            gm.member_id = new_member.id
+
+        # Opener may have been swapped out — reassign from the current females if so.
+        from form_app.services.group_matching import _pick_opener
+        current_females = [
+            m for m in (session.get(Member, gm.member_id) for gm in memberships)
+            if m and m.gender == 'F'
+        ]
+        if group.opener_member_id not in {f.id for f in current_females}:
+            new_opener = _pick_opener(current_females, session)
+            group.opener_member_id = new_opener.id if new_opener else None
+
+    new_cool_name = request.form.get('cool_name', '').strip()
+    if new_cool_name:
+        group.cool_name = new_cool_name
+
     session.commit()
-    process_all_notifications(session)
     _invalidate_dashboard_cache()
-    flash(f'已核准群組「{group.cool_name}」並發送 LINE 通知', 'success')
+    flash(f'已更新草稿群組「{group.cool_name}」', 'success')
     return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
 
 
@@ -1539,27 +1603,6 @@ def discard_all_drafts():
     session.commit()
     _invalidate_dashboard_cache()
     flash(f'已刪除 {count} 筆草稿配對。', 'success')
-    return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
-
-
-@bp.route('/matchings/<int:matching_id>/approve-draft', methods=['POST'])
-@login_required
-@admin_required
-def approve_draft(matching_id):
-    session = get_db()
-    matching = session.get(Matching, matching_id)
-    if matching is None or not matching.is_draft:
-        flash('找不到該草稿配對', 'danger')
-        return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
-    matching.approve_draft()
-    # Individual approval counts as a partial finalisation for these two members only
-    eligible_pool = get_eligible_matching_pool(session)
-    update_unmatched_counters(eligible_pool, {matching.subject_id, matching.object_id}, session)
-    session.commit()
-    process_all_notifications(session)
-    session.commit()
-    _invalidate_dashboard_cache()
-    flash(f'已確認配對「{matching.cool_name}」並發送通知。', 'success')
     return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
 
 

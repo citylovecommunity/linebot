@@ -78,12 +78,9 @@
               </button>
             </form>
           {% elif matching.status.value == 'DRAFT' %}
-            <form method="POST" action="{{ url_for('admin_bp.approve_draft', matching_id=matching.id) }}"
-                  onsubmit="return confirm('確定核准此草稿？')">
-              <button class="btn btn-success btn-sm">
-                <i class="bi bi-check2 me-1"></i>核准草稿
-              </button>
-            </form>
+            <a href="{{ url_for('admin_bp.admin_dashboard', tab='drafts') }}" class="btn btn-outline-secondary btn-sm">
+              <i class="bi bi-pencil me-1"></i>前往草稿列表編輯
+            </a>
             <form method="POST" action="{{ url_for('admin_bp.delete_draft', matching_id=matching.id) }}"
                   onsubmit="return confirm('確定刪除此草稿？')">
               <button class="btn btn-danger btn-sm">

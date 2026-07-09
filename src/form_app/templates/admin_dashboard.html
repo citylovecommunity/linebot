@@ -404,16 +404,8 @@
               <td class="text-nowrap">
                 <button type="button" class="btn btn-sm btn-outline-secondary" title="編輯"
                   onclick="openDraftEdit({{ matching.id }}, {{ male_id }}, {{ female_id }}, '{{ matching.cool_name }}')">
-                  <i class="bi bi-pencil"></i>
+                  <i class="bi bi-pencil"></i> 編輯
                 </button>
-                <form method="POST"
-                  action="{{ url_for('admin_bp.approve_draft', matching_id=matching.id) }}"
-                  class="d-inline"
-                  onsubmit="return confirm('確認此配對並發送通知？')">
-                  <button type="submit" class="btn btn-sm btn-success" title="確認並通知">
-                    <i class="bi bi-check-lg"></i>
-                  </button>
-                </form>
                 <form method="POST"
                   action="{{ url_for('admin_bp.delete_draft', matching_id=matching.id) }}"
                   class="d-inline"
@@ -591,10 +583,10 @@
                   {% endif %}
                 </td>
                 <td>
-                  <form method="POST" action="{{ url_for('admin_bp.approve_group_draft', group_id=g.id) }}"
-                    class="d-inline">
-                    <button type="submit" class="btn btn-sm btn-outline-success me-1">核准</button>
-                  </form>
+                  <button type="button" class="btn btn-sm btn-outline-secondary me-1" title="編輯"
+                    onclick="openGroupEdit({{ g.id }}, [{% for gm in g.memberships %}{membershipId:{{ gm.id }}, memberId:{{ gm.member_id }}}{% if not loop.last %},{% endif %}{% endfor %}], '{{ g.cool_name }}')">
+                    <i class="bi bi-pencil"></i> 編輯
+                  </button>
                   <form method="POST" action="{{ url_for('admin_bp.discard_group_draft', group_id=g.id) }}"
                     class="d-inline"
                     onsubmit="return confirm('確定捨棄群組「{{ g.cool_name }}」？')">
@@ -1426,6 +1418,109 @@
     }, 50);
   }
 
+  // ── 草稿群組編輯 Modal ──
+  let _groupEditMembers = [];  // [{membershipId, memberId, gender, name}]
+  let _groupPickerBuilt = {};
+
+  function openGroupEdit(groupId, memberships, coolName) {
+    _groupEditMembers = memberships.map(m => {
+      const info = membersData[m.memberId] || {};
+      return { membershipId: m.membershipId, memberId: m.memberId, gender: info.gender, name: info.name || '—' };
+    });
+    _groupPickerBuilt = {};
+
+    document.getElementById('edit-group-form').action = `/admin/groups/${groupId}/edit-draft`;
+    document.getElementById('edit-group-cool-name').value = coolName;
+
+    const container = document.getElementById('edit-group-members');
+    container.innerHTML = _groupEditMembers.map(m => `
+      <div class="mb-2">
+        <div class="d-flex align-items-center gap-2">
+          <input type="hidden" name="member_id_${m.membershipId}" id="edit-group-member-${m.membershipId}" value="${m.memberId}">
+          <span class="badge ${m.gender === 'M' ? 'bg-primary' : 'bg-danger'} fs-6 px-3 py-2" id="edit-group-name-${m.membershipId}">${m.name}</span>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleGroupReplace(${m.membershipId}, '${m.gender}')">
+            <i class="bi bi-arrow-left-right"></i> 更換
+          </button>
+        </div>
+        <div id="edit-group-replace-area-${m.membershipId}" class="d-none mt-1">
+          <input type="text" class="form-control form-control-sm mb-1" id="edit-group-search-${m.membershipId}"
+            placeholder="搜尋姓名…" oninput="filterPickCards(this, 'edit-group-list-${m.membershipId}')">
+          <div id="edit-group-list-${m.membershipId}" class="member-pick-list"></div>
+        </div>
+      </div>
+    `).join('');
+
+    new bootstrap.Modal(document.getElementById('editGroupModal')).show();
+  }
+
+  function toggleGroupReplace(membershipId, gender) {
+    const area = document.getElementById(`edit-group-replace-area-${membershipId}`);
+    const isOpening = area.classList.contains('d-none');
+    area.classList.toggle('d-none');
+
+    if (!isOpening) return;
+
+    if (_groupPickerBuilt[membershipId]) {
+      document.getElementById(`edit-group-search-${membershipId}`).focus();
+      return;
+    }
+
+    const listEl = document.getElementById(`edit-group-list-${membershipId}`);
+    listEl.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-secondary" role="status"><span class="visually-hidden">載入中…</span></div></div>';
+    setTimeout(() => {
+      const pool = gender === 'M' ? males : females;
+      const currentIds = new Set(_groupEditMembers.map(m => m.memberId));
+      const selectedId = parseInt(document.getElementById(`edit-group-member-${membershipId}`).value, 10);
+      const candidates = pool.filter(p => p.id === selectedId || !currentIds.has(p.id));
+      buildGroupPickCards(candidates, selectedId, membershipId, `edit-group-list-${membershipId}`, gender);
+      _groupPickerBuilt[membershipId] = true;
+      document.getElementById(`edit-group-search-${membershipId}`).focus();
+    }, 50);
+  }
+
+  function buildGroupPickCards(list, selectedId, membershipId, containerId, gender) {
+    const selClass = gender === 'M' ? 'selected-m' : 'selected-f';
+    const container = document.getElementById(containerId);
+    let html = '';
+    list.forEach(m => {
+      const parts = [];
+      if (m.age)     parts.push(m.age + '歲');
+      if (m.height)  parts.push(m.height + 'cm');
+      if (m.marital) parts.push(m.marital);
+      if (m.job)     parts.push(m.job);
+      const info = parts.join(' · ');
+      const isSel = m.id === selectedId;
+      html += `<div class="member-pick-card${isSel ? ' ' + selClass : ''}"
+        data-id="${m.id}" data-name="${m.name}"
+        onclick="selectGroupPickCard(${m.id}, '${m.name}', ${membershipId}, '${containerId}', '${gender}')">
+        <span class="fw-semibold">${m.name}</span>
+        <span class="text-muted small ms-2">${info}</span>
+      </div>`;
+    });
+    container.innerHTML = html;
+    const sel = container.querySelector('.' + selClass);
+    if (sel) sel.scrollIntoView({ block: 'nearest' });
+  }
+
+  function selectGroupPickCard(memberId, memberName, membershipId, containerId, gender) {
+    const selClass = gender === 'M' ? 'selected-m' : 'selected-f';
+    document.querySelectorAll('#' + containerId + ' .member-pick-card').forEach(c => {
+      c.classList.remove('selected-m', 'selected-f');
+    });
+    const card = document.querySelector('#' + containerId + ' [data-id="' + memberId + '"]');
+    if (card) card.classList.add(selClass);
+    document.getElementById(`edit-group-member-${membershipId}`).value = memberId;
+    document.getElementById(`edit-group-name-${membershipId}`).textContent = memberName;
+    const idx = _groupEditMembers.findIndex(m => m.membershipId === membershipId);
+    if (idx !== -1) _groupEditMembers[idx].memberId = memberId;
+  }
+
+  document.getElementById('edit-group-form')?.addEventListener('submit', function() {
+    const btn = document.getElementById('edit-group-save-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> 儲存中…';
+  });
+
   // ── 會員資訊 Modal ──
   const membersData = {
     {% for m in members %}
@@ -1830,6 +1925,40 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
           <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save"></i> 儲存變更
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- 編輯草稿群組 Modal -->
+<div class="modal fade" id="editGroupModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="POST" id="edit-group-form">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>編輯草稿群組</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="edit-group-members"></div>
+
+          <div class="mt-3">
+            <label class="form-label fw-semibold">群組代號</label>
+            <div class="input-group">
+              <input type="text" class="form-control" name="cool_name" id="edit-group-cool-name"
+                placeholder="代號（留空不變）">
+              <button type="button" class="btn btn-outline-secondary"
+                onclick="document.getElementById('edit-group-cool-name').value = ''">清除</button>
+            </div>
+            <div class="form-text">清除後儲存將保留原代號。</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" id="edit-group-save-btn" class="btn btn-primary">
             <i class="bi bi-save"></i> 儲存變更
           </button>
         </div>
