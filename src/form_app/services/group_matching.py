@@ -63,9 +63,6 @@ _NEIGHBOR_REGIONS: dict[str, list[str]] = {
 # Campaign whose signups get a priority group-formation pass before the general pool.
 PICKLE_BALL_CAMPAIGN = "pickle_ball"
 
-# "Enough activity" bar for the male side of a pickle_ball group.
-_PICKLE_BALL_ACTIVE_LABELS = (ActivityLabel.ACTIVE_TRAVELER, ActivityLabel.SUPER_TRAVELER)
-
 # Posted into the group chat as a system message as soon as a pickle_ball
 # group is formed (in addition to the LINE formation push).
 PICKLE_BALL_CHAT_ANNOUNCEMENT = (
@@ -408,22 +405,25 @@ def _form_pickleball_groups(
     females: list[Member], males: list[Member]
 ) -> tuple[list[tuple[list[Member], list[Member], Optional[str]]], set[int], set[int]]:
     """
-    Priority pass, run before the general region loop: pair pickle_ball-campaign
-    females with sufficiently active males (ACTIVE_TRAVELER+), region-compatible,
-    strictly as 2F+2M groups (no 1F/female-only fallback here — any pickle_ball
-    leftovers simply flow into the general pass like any other member).
+    Priority pass, run before the general region loop: group pickle_ball-campaign
+    females together, region-compatible, before the general pool gets a chance
+    at them. Two or more pickle_ball women always form a pickle_ball-tagged
+    group regardless of male availability — priority order per region is
+    2F+2M, then 2F+1M, then a female-only pickle_ball group (2–4 people) once
+    no men are left. Males are drawn from the general eligible pool with no
+    activity-label requirement. A single leftover pickle_ball woman (no other
+    pickle_ball woman to pair with) flows into the general pass like anyone else.
 
     Returns (groups, consumed_female_ids, consumed_male_ids) where each group is
     a (females, males, region) tuple.
     """
     pickle_f = [f for f in females if f.join_campaign == PICKLE_BALL_CAMPAIGN]
-    active_m = [m for m in males if m.activity_label in _PICKLE_BALL_ACTIVE_LABELS]
 
-    if len(pickle_f) < 2 or len(active_m) < 2:
+    if len(pickle_f) < 2:
         return [], set(), set()
 
     f_buckets, unrestricted_f = _bucket_by_region(pickle_f)
-    m_buckets, unrestricted_m = _bucket_by_region(active_m)
+    m_buckets, unrestricted_m = _bucket_by_region(males)
 
     groups: list[tuple[list[Member], list[Member], Optional[str]]] = []
     consumed_f: set[int] = set()
@@ -448,6 +448,7 @@ def _form_pickleball_groups(
             if m.id not in consumed_m and m.id not in seen_m and not seen_m.add(m.id)  # type: ignore[func-returns-value]
         ]
 
+        # Priority 1: 2F + 2M
         while len(avail_f) >= 2 and len(avail_m) >= 2:
             f_pair, m_pair = _best_2f2m(avail_f, avail_m)
             groups.append((f_pair, m_pair, region))
@@ -457,6 +458,27 @@ def _form_pickleball_groups(
             for m in m_pair:
                 avail_m.remove(m)
                 consumed_m.add(m.id)
+
+        # Priority 2: 2F + 1M
+        if len(avail_f) >= 2 and len(avail_m) == 1:
+            f_pair = _best_females_for(avail_m, avail_f, 2)
+            groups.append((f_pair, avail_m[:], region))
+            for f in f_pair:
+                avail_f.remove(f)
+                consumed_f.add(f.id)
+            consumed_m.add(avail_m[0].id)
+            avail_m.clear()
+
+        # Priority 3: no men left — pickle_ball women still form a female-only
+        # group of their own (2–4 people); unlike the general pool's fallback,
+        # a pair of exactly 2 is a valid pickle_ball group.
+        while len(avail_f) >= 2:
+            size = min(4, len(avail_f))
+            group_f = avail_f[:size]
+            groups.append((group_f, [], region))
+            for f in group_f:
+                consumed_f.add(f.id)
+            avail_f = avail_f[size:]
 
     return groups, consumed_f, consumed_m
 
