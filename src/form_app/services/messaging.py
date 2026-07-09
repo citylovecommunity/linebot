@@ -14,6 +14,7 @@ from form_app.models import (
     DateProposal, Matching, Member, Message,
     GroupMatching, GroupMessage, GroupDateProposal,
 )
+from form_app.services.group_matching import PICKLE_BALL_CAMPAIGN
 
 APP_URL = settings.APP_URL
 
@@ -184,15 +185,23 @@ def collect_new_group_match_texts(session):
         .all()
     )
     for group in new_groups:
-        partner_names = ', '.join(m.proper_name for m in group.members)
+        is_pickleball = group.source_campaign == PICKLE_BALL_CAMPAIGN
         for member in group.members:
             others = [m.proper_name for m in group.members if m.id != member.id]
-            text = (
-                f"🎉 您有一個新的群組配對！\n\n"
-                f"代號：{group.cool_name}\n"
-                f"成員：{'、'.join(others)}\n\n"
-                f"👇 進入群組對話：\n{APP_URL}/dashboard/group/{group.id}"
-            )
+            if is_pickleball:
+                text = (
+                    f"Hi 本週你的新球友來了！\n"
+                    f"→ 點此查看 {APP_URL}/dashboard/group/{group.id}\n"
+                    f"這週你有 {len(others)} 位新球友！\n"
+                    f"• 提醒：打球時間地點由大家自行約定，不限任何特定時間和地點"
+                )
+            else:
+                text = (
+                    f"🎉 您有一個新的群組配對！\n\n"
+                    f"代號：{group.cool_name}\n"
+                    f"成員：{'、'.join(others)}\n\n"
+                    f"👇 進入群組對話：\n{APP_URL}/dashboard/group/{group.id}"
+                )
             updates[member.id].append(text)
         group.is_notified = True
     return updates

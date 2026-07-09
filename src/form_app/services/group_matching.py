@@ -21,7 +21,7 @@ from form_app.config import settings
 from form_app.extensions import line_bot_helper
 from form_app.models import (
     ActivityLabel, COMPANION_AVATARS,
-    GroupMatching, GroupMembership, GroupMatchingStatus,
+    GroupMatching, GroupMembership, GroupMatchingStatus, GroupMessage,
     Line_Info, Member, assign_session_avatars,
 )
 from form_app.services.cool_name import generate_funny_name
@@ -65,6 +65,14 @@ PICKLE_BALL_CAMPAIGN = "pickle_ball"
 
 # "Enough activity" bar for the male side of a pickle_ball group.
 _PICKLE_BALL_ACTIVE_LABELS = (ActivityLabel.ACTIVE_TRAVELER, ActivityLabel.SUPER_TRAVELER)
+
+# Posted into the group chat as a system message as soon as a pickle_ball
+# group is formed (in addition to the LINE formation push).
+PICKLE_BALL_CHAT_ANNOUNCEMENT = (
+    "Hi 🏓 歡迎來到城遇匹克球季\n"
+    "本次任務內容如下：https://join.citylove.tw/pickleball_instructions\n"
+    "一起約打球吧～"
+)
 
 # ── Label thresholds ──────────────────────────────────────────────────────────
 
@@ -498,6 +506,24 @@ def _create_group(
         ],
     )
     session.add(group)
+
+    if source_campaign == PICKLE_BALL_CAMPAIGN and opener:
+        # Flush so `group.id` exists for the message FK, then post the
+        # welcome announcement as the group's opening system message.
+        session.flush()
+        announcement = GroupMessage(
+            group_id=group.id,
+            sender_id=opener.id,
+            content=PICKLE_BALL_CHAT_ANNOUNCEMENT,
+            is_system_notification=True,
+            # Already covered by the dedicated "新球友" LINE push below —
+            # don't also fire the generic "you have unread messages" push.
+            is_notified=True,
+        )
+        session.add(announcement)
+        session.flush()
+        group.last_message_id = announcement.id
+
     return group
 
 
