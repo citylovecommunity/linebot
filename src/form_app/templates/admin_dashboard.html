@@ -266,6 +266,10 @@
         <div>
           <h5 class="mb-0">草稿配對 <span class="badge bg-warning text-dark ms-1">{{ draft_matchings|length }}</span></h5>
           <p class="text-muted small mb-0 mt-1">本週自動配對結果，請確認後再發送通知給會員。</p>
+          <p class="text-muted small mb-0 mt-1">
+            <i class="bi bi-clock-history me-1"></i>下次自動生成時間：{{ next_one_to_one_match_run.strftime('%Y-%m-%d %H:%M') }}
+            ・<i class="bi bi-send me-1"></i>自動送出時間：{{ next_stale_draft_send.strftime('%Y-%m-%d %H:%M') }}
+          </p>
         </div>
         <div class="d-flex gap-2">
           {% if draft_matchings %}
@@ -517,7 +521,12 @@
     <!-- 群組頁籤 -->
     <div class="tab-pane fade" id="groups" role="tabpanel">
       <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="mb-0">群組配對</h5>
+        <div>
+          <h5 class="mb-0">群組配對</h5>
+          <p class="text-muted small mb-0 mt-1">
+            <i class="bi bi-clock-history me-1"></i>下次自動生成時間：{{ next_group_match_run.strftime('%Y-%m-%d %H:%M') }}
+          </p>
+        </div>
         <div class="d-flex gap-2">
           <form method="POST" action="{{ url_for('admin_bp.auto_form_groups') }}"
                 id="auto-form-groups-form"

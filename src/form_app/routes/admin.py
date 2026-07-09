@@ -277,6 +277,13 @@ def admin_dashboard():
         .all()
     )
 
+    from form_app.services.cron_schedule import (
+        GROUP_MATCH_SCHEDULE, ONE_TO_ONE_MATCH_SCHEDULE, STALE_DRAFT_SCHEDULE, next_occurrence,
+    )
+    next_group_match_run = next_occurrence(*GROUP_MATCH_SCHEDULE)
+    next_one_to_one_match_run = next_occurrence(*ONE_TO_ONE_MATCH_SCHEDULE)
+    next_stale_draft_send = next_occurrence(*STALE_DRAFT_SCHEDULE)
+
     member_match_counts = defaultdict(int)
     for m in all_matchings:
         member_match_counts[m.subject_id] += 1
@@ -527,6 +534,9 @@ def admin_dashboard():
         weeks_unmatched_by_id=weeks_unmatched_by_id,
         group_matchings=all_group_matchings,
         draft_group_matchings=draft_group_matchings,
+        next_group_match_run=next_group_match_run,
+        next_one_to_one_match_run=next_one_to_one_match_run,
+        next_stale_draft_send=next_stale_draft_send,
         job_by_id=job_by_id,
         member_regions=member_regions,
         member_last_seen_days=member_last_seen_days,
