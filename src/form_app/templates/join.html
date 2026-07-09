@@ -349,7 +349,7 @@
         </div>
 
         <div class="mb-3">
-          <label class="form-label">簡單介紹自己 <span class="text-danger">*</span></label>
+          <label class="form-label">簡單介紹自己 <span class="text-danger">*</span> <span class="text-muted fw-normal small">（會出現在介紹卡上）</span></label>
           <textarea class="form-control" name="self_intro" id="f-intro" rows="4"
             placeholder="說說你的個性、生活方式，或是想找什麼樣的朋友…"
             style="resize:none; font-size:.92rem;"></textarea>
@@ -369,14 +369,15 @@
         <div class="step-sub">選擇可見面地區，並上傳一張照片</div>
 
         <div class="mb-4">
-          <label class="form-label">可見面地區 <span class="text-muted fw-normal small">（可複選）</span></label>
-          <div class="pill-group">
+          <label class="form-label">可見面地區 <span class="text-danger">*</span> <span class="text-muted fw-normal small">（可複選）</span></label>
+          <div class="pill-group" id="g-region">
             {% for region in ['大台北地區', '桃園', '新竹', '台中', '台南', '高雄', '基隆', '宜蘭', '花蓮', '台東'] %}
             <label class="pill-label">
               <input type="checkbox" name="date_regions" value="{{ region }}"> {{ region }}
             </label>
             {% endfor %}
           </div>
+          <div class="field-error d-none" id="e-region">請至少選擇一個可見面地區</div>
         </div>
 
         <div class="mb-1">
@@ -531,17 +532,33 @@
     }
 
     if (step === 3) {
+      let ok = true;
+
+      const anyRegion = document.querySelector('input[name="date_regions"]:checked');
+      const regionGroup = document.getElementById('g-region');
+      const regionErr = document.getElementById('e-region');
+      if (!anyRegion) {
+        regionGroup.classList.add('has-error');
+        regionErr.classList.remove('d-none');
+        ok = false;
+      } else {
+        regionGroup.classList.remove('has-error');
+        regionErr.classList.add('d-none');
+      }
+
       const photo = document.getElementById('f-photo');
       const photoErr = document.getElementById('e-photo');
       const uploadArea = document.getElementById('upload-area');
       if (!photo.files || photo.files.length === 0) {
         uploadArea.style.borderColor = '#e53935';
         photoErr.classList.remove('d-none');
-        return false;
+        ok = false;
+      } else {
+        uploadArea.style.borderColor = '';
+        photoErr.classList.add('d-none');
       }
-      uploadArea.style.borderColor = '';
-      photoErr.classList.add('d-none');
-      return true;
+
+      return ok;
     }
 
     return true;
