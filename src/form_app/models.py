@@ -713,6 +713,7 @@ class GroupMatching(Base):
         back_populates="group",
         foreign_keys="GroupMessage.group_id",
         order_by="GroupMessage.timestamp",
+        cascade="all, delete-orphan",
     )
     proposals: Mapped[list["GroupDateProposal"]] = relationship(
         "GroupDateProposal",
