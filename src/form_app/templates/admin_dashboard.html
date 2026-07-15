@@ -496,11 +496,11 @@
                   <button type="submit" class="btn btn-sm btn-outline-danger">取消配對</button>
                 </form>
                 {% elif matching.status.value == 'CANCELLED' %}
-                <form method="POST"
-                  action="{{ url_for('admin_bp.reactivate_matching', matching_id=matching.id) }}"
-                  class="d-inline">
-                  <button type="submit" class="btn btn-sm btn-outline-success">重新啟用</button>
-                </form>
+                <button type="button" class="btn btn-sm btn-outline-success"
+                  data-bs-toggle="modal" data-bs-target="#reactivateModal"
+                  data-reactivate-url="{{ url_for('admin_bp.reactivate_matching', matching_id=matching.id) }}">
+                  重新啟用
+                </button>
                 {% endif %}
               </td>
             </tr>
@@ -1057,10 +1057,37 @@
 
   </div>
 </div>
+
+<!-- Reactivate confirmation modal (shared across matchings list rows) -->
+<div class="modal fade" id="reactivateModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">重新啟用配對</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        是否要同時重新發送配對通知給雙方？
+      </div>
+      <div class="modal-footer">
+        <form method="POST" id="reactivateForm">
+          <input type="hidden" name="resend_notification" id="reactivateResendInput" value="0">
+          <button type="submit" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('reactivateResendInput').value='0'">僅重新啟用</button>
+          <button type="submit" class="btn btn-success btn-sm" onclick="document.getElementById('reactivateResendInput').value='1'">重新啟用並發送通知</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<script>
+  document.getElementById('reactivateModal').addEventListener('show.bs.modal', function (event) {
+    document.getElementById('reactivateForm').action = event.relatedTarget.getAttribute('data-reactivate-url');
+  });
+</script>
 <script>
   // ── 會員篩選與排序 ──
   const filters = { gender: 'all', status: 'all', eligible: 'all', expiry: 'all' };

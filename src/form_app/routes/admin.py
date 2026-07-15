@@ -1097,9 +1097,15 @@ def reactivate_matching(matching_id):
         flash('找不到該配對', 'danger')
         return redirect(url_for('admin_bp.admin_dashboard'))
     matching.activate()
+    resend = request.form.get('resend_notification') == '1'
+    if resend:
+        matching.is_match_notified = False
     session.commit()
+    if resend:
+        process_all_notifications(session)
+        session.commit()
     _invalidate_dashboard_cache()
-    flash(f'已重新啟用配對「{matching.cool_name}」', 'success')
+    flash(f'已重新啟用配對「{matching.cool_name}」' + ('，並已發送通知' if resend else ''), 'success')
     back = request.referrer or ''
     if 'matchings' in back and str(matching_id) in back:
         return redirect(url_for('admin_bp.matching_detail', matching_id=matching_id))
@@ -1637,7 +1643,6 @@ def matching_detail(matching_id):
             joinedload(Matching.subject),
             joinedload(Matching.object),
             subqueryload(Matching.proposals).joinedload(DateProposal.proposer),
-            subqueryload(Matching.messages).joinedload(Message.user),
         )
         .first()
     )
@@ -1660,7 +1665,6 @@ def matching_detail(matching_id):
     )
 
     proposals = sorted(matching.proposals, key=lambda p: p.proposed_datetime)
-    messages = sorted(matching.messages, key=lambda m: m.timestamp)
 
     return render_template(
         'admin_matching_detail.html',
@@ -1668,7 +1672,6 @@ def matching_detail(matching_id):
         breakdown_subj=breakdown_subj,
         breakdown_obj=breakdown_obj,
         proposals=proposals,
-        messages=messages,
     )
 
 

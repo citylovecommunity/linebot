@@ -71,12 +71,10 @@
               </button>
             </form>
           {% elif matching.status.value in ('CANCELLED', 'COMPLETED') %}
-            <form method="POST" action="{{ url_for('admin_bp.reactivate_matching', matching_id=matching.id) }}"
-                  onsubmit="return confirm('確定重新啟用此配對？')">
-              <button class="btn btn-success btn-sm">
-                <i class="bi bi-arrow-counterclockwise me-1"></i>重新啟用
-              </button>
-            </form>
+            <button type="button" class="btn btn-success btn-sm"
+                    data-bs-toggle="modal" data-bs-target="#reactivateModal">
+              <i class="bi bi-arrow-counterclockwise me-1"></i>重新啟用
+            </button>
           {% elif matching.status.value == 'DRAFT' %}
             <a href="{{ url_for('admin_bp.admin_dashboard', tab='drafts') }}" class="btn btn-outline-secondary btn-sm">
               <i class="bi bi-pencil me-1"></i>前往草稿列表編輯
@@ -218,41 +216,30 @@
   </div>
 
 
-  <!-- ══════════════════════════════════════════════════
-       Section 4 — Chat log
-  ══════════════════════════════════════════════════ -->
-  <div class="card mb-5">
-    <div class="card-header fw-semibold">
-      <i class="bi bi-chat-dots me-1"></i> 對話記錄
-      <span class="badge bg-secondary ms-1">{{ messages | length }}</span>
-    </div>
-    {% if messages %}
-    <div class="card-body" style="max-height:480px; overflow-y:auto;" id="chatLog">
-      {% for msg in messages %}
-      {% set is_subj = msg.user_id == matching.subject_id %}
-      <div class="d-flex mb-3 {{ 'justify-content-end' if is_subj else '' }}">
-        <div style="max-width:70%;">
-          <div class="small text-muted mb-1 {{ 'text-end' if is_subj else '' }}">
-            {{ msg.user.name if msg.user else '—' }}
-            · {{ msg.timestamp.strftime('%m-%d %H:%M') }}
-            {% if msg.is_system_notification %}<span class="badge bg-light text-secondary ms-1">系統</span>{% endif %}
-          </div>
-          <div class="p-2 rounded {{ 'bg-primary text-white' if is_subj else 'bg-light border' }}"
-               style="white-space:pre-wrap; word-break:break-word;">{{ msg.content }}</div>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    <div class="card-body text-muted">尚無對話記錄。</div>
-    {% endif %}
-  </div>
-
 </div>
 
-<script>
-  // Scroll chat to bottom on load
-  const log = document.getElementById('chatLog');
-  if (log) log.scrollTop = log.scrollHeight;
-</script>
+<!-- Reactivate confirmation modal -->
+<div class="modal fade" id="reactivateModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">重新啟用配對</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        是否要同時重新發送配對通知給雙方？
+      </div>
+      <div class="modal-footer">
+        <form method="POST" action="{{ url_for('admin_bp.reactivate_matching', matching_id=matching.id) }}" class="d-inline">
+          <input type="hidden" name="resend_notification" value="0">
+          <button type="submit" class="btn btn-outline-secondary btn-sm">僅重新啟用</button>
+        </form>
+        <form method="POST" action="{{ url_for('admin_bp.reactivate_matching', matching_id=matching.id) }}" class="d-inline">
+          <input type="hidden" name="resend_notification" value="1">
+          <button type="submit" class="btn btn-success btn-sm">重新啟用並發送通知</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
