@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     META_PAGE_ACCESS_TOKEN: Optional[str] = None
 
     LIFF_ID: Optional[str] = None
+    LINE_OA_BASIC_ID: Optional[str] = "488yitly"
 
     CLOUDINARY_CLOUD_NAME: str = "ddlaiteiw"
     CLOUDINARY_UPLOAD_PRESET: str = "citylove_server"

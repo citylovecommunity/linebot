@@ -11,7 +11,11 @@ bp = Blueprint('liff_bp', __name__, url_prefix='/liff')
 
 @bp.route('/bind')
 def bind():
-    return render_template('liff_bind.html', liff_id=settings.LIFF_ID)
+    return render_template(
+        'liff_bind.html',
+        liff_id=settings.LIFF_ID,
+        oa_basic_id=settings.LINE_OA_BASIC_ID,
+    )
 
 
 @bp.route('/bind', methods=['POST'])

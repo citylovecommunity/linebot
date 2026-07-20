@@ -35,6 +35,15 @@
       <button id="phone-submit" class="btn btn-brand w-100 fw-bold py-2">確認綁定</button>
     </div>
 
+    <!-- Not-yet-friend gate: shown before binding is allowed to proceed -->
+    <div id="not-friend" class="d-none">
+      <div class="status-icon mb-2">💌</div>
+      <h5 class="fw-bold">請先加入好友</h5>
+      <p class="text-muted small mb-3">綁定前需要先加入 CityLove 官方帳號好友，之後配對通知才能傳送給你。</p>
+      <a id="add-friend-btn" class="btn btn-brand w-100 fw-bold py-2 mb-2" target="_blank" rel="noopener">加入好友</a>
+      <button id="recheck-btn" class="btn btn-outline-secondary w-100">我已加入好友，重新檢查</button>
+    </div>
+
     <!-- Result (both flows) -->
     <div id="result" class="d-none">
       <div class="status-icon mb-2" id="result-icon"></div>
@@ -46,15 +55,37 @@
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script>
     const LIFF_ID = {{ liff_id | tojson }};
+    const OA_BASIC_ID = {{ oa_basic_id | tojson }};
+
+    const PANELS = ['loading', 'phone-form', 'not-friend', 'result'];
 
     function show(icon, title, msg, color) {
-      document.getElementById('loading').classList.add('d-none');
-      document.getElementById('phone-form').classList.add('d-none');
+      PANELS.forEach(id => document.getElementById(id).classList.add('d-none'));
       document.getElementById('result').classList.remove('d-none');
       document.getElementById('result-icon').textContent = icon;
       document.getElementById('result-title').textContent = title;
       document.getElementById('result-title').className = 'fw-bold mt-2 text-' + color;
       document.getElementById('result-msg').textContent = msg;
+    }
+
+    function showNotFriend() {
+      PANELS.forEach(id => document.getElementById(id).classList.add('d-none'));
+      document.getElementById('not-friend').classList.remove('d-none');
+      if (OA_BASIC_ID) {
+        document.getElementById('add-friend-btn').href = 'https://line.me/R/ti/p/%40' + OA_BASIC_ID;
+      }
+    }
+
+    // Returns true if the current LIFF user is a friend of the linked OA.
+    // Requires the LIFF app's "Add friend option" to have a linked OA.
+    async function isFriend() {
+      try {
+        const friendship = await liff.getFriendship();
+        return !!friendship.friendFlag;
+      } catch (e) {
+        // If the check itself fails, don't block binding on it.
+        return true;
+      }
     }
 
     async function callBind(payload) {
@@ -135,8 +166,18 @@
         } catch (e) {
           show('❌', '網路錯誤', '請確認網路連線後重試。', 'danger');
         }
+        return;
+      }
 
-      } else if (token) {
+      // Binding must not succeed for users who haven't actually added the OA
+      // as a friend — LIFF login alone doesn't require that.
+      document.getElementById('recheck-btn').onclick = run;
+      if (!(await isFriend())) {
+        showNotFriend();
+        return;
+      }
+
+      if (token) {
         // Token flow (from join page / member centre): auto-bind immediately
         try {
           const body = await callBind({ token, line_user_id: profile.userId });
