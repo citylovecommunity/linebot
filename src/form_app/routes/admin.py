@@ -1535,13 +1535,15 @@ def edit_draft(matching_id):
             flash('找不到指定會員', 'danger')
             return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
 
-        # Check that the newly assigned members aren't already in another active/draft matching.
+        # Check that the newly assigned members aren't already in an active matching.
+        # Being in another DRAFT is fine — the same person can be held in multiple
+        # candidate drafts at once; approve_all_drafts() rejects duplicates before commit.
         for member, label in ((male_member, '男生'), (female_member, '女生')):
             if member.id in (cur_male_id, cur_female_id):
                 continue  # unchanged side — no conflict possible
             conflict = session.query(Matching).filter(
                 or_(Matching.subject_id == member.id, Matching.object_id == member.id),
-                Matching.status.in_([MatchingStatus.ACTIVE, MatchingStatus.DRAFT]),
+                Matching.status == MatchingStatus.ACTIVE,
                 Matching.id != matching_id,
             ).first()
             if conflict:
@@ -1578,6 +1580,20 @@ def approve_all_drafts():
     drafts = session.query(Matching).filter(Matching.status == MatchingStatus.DRAFT).all()
     if not drafts:
         flash('目前沒有草稿配對。', 'info')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
+
+    # A member may sit in multiple candidate drafts at once, but only one can
+    # ever be approved into an ACTIVE matching — reject the whole batch if any
+    # duplicates remain so admins resolve them (delete the extras) first.
+    seen_ids = set()
+    dupe_names = []
+    for m in drafts:
+        for member_id, member in ((m.subject_id, m.subject), (m.object_id, m.object)):
+            if member_id in seen_ids:
+                dupe_names.append(member.name)
+            seen_ids.add(member_id)
+    if dupe_names:
+        flash(f'以下會員出現在多筆草稿配對中，請先刪除多餘的草稿再核准：{"、".join(dupe_names)}', 'danger')
         return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
 
     matched_ids = set()
