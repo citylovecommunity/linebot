@@ -69,6 +69,12 @@ def _cover_crop(img: Image.Image, w: int, h: int) -> Image.Image:
 
 
 def _wrap(text: str, font: ImageFont.FreeTypeFont, max_w: int) -> list[str]:
+    # Collapse embedded newlines/tabs/runs of spaces first — form answers
+    # sometimes contain literal "\r\n". A raw newline passed into draw.text()
+    # renders as its own multi-line block with tight internal spacing, which
+    # then overlaps the next wrapped line since cursor_y only advances by one
+    # LINE_H per _wrap() line.
+    text = " ".join(text.split())
     lines, current = [], ""
     for ch in text:
         test = current + ch
