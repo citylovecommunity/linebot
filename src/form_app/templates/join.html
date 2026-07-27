@@ -249,12 +249,14 @@
         <div class="mb-3">
           <label class="form-label">你的名字 <span class="text-danger">*</span></label>
           <input type="text" class="form-control" name="name" id="f-name"
-            placeholder="請輸入你的名字" required autocomplete="name">
+            placeholder="請輸入你的名字" required autocomplete="name"
+            value="{{ request.form.get('name', '') }}">
         </div>
         <div class="mb-3">
           <label class="form-label">手機號碼 <span class="text-danger">*</span></label>
           <input type="tel" class="form-control" name="phone_number" id="f-phone"
-            placeholder="09XXXXXXXX" pattern="09\d{8}" required autocomplete="tel">
+            placeholder="09XXXXXXXX" pattern="09\d{8}" required autocomplete="tel"
+            value="{{ request.form.get('phone_number', '') }}">
           <div class="invalid-feedback">請輸入有效的台灣手機號碼（09 開頭，共 10 碼）</div>
         </div>
         <div class="row g-3 mb-3">
@@ -262,24 +264,27 @@
             <label class="form-label">性別 <span class="text-danger">*</span></label>
             <select class="form-select" name="gender" id="f-gender" required>
               <option value="">請選擇</option>
-              <option value="M">男</option>
-              <option value="F">女</option>
+              <option value="M" {% if request.form.get('gender') == 'M' %}selected{% endif %}>男</option>
+              <option value="F" {% if request.form.get('gender') == 'F' %}selected{% endif %}>女</option>
             </select>
           </div>
           <div class="col-6">
             <label class="form-label">身高 (cm) <span class="text-danger">*</span></label>
             <input type="number" class="form-control" name="height" id="f-height"
-              min="100" max="250" placeholder="例：170" required>
+              min="100" max="250" placeholder="例：170" required
+              value="{{ request.form.get('height', '') }}">
           </div>
         </div>
         <div class="mb-3">
           <label class="form-label">生日 <span class="text-danger">*</span></label>
-          <input type="date" class="form-control" name="birthday" id="f-birthday" required>
+          <input type="date" class="form-control" name="birthday" id="f-birthday" required
+            value="{{ request.form.get('birthday', '') }}">
         </div>
         <div class="mb-3">
           <label class="form-label">Email <span class="text-muted fw-normal small">（選填）</span></label>
           <input type="email" class="form-control" name="email"
-            placeholder="example@email.com" autocomplete="email">
+            placeholder="example@email.com" autocomplete="email"
+            value="{{ request.form.get('email', '') }}">
         </div>
 
         <div class="wizard-nav">
@@ -299,7 +304,7 @@
           <div class="pill-group" id="g-marital">
             {% for v in ['單身', '離婚', '喪偶'] %}
             <label class="pill-label">
-              <input type="radio" name="marital_status" value="{{ v }}"> {{ v }}
+              <input type="radio" name="marital_status" value="{{ v }}" {% if request.form.get('marital_status') == v %}checked{% endif %}> {{ v }}
             </label>
             {% endfor %}
           </div>
@@ -311,7 +316,7 @@
           <div class="pill-group" id="g-children">
             {% for v in ['沒有', '有'] %}
             <label class="pill-label">
-              <input type="radio" name="has_children" value="{{ v }}"> {{ v }}
+              <input type="radio" name="has_children" value="{{ v }}" {% if request.form.get('has_children') == v %}checked{% endif %}> {{ v }}
             </label>
             {% endfor %}
           </div>
@@ -321,7 +326,8 @@
         <div class="mb-3">
           <label class="form-label">職業類別 <span class="text-danger">*</span></label>
           <input type="text" class="form-control" name="job_category" id="f-job"
-            placeholder="例：科技業、金融業、醫療、教育">
+            placeholder="例：科技業、金融業、醫療、教育"
+            value="{{ request.form.get('job_category', '') }}">
           <div class="field-error d-none" id="e-job">請填寫職業類別</div>
         </div>
 
@@ -330,7 +336,7 @@
           <div class="pill-group">
             {% for rel in ['無特別信仰', '佛教', '基督教', '天主教', '伊斯蘭教', '道教'] %}
             <label class="pill-label">
-              <input type="radio" name="religion" value="{{ rel }}"> {{ rel }}
+              <input type="radio" name="religion" value="{{ rel }}" {% if request.form.get('religion') == rel %}checked{% endif %}> {{ rel }}
             </label>
             {% endfor %}
           </div>
@@ -339,9 +345,10 @@
         <div class="mb-3">
           <label class="form-label">興趣 <span class="text-danger">*</span> <span class="text-muted fw-normal small">（可複選）</span></label>
           <div class="pill-group" id="g-interests">
+            {% set cur_interests = request.form.getlist('interests') %}
             {% for interest in ['電影', '音樂', '旅行', '運動', '閱讀', '烹飪', '攝影', '藝術', '電玩', '戶外活動', '美食探索', '養寵物', '健身', '跳舞', '咖啡'] %}
             <label class="pill-label">
-              <input type="checkbox" name="interests" value="{{ interest }}"> {{ interest }}
+              <input type="checkbox" name="interests" value="{{ interest }}" {% if interest in cur_interests %}checked{% endif %}> {{ interest }}
             </label>
             {% endfor %}
           </div>
@@ -352,7 +359,7 @@
           <label class="form-label">簡單介紹自己 <span class="text-danger">*</span> <span class="text-muted fw-normal small">（會出現在介紹卡上）</span></label>
           <textarea class="form-control" name="self_intro" id="f-intro" rows="4"
             placeholder="說說你的個性、生活方式，或是想找什麼樣的朋友…"
-            style="resize:none; font-size:.92rem;"></textarea>
+            style="resize:none; font-size:.92rem;">{{ request.form.get('self_intro', '') }}</textarea>
           <div class="field-error d-none" id="e-intro">請簡單介紹自己</div>
         </div>
 
@@ -371,9 +378,10 @@
         <div class="mb-4">
           <label class="form-label">可見面地區 <span class="text-danger">*</span> <span class="text-muted fw-normal small">（可複選）</span></label>
           <div class="pill-group" id="g-region">
+            {% set cur_regions = request.form.getlist('date_regions') %}
             {% for region in ['大台北地區', '桃園', '新竹', '台中', '台南', '高雄', '基隆', '宜蘭', '花蓮', '台東'] %}
             <label class="pill-label">
-              <input type="checkbox" name="date_regions" value="{{ region }}"> {{ region }}
+              <input type="checkbox" name="date_regions" value="{{ region }}" {% if region in cur_regions %}checked{% endif %}> {{ region }}
             </label>
             {% endfor %}
           </div>
@@ -382,6 +390,9 @@
 
         <div class="mb-1">
           <label class="form-label">上傳個人相片 <span class="text-danger">*</span></label>
+          {% if error %}
+          <div class="field-error" style="display:block; color:#e08a00;">因瀏覽器安全限制，相片無法自動保留，請重新選擇一次</div>
+          {% endif %}
           <div class="upload-area" id="upload-area">
             <input type="file" name="profile_photo" id="f-photo"
               accept="image/*" onchange="previewPhoto(this)">
@@ -564,8 +575,12 @@
     return true;
   }
 
+  let isSubmitting = false;
   function submitIfValid() {
+    if (isSubmitting) return;
     if (!validateStep(3)) return;
+    isSubmitting = true;
+    document.getElementById('submitBtn').disabled = true;
     document.getElementById('submit-overlay').classList.add('show');
     requestAnimationFrame(() => requestAnimationFrame(() => {
       document.getElementById('joinForm').submit();

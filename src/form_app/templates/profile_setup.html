@@ -21,7 +21,7 @@
   <div class="alert alert-danger">{{ error }}</div>
   {% endif %}
 
-  <form method="POST">
+  <form method="POST" id="profileSetupForm">
 
     <!-- ── 個人基本資料 ─────────────────────────────────────────── -->
     <div class="card mb-3 shadow-sm">
@@ -231,7 +231,7 @@
     </div>
 
     <div class="d-grid">
-      <button type="submit" class="btn btn-primary btn-lg">
+      <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
         <i class="bi bi-check-circle-fill me-1"></i> 送出資料
       </button>
     </div>
@@ -239,6 +239,25 @@
   </form>
 </div>
 
+<div id="submit-overlay" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(255,255,255,.92); backdrop-filter:blur(4px); flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:2rem;">
+  <div class="spinner-border text-primary mb-3" style="width:3rem; height:3rem;" role="status"></div>
+  <div class="fw-bold fs-5 mb-1">正在建檔，請稍候…</div>
+  <div class="text-muted small">請勿關閉或重新整理此頁面</div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  let isSubmitting = false;
+  document.getElementById('profileSetupForm').addEventListener('submit', function (e) {
+    if (isSubmitting) {
+      e.preventDefault();
+      return;
+    }
+    isSubmitting = true;
+    document.getElementById('submitBtn').disabled = true;
+    const overlay = document.getElementById('submit-overlay');
+    overlay.style.display = 'flex';
+  });
+</script>
 </body>
 </html>
