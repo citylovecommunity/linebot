@@ -1528,27 +1528,28 @@ def edit_draft(matching_id):
         return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
 
     if final_male_id != cur_male_id or final_female_id != cur_female_id:
-        from sqlalchemy import or_
+        from sqlalchemy import and_, or_
         male_member   = session.get(Member, final_male_id)
         female_member = session.get(Member, final_female_id)
         if not male_member or not female_member:
             flash('找不到指定會員', 'danger')
             return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
 
-        # Check that the newly assigned members aren't already in an active matching.
-        # Being in another DRAFT is fine — the same person can be held in multiple
-        # candidate drafts at once; approve_all_drafts() rejects duplicates before commit.
-        for member, label in ((male_member, '男生'), (female_member, '女生')):
-            if member.id in (cur_male_id, cur_female_id):
-                continue  # unchanged side — no conflict possible
-            conflict = session.query(Matching).filter(
-                or_(Matching.subject_id == member.id, Matching.object_id == member.id),
-                Matching.status == MatchingStatus.ACTIVE,
-                Matching.id != matching_id,
-            ).first()
-            if conflict:
-                flash(f'「{member.name}」已有進行中的配對，無法加入草稿', 'danger')
-                return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
+        # Only block if this exact pair already has another ACTIVE/DRAFT matching.
+        # A member being active or drafted with someone else is fine — mirrors
+        # create_draft_pair's conflict check; approve_all_drafts() rejects
+        # duplicate members across simultaneous ACTIVE matchings before commit.
+        conflict = session.query(Matching).filter(
+            or_(
+                and_(Matching.subject_id == final_male_id, Matching.object_id == final_female_id),
+                and_(Matching.subject_id == final_female_id, Matching.object_id == final_male_id),
+            ),
+            Matching.status.in_([MatchingStatus.ACTIVE, MatchingStatus.DRAFT]),
+            Matching.id != matching_id,
+        ).first()
+        if conflict:
+            flash(f'「{male_member.name}」與「{female_member.name}」已有進行中的配對', 'danger')
+            return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
 
         score_mf = session.query(UserMatchScore).filter_by(
             source_user_id=final_male_id, target_user_id=final_female_id
@@ -1576,6 +1577,7 @@ def edit_draft(matching_id):
 @login_required
 @admin_required
 def approve_all_drafts():
+    from sqlalchemy import or_
     session = get_db()
     drafts = session.query(Matching).filter(Matching.status == MatchingStatus.DRAFT).all()
     if not drafts:
@@ -1594,6 +1596,21 @@ def approve_all_drafts():
             seen_ids.add(member_id)
     if dupe_names:
         flash(f'以下會員出現在多筆草稿配對中，請先刪除多餘的草稿再核准：{"、".join(dupe_names)}', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
+
+    # A draft member may also already hold a pre-existing ACTIVE matching with
+    # someone else (create_draft_pair/edit_draft only block same-pair conflicts).
+    # Approving would give them two simultaneous ACTIVE matchings — reject instead.
+    active_conflicts = session.query(Matching).filter(
+        Matching.status == MatchingStatus.ACTIVE,
+        or_(Matching.subject_id.in_(seen_ids), Matching.object_id.in_(seen_ids)),
+    ).all()
+    conflict_names = sorted({
+        (m.subject.name if m.subject_id in seen_ids else m.object.name)
+        for m in active_conflicts
+    })
+    if conflict_names:
+        flash(f'以下會員已有進行中的配對，請先處理後再核准：{"、".join(conflict_names)}', 'danger')
         return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
 
     matched_ids = set()
