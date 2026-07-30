@@ -96,15 +96,18 @@ New developers need a developer account bootstrapped once from the shell (no UI 
 
 ```bash
 uv run python - <<'EOF'
-from form_app.database import SessionLocal
+from form_app.config import settings
+from form_app.database import get_session_factory
 from form_app.models import Member
-db = SessionLocal()
-me = db.query(Member).filter_by(phone_number='09XXXXXXXX').first()
-me.is_developer = True
-me.is_test = True         # excludes from matching pool
-me.is_member_active = False  # excludes from member stats
-db.commit()
-print('Done:', me.name)
+
+SessionFactory = get_session_factory(settings.DB)
+with SessionFactory() as db:
+    me = db.query(Member).filter_by(phone_number='09XXXXXXXX').first()
+    me.is_developer = True
+    me.is_test = True         # excludes from matching pool
+    me.is_member_active = False  # excludes from member stats
+    db.commit()
+    print('Done:', me.name)
 EOF
 ```
 

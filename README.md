@@ -45,15 +45,18 @@ first time there is no UI to do this, so run it once from the shell:
 
 ```bash
 uv run python - <<'EOF'
-from form_app.database import SessionLocal
+from form_app.config import settings
+from form_app.database import get_session_factory
 from form_app.models import Member
-db = SessionLocal()
-me = db.query(Member).filter_by(phone_number='09XXXXXXXX').first()
-me.is_developer = True
-me.is_test = True    # excludes you from the matching pool
-me.is_active = False # excludes you from member stats
-db.commit()
-print('Done:', me.name)
+
+SessionFactory = get_session_factory(settings.DB)
+with SessionFactory() as db:
+    me = db.query(Member).filter_by(phone_number='09XXXXXXXX').first()
+    me.is_developer = True
+    me.is_test = True             # excludes you from the matching pool
+    me.is_member_active = False   # excludes you from member stats
+    db.commit()
+    print('Done:', me.name)
 EOF
 ```
 
