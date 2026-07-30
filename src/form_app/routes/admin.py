@@ -1,4 +1,5 @@
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, date, timedelta, timezone
 
 from flask import Blueprint, jsonify, render_template, redirect, url_for, flash, request, session as flask_session
@@ -1015,7 +1016,11 @@ def broadcast_message():
         .options(joinedload(Member.line_info))
         .all()
     )
-    members_by_id = {m.id: m for m in members}
+    # Capture each member's LINE user id before commit, since commit() expires
+    # loaded attributes and would otherwise force a per-member lazy-load query
+    # (member.line_info) inside the push loop below.
+    member_ids = {m.id for m in members}
+    line_id_by_uid = {m.id: m.line_info.user_id for m in members if m.line_info}
 
     session.commit()
 
@@ -1032,18 +1037,17 @@ def broadcast_message():
 
     line_bot_api = LineBotApi(line_bot_helper.configuration.access_token)
     dev = settings.is_dev
-    sent = failed = 0
 
-    for uid, mid_list in member_matchings.items():
-        member = members_by_id.get(uid)
-        if not member:
-            continue
+    def _send(uid, mid_list):
+        """Returns True (sent), False (push raised), or None (skipped, not counted)."""
+        if uid not in member_ids:
+            return None
         if dev:
             target_line_id = settings.LINE_TEST_USER_ID
         else:
-            if not member.line_info:
-                continue
-            target_line_id = member.line_info.user_id
+            target_line_id = line_id_by_uid.get(uid)
+            if not target_line_id:
+                return None
 
         if len(mid_list) == 1:
             chat_link = f"🔗 前往對話：{settings.APP_URL}/dashboard/{mid_list[0]}"
@@ -1054,10 +1058,18 @@ def broadcast_message():
         line_text = f"📢 系統通知\n\n{content}\n\n{chat_link}"
         try:
             line_bot_api.push_message(target_line_id, TextSendMessage(text=line_text))
-            sent += 1
+            return True
         except Exception as e:
-            failed += 1
             print(f"[broadcast] Failed to notify user {uid}: {e}")
+            return False
+
+    # Push calls are I/O-bound HTTP requests to the LINE API; running them
+    # concurrently keeps a large broadcast well under gunicorn's request timeout
+    # instead of paying each member's round-trip sequentially.
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        results = list(executor.map(lambda item: _send(*item), member_matchings.items()))
+    sent = sum(1 for r in results if r is True)
+    failed = sum(1 for r in results if r is False)
 
     _invalidate_dashboard_cache()
     flash(
