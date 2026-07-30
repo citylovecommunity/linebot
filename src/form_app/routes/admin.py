@@ -1052,8 +1052,7 @@ def broadcast_message():
         if len(mid_list) == 1:
             chat_link = f"🔗 前往對話：{settings.APP_URL}/dashboard/{mid_list[0]}"
         else:
-            links = "\n".join(f"  • {settings.APP_URL}/dashboard/{mid}" for mid in mid_list)
-            chat_link = f"🔗 受影響的對話：\n{links}"
+            chat_link = f"🔗 你在 {len(mid_list)} 個配對中收到本通知，前往查看：{settings.APP_URL}/dashboard/"
 
         line_text = f"📢 系統通知\n\n{content}\n\n{chat_link}"
         try:
