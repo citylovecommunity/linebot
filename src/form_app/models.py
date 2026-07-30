@@ -4,7 +4,7 @@ import random
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import Column, DateTime, Integer, Table
+from sqlalchemy import Column, DateTime, Integer, Table, UniqueConstraint
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy import ForeignKey, func
 from sqlalchemy.dialects.postgresql.json import JSONB
@@ -784,6 +784,30 @@ class GroupDateProposal(Base):
 
     group: Mapped["GroupMatching"] = relationship(back_populates="proposals")
     proposer: Mapped["Member"] = relationship(foreign_keys=[proposer_id])
+
+
+class NotificationDelivery(Base):
+    """
+    Records that a specific member actually received the LINE push for a given
+    broadcast event (a match, a date proposal, a group message, ...). Broadcast
+    events notify multiple recipients from a single row (e.g. Matching notifies
+    both subject and object); this table tracks success per-recipient so a push
+    failure for one recipient doesn't get masked by the other recipient's
+    success, and can be retried without re-notifying whoever already got it.
+    """
+    __tablename__ = "notification_delivery"
+    __table_args__ = (
+        UniqueConstraint("member_id", "event_type", "event_id", name="uq_notification_delivery"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey("member.id"))
+    event_type: Mapped[str]
+    event_id: Mapped[int]
+    sent_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
 
 
 class GroupBadge(Base):
