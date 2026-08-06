@@ -278,11 +278,7 @@ def admin_dashboard():
         .all()
     )
 
-    from form_app.services.cron_schedule import (
-        GROUP_MATCH_SCHEDULE, ONE_TO_ONE_MATCH_SCHEDULE, STALE_DRAFT_SCHEDULE, next_occurrence,
-    )
-    next_group_match_run = next_occurrence(*GROUP_MATCH_SCHEDULE)
-    next_one_to_one_match_run = next_occurrence(*ONE_TO_ONE_MATCH_SCHEDULE)
+    from form_app.services.cron_schedule import STALE_DRAFT_SCHEDULE, next_occurrence
     next_stale_draft_send = next_occurrence(*STALE_DRAFT_SCHEDULE)
 
     member_match_counts = defaultdict(int)
@@ -535,8 +531,6 @@ def admin_dashboard():
         weeks_unmatched_by_id=weeks_unmatched_by_id,
         group_matchings=all_group_matchings,
         draft_group_matchings=draft_group_matchings,
-        next_group_match_run=next_group_match_run,
-        next_one_to_one_match_run=next_one_to_one_match_run,
         next_stale_draft_send=next_stale_draft_send,
         job_by_id=job_by_id,
         member_regions=member_regions,
@@ -1588,52 +1582,16 @@ def edit_draft(matching_id):
 @login_required
 @admin_required
 def approve_all_drafts():
-    from sqlalchemy import or_
     session = get_db()
     drafts = session.query(Matching).filter(Matching.status == MatchingStatus.DRAFT).all()
     if not drafts:
         flash('目前沒有草稿配對。', 'info')
         return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
 
-    # A member may sit in multiple candidate drafts at once, but only one can
-    # ever be approved into an ACTIVE matching. Rather than blocking the whole
-    # batch, skip the drafts that touch a duplicated member (leave them as
-    # drafts) and approve everything else — admins resolve the leftovers by
-    # deleting/editing the extras and re-approving.
-    all_ids = set()
-    dupe_ids = set()
-    for m in drafts:
-        for member_id in (m.subject_id, m.object_id):
-            if member_id in all_ids:
-                dupe_ids.add(member_id)
-            all_ids.add(member_id)
-
-    # A draft member may also already hold a pre-existing ACTIVE matching with
-    # someone else (create_draft_pair/edit_draft only block same-pair conflicts).
-    # Approving would give them two simultaneous ACTIVE matchings — skip those too.
-    active_conflicts = session.query(Matching).filter(
-        Matching.status == MatchingStatus.ACTIVE,
-        or_(Matching.subject_id.in_(all_ids), Matching.object_id.in_(all_ids)),
-    ).all()
-    active_conflict_ids = set()
-    for m in active_conflicts:
-        if m.subject_id in all_ids:
-            active_conflict_ids.add(m.subject_id)
-        if m.object_id in all_ids:
-            active_conflict_ids.add(m.object_id)
-
-    skip_ids = dupe_ids | active_conflict_ids
-    to_approve = [m for m in drafts if m.subject_id not in skip_ids and m.object_id not in skip_ids]
-    skipped = [m for m in drafts if m not in to_approve]
-
-    if not to_approve:
-        flash('以下會員出現在多筆草稿配對或已有進行中的配對，請先處理後再核准：'
-              + '、'.join(sorted({m.subject.name for m in skipped} | {m.object.name for m in skipped})),
-              'danger')
-        return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
-
+    # A member may legitimately sit in multiple simultaneous ACTIVE matchings
+    # (this is expected, not a conflict), so every draft is approved as-is.
     matched_ids = set()
-    for m in to_approve:
+    for m in drafts:
         m.approve_draft()
         matched_ids.add(m.subject_id)
         matched_ids.add(m.object_id)
@@ -1649,15 +1607,7 @@ def approve_all_drafts():
     session.commit()
     _invalidate_dashboard_cache()
 
-    if skipped:
-        skipped_names = sorted({m.subject.name for m in skipped} | {m.object.name for m in skipped})
-        flash(
-            f'已確認 {len(to_approve)} 筆配對並發送通知。'
-            f'以下會員出現在多筆草稿配對或已有進行中的配對，已略過未核准：{"、".join(skipped_names)}',
-            'warning',
-        )
-    else:
-        flash(f'已確認 {len(to_approve)} 筆配對並發送通知。', 'success')
+    flash(f'已確認 {len(drafts)} 筆配對並發送通知。', 'success')
     return redirect(url_for('admin_bp.admin_dashboard', tab='matchings'))
 
 
