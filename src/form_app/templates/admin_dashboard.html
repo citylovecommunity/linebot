@@ -357,6 +357,11 @@
                 {% elif mw >= 4 %}<span class="badge bg-danger ms-1" style="font-size:.65em">{{ mw }}w</span>
                 {% elif mw >= 1 %}<span class="badge bg-warning text-dark ms-1" style="font-size:.65em">{{ mw }}w</span>
                 {% endif %}{% endif %}
+                {% if male and male.tags %}
+                <div class="mt-1">
+                  {% for tag in male.tags %}<span class="badge bg-{{ tag.color }} me-1" style="font-size:.65em">{{ tag.name }}</span>{% endfor %}
+                </div>
+                {% endif %}
                 <div class="text-muted small">
                   {% if male and male.birthday %}{{ 2026 - male.birthday.year }}歲{% endif %}
                   {% if male and male.height %} · {{ male.height }}cm{% endif %}
@@ -375,6 +380,11 @@
                 {% elif fw >= 4 %}<span class="badge bg-danger ms-1" style="font-size:.65em">{{ fw }}w</span>
                 {% elif fw >= 1 %}<span class="badge bg-warning text-dark ms-1" style="font-size:.65em">{{ fw }}w</span>
                 {% endif %}{% endif %}
+                {% if female and female.tags %}
+                <div class="mt-1">
+                  {% for tag in female.tags %}<span class="badge bg-{{ tag.color }} me-1" style="font-size:.65em">{{ tag.name }}</span>{% endfor %}
+                </div>
+                {% endif %}
                 <div class="text-muted small">
                   {% if female and female.birthday %}{{ 2026 - female.birthday.year }}歲{% endif %}
                   {% if female and female.height %} · {{ female.height }}cm{% endif %}
