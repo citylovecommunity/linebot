@@ -1596,36 +1596,44 @@ def approve_all_drafts():
         return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
 
     # A member may sit in multiple candidate drafts at once, but only one can
-    # ever be approved into an ACTIVE matching — reject the whole batch if any
-    # duplicates remain so admins resolve them (delete the extras) first.
-    seen_ids = set()
-    dupe_names = []
+    # ever be approved into an ACTIVE matching. Rather than blocking the whole
+    # batch, skip the drafts that touch a duplicated member (leave them as
+    # drafts) and approve everything else — admins resolve the leftovers by
+    # deleting/editing the extras and re-approving.
+    all_ids = set()
+    dupe_ids = set()
     for m in drafts:
-        for member_id, member in ((m.subject_id, m.subject), (m.object_id, m.object)):
-            if member_id in seen_ids:
-                dupe_names.append(member.name)
-            seen_ids.add(member_id)
-    if dupe_names:
-        flash(f'以下會員出現在多筆草稿配對中，請先刪除多餘的草稿再核准：{"、".join(dupe_names)}', 'danger')
-        return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
+        for member_id in (m.subject_id, m.object_id):
+            if member_id in all_ids:
+                dupe_ids.add(member_id)
+            all_ids.add(member_id)
 
     # A draft member may also already hold a pre-existing ACTIVE matching with
     # someone else (create_draft_pair/edit_draft only block same-pair conflicts).
-    # Approving would give them two simultaneous ACTIVE matchings — reject instead.
+    # Approving would give them two simultaneous ACTIVE matchings — skip those too.
     active_conflicts = session.query(Matching).filter(
         Matching.status == MatchingStatus.ACTIVE,
-        or_(Matching.subject_id.in_(seen_ids), Matching.object_id.in_(seen_ids)),
+        or_(Matching.subject_id.in_(all_ids), Matching.object_id.in_(all_ids)),
     ).all()
-    conflict_names = sorted({
-        (m.subject.name if m.subject_id in seen_ids else m.object.name)
-        for m in active_conflicts
-    })
-    if conflict_names:
-        flash(f'以下會員已有進行中的配對，請先處理後再核准：{"、".join(conflict_names)}', 'danger')
+    active_conflict_ids = set()
+    for m in active_conflicts:
+        if m.subject_id in all_ids:
+            active_conflict_ids.add(m.subject_id)
+        if m.object_id in all_ids:
+            active_conflict_ids.add(m.object_id)
+
+    skip_ids = dupe_ids | active_conflict_ids
+    to_approve = [m for m in drafts if m.subject_id not in skip_ids and m.object_id not in skip_ids]
+    skipped = [m for m in drafts if m not in to_approve]
+
+    if not to_approve:
+        flash('以下會員出現在多筆草稿配對或已有進行中的配對，請先處理後再核准：'
+              + '、'.join(sorted({m.subject.name for m in skipped} | {m.object.name for m in skipped})),
+              'danger')
         return redirect(url_for('admin_bp.admin_dashboard', tab='drafts'))
 
     matched_ids = set()
-    for m in drafts:
+    for m in to_approve:
         m.approve_draft()
         matched_ids.add(m.subject_id)
         matched_ids.add(m.object_id)
@@ -1640,7 +1648,16 @@ def approve_all_drafts():
     process_all_notifications(session)
     session.commit()
     _invalidate_dashboard_cache()
-    flash(f'已確認 {len(drafts)} 筆配對並發送通知。', 'success')
+
+    if skipped:
+        skipped_names = sorted({m.subject.name for m in skipped} | {m.object.name for m in skipped})
+        flash(
+            f'已確認 {len(to_approve)} 筆配對並發送通知。'
+            f'以下會員出現在多筆草稿配對或已有進行中的配對，已略過未核准：{"、".join(skipped_names)}',
+            'warning',
+        )
+    else:
+        flash(f'已確認 {len(to_approve)} 筆配對並發送通知。', 'success')
     return redirect(url_for('admin_bp.admin_dashboard', tab='matchings'))
 
 
