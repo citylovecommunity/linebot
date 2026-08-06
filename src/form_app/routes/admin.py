@@ -279,11 +279,12 @@ def admin_dashboard():
     )
 
     from form_app.services.cron_schedule import (
-        GROUP_MATCH_SCHEDULE, ONE_TO_ONE_MATCH_SCHEDULE, STALE_DRAFT_SCHEDULE, next_occurrence,
+        GROUP_MATCH_SCHEDULE, ONE_TO_ONE_MATCH_SCHEDULE, STALE_DRAFT_SCHEDULE,
+        next_occurrence, next_daily_occurrence,
     )
     next_group_match_run = next_occurrence(*GROUP_MATCH_SCHEDULE)
     next_one_to_one_match_run = next_occurrence(*ONE_TO_ONE_MATCH_SCHEDULE)
-    next_stale_draft_send = next_occurrence(*STALE_DRAFT_SCHEDULE)
+    next_stale_draft_send = next_daily_occurrence(*STALE_DRAFT_SCHEDULE)
 
     member_match_counts = defaultdict(int)
     for m in all_matchings:
