@@ -28,6 +28,14 @@ def task_match_all_users():
     if request.headers.get('X-Task-Secret') != settings.TASK_SECRET:
         return "Unauthorized", 401
 
+    # ?week_gate=even|odd: see task_form_groups above — same mechanism, used
+    # to run 1:1 matching on the alternate Thursdays from group formation.
+    week_gate = request.args.get('week_gate')
+    if week_gate in ('even', 'odd'):
+        is_even_week = date.today().isocalendar()[1] % 2 == 0
+        if (week_gate == 'even') != is_even_week:
+            return "本週非排定週次，略過本次一對一配對生成", 200
+
     # ?save_as_draft=true: insert matchings as DRAFT status so admin can review
     # before notifications are sent. Admin approves via the admin dashboard.
     save_as_draft = request.args.get('save_as_draft', 'false').lower() == 'true'
@@ -171,6 +179,17 @@ def task_form_groups():
     if request.headers.get('X-Task-Secret') != settings.TASK_SECRET:
         return "Unauthorized", 401
 
+    # ?week_gate=even|odd: only proceed if the current ISO week matches the
+    # given parity. Lets Cloud Scheduler fire weekly on Thursday while only
+    # acting every other week — ISO-week parity survives month-length quirks
+    # without needing yearly cron edits. Omitted (as any manual/ops call
+    # would do) means always run.
+    week_gate = request.args.get('week_gate')
+    if week_gate in ('even', 'odd'):
+        is_even_week = date.today().isocalendar()[1] % 2 == 0
+        if (week_gate == 'even') != is_even_week:
+            return "本週非排定週次，略過本次同行局生成", 200
+
     # ?save_as_draft=true: insert groups as DRAFT status so admin can review
     # before notifications are sent. Admin approves via the admin dashboard.
     save_as_draft = request.args.get('save_as_draft', 'false').lower() == 'true'
@@ -229,6 +248,10 @@ def task_approve_stale_drafts():
     hours = int(request.args.get('hours', 72))
     cutoff = datetime.now() - timedelta(hours=hours)
 
+    # ?include_groups=false: skip auto-approving group drafts — group
+    # pairings are reviewed manually and never auto-sent, unlike 1:1 drafts.
+    include_groups = request.args.get('include_groups', 'true').lower() == 'true'
+
     session = get_db()
 
     stale_matchings = session.query(Matching).filter(
@@ -244,12 +267,14 @@ def task_approve_stale_drafts():
         eligible_pool = get_eligible_matching_pool(session)
         update_unmatched_counters(eligible_pool, matched_ids, session)
 
-    stale_groups = session.query(GroupMatching).filter(
-        GroupMatching.status == GroupMatchingStatus.DRAFT,
-        GroupMatching.created_at <= cutoff,
-    ).all()
-    for g in stale_groups:
-        g.approve_draft()
+    stale_groups = []
+    if include_groups:
+        stale_groups = session.query(GroupMatching).filter(
+            GroupMatching.status == GroupMatchingStatus.DRAFT,
+            GroupMatching.created_at <= cutoff,
+        ).all()
+        for g in stale_groups:
+            g.approve_draft()
 
     session.commit()
 

@@ -16,7 +16,7 @@ from form_app.models import (
     GroupMatching, GroupMessage, GroupDateProposal,
 )
 from form_app.services.group_matching import PICKLE_BALL_CAMPAIGN
-from form_app.services.match_intro import generate_match_intro_long
+from form_app.services.scoring import has_pickle_ball_affinity
 
 APP_URL = settings.APP_URL
 
@@ -221,7 +221,10 @@ def collect_new_match_texts(session):
     candidates = (
         session.query(Matching)
         .filter(Matching.is_match_notified.is_not(True))
-        .options(joinedload(Matching.subject), joinedload(Matching.object))
+        .options(
+            joinedload(Matching.subject).selectinload(Member.tags),
+            joinedload(Matching.object).selectinload(Member.tags),
+        )
         .all()
     )
     if not candidates:
@@ -237,17 +240,31 @@ def collect_new_match_texts(session):
             matching.is_match_notified = True
             continue
 
+        url = f"{APP_URL}/dashboard/{matching.id}"
+        if (matching.subject and matching.object
+                and has_pickle_ball_affinity(matching.subject)
+                and has_pickle_ball_affinity(matching.object)):
+            text = (
+                f"Hi 本週你的新球友來了！\n"
+                f"→ 點此查看 {url}\n"
+                f"提醒：打球時間地點由大家自行約定，不限任何特定時間和地點"
+            )
+        else:
+            text = (
+                f"推薦你認識新朋友的時間來囉！\n\n"
+                f"您們可以一起相約喝個咖啡，\n"
+                f"或是本季我們主打大家一起認識現火熱的匹克球運動，\n"
+                f"歡迎你們一起相約共襄盛舉！\n"
+                f"詳見對話框的任務牆～\n\n"
+                f"{url}"
+            )
+
         for member, partner in (
             (matching.subject, matching.object),
             (matching.object, matching.subject),
         ):
             if not member or not partner or member.id in already:
                 continue
-            intro = generate_match_intro_long(member, partner, matching.cool_name)
-            text = (
-                f"🎉 {member.proper_name}，{intro}\n"
-                f"{APP_URL}/dashboard/{matching.id}"
-            )
             updates[member.id].append(NotifItem(text, [('match', matching.id)]))
 
     return updates

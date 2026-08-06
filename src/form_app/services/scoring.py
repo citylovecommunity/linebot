@@ -1,7 +1,7 @@
 from collections import defaultdict
 
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.sql.expression import exists
 
 from form_app.models import Line_Info, Member, UserMatchScore
@@ -9,6 +9,19 @@ from form_app.models import Line_Info, Member, UserMatchScore
 # Returned when a hard dealbreaker is triggered — ensures the pair is excluded
 # by the score <= 0 check in generate_weekly_matches
 HARD_EXCLUDE = -9999
+
+# Pickleball season matching boost: males manually tagged with this tag name,
+# paired against females who signed up via the pickle_ball campaign form.
+PICKLE_BALL_TAG_NAME = "匹克球賽季"
+PICKLE_BALL_CAMPAIGN_SLUG = "pickle_ball"
+PICKLE_BALL_MATCH_BONUS = 25
+
+
+def has_pickle_ball_affinity(member: "Member") -> bool:
+    """Males are manually tagged '匹克球賽季'; females opt in via the pickle_ball campaign form."""
+    if member.gender == 'M':
+        return any(t.name == PICKLE_BALL_TAG_NAME for t in member.tags)
+    return member.join_campaign == PICKLE_BALL_CAMPAIGN_SLUG
 
 
 class UserProfileAdapter:
@@ -48,6 +61,7 @@ class UserProfileAdapter:
         if member.pref_youngest_birth_year:
             info.setdefault('您期待認識的對象最小年紀', str(member.pref_youngest_birth_year))
         info['_locks'] = member.pref_locks or {}
+        info['_pickle_ball_affinity'] = has_pickle_ball_affinity(member)
         return cls(info)
 
     def _parse_int(self, key, default=0):
@@ -191,7 +205,7 @@ def get_eligible_matching_pool(session: Session, defer_user_info: bool = False):
 
         # Rule 6: Matching window has not ended
         (Member.matching_end_date == None) | (Member.matching_end_date >= today),
-    )
+    ).options(selectinload(Member.tags))
     if defer_user_info:
         q = q.options(sa_defer(Member.user_info))
     return q.all()
@@ -289,6 +303,11 @@ def calculate_match_score(me_adapter, candidate_adapter):
             return HARD_EXCLUDE, {'hard_dealbreaker': 'region_no_overlap'}
         score -= 20
         breakdown['datable_place'] = "-20"
+
+    # --- 8. PICKLEBALL SEASON AFFINITY ---
+    if me_adapter.raw.get('_pickle_ball_affinity') and candidate_adapter.raw.get('_pickle_ball_affinity'):
+        score += PICKLE_BALL_MATCH_BONUS
+        breakdown['pickle_ball_bonus'] = f"+{PICKLE_BALL_MATCH_BONUS} (匹克球賽季配對加成)"
 
     return score, breakdown
 

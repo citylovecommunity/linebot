@@ -45,29 +45,3 @@ def generate_match_intro(viewer, partner) -> str:
     if not reasons:
         return "期待你們擦出火花！✨"
     return "，".join(reasons[:2]) + "！✨"
-
-
-def generate_match_intro_long(viewer, partner, cool_name: str = "") -> str:
-    """
-    Multi-line consultant-recommendation introduction used in the LINE new-match notification.
-    Each member gets a personalised message about their specific partner.
-    """
-    v = UserProfileAdapter.from_member(viewer)
-    p = UserProfileAdapter.from_member(partner)
-
-    pronoun = "他" if partner.gender == "M" else "她"
-
-    reasons = _shared_reasons(v, p)
-    reason_line = "，".join(reasons[:2]) if reasons else None
-
-    lines = [f"顧問覺得 {partner.proper_name} 是一個值得認識的人！\n"]
-
-    if reason_line:
-        lines.append(f"✨ {reason_line}")
-        lines.append("")
-
-    if cool_name:
-        lines.append(f"代號：{cool_name}")
-
-    lines.append(f"\n👇 快去認識{pronoun}吧：")
-    return "\n".join(lines)

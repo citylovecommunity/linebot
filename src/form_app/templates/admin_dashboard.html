@@ -1318,7 +1318,10 @@
       age: {% if m.birthday %}{{ today.year - m.birthday.year }}{% else %}null{% endif %},
       height: {{ m.height or 'null' }},
       marital: {{ (m.marital_status or '') | tojson }},
-      job: {{ (job_by_id.get(m.id, '') or '') | tojson }} },
+      job: {{ (job_by_id.get(m.id, '') or '') | tojson }},
+      rank: {{ (m.rank or '') | tojson }},
+      join_campaign: {{ (m.join_campaign or '') | tojson }},
+      tags: [{% for t in m.tags %}{ name: {{ t.name | tojson }}, color: {{ t.color | tojson }} }{% if not loop.last %}, {% endif %}{% endfor %}] },
     {% endif %}
     {% endfor %}
   ];
@@ -1332,6 +1335,38 @@
     {{ mid }}: new Set([{{ partners | join(', ') }}]),
     {% endfor %}
   };
+
+  function setRankBadge(elId, rank) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    el.textContent = rank || '';
+    el.classList.toggle('d-none', !rank);
+  }
+
+  function renderTagBadges(elId, tags) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    el.innerHTML = '';
+    (tags || []).forEach(t => {
+      const badge = document.createElement('span');
+      badge.className = 'badge bg-' + t.color;
+      badge.style.fontSize = '.7rem';
+      badge.textContent = t.name;
+      el.appendChild(badge);
+    });
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function setCampaignBadge(elId, joinCampaign) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    el.classList.toggle('d-none', joinCampaign !== 'pickle_ball');
+  }
 
   function buildPickCards(list, selectedId, historicalPartnersOf, containerId, gender) {
     const historical = historicalPartnersOf ? (historicalPartners[historicalPartnersOf] || new Set()) : new Set();
@@ -1348,12 +1383,20 @@
       if (m.marital) parts.push(m.marital);
       if (m.job)     parts.push(m.job);
       const info = parts.join(' · ');
+      const rankBadge = m.rank ? `<span class="badge bg-secondary ms-2" style="font-size:.7rem;">${escapeHtml(m.rank)}</span>` : '';
+      const campaignBadge = m.join_campaign === 'pickle_ball' ? '<span class="badge bg-info text-dark ms-2" style="font-size:.7rem;">🏓 匹克球</span>' : '';
+      const tagsHtml = (m.tags || [])
+        .map(t => `<span class="badge bg-${escapeHtml(t.color)}" style="font-size:.65rem;">${escapeHtml(t.name)}</span>`)
+        .join(' ');
       const isSel = m.id === selectedId;
       html += `<div class="member-pick-card${isSel ? ' ' + selClass : ''}"
         data-id="${m.id}" data-name="${m.name}"
         onclick="selectPickCard(${m.id}, '${m.name}', '${gender}', '${containerId}')">
-        <span class="fw-semibold">${m.name}</span>
-        <span class="text-muted small ms-2">${info}</span>
+        <div class="d-flex align-items-center justify-content-between">
+          <span class="fw-semibold">${m.name}</span>${rankBadge}${campaignBadge}
+        </div>
+        <div class="text-muted small">${info}</div>
+        ${tagsHtml ? `<div class="d-flex flex-wrap gap-1 mt-1">${tagsHtml}</div>` : ''}
       </div>`;
     });
     if (hiddenCount > 0) {
@@ -1377,6 +1420,10 @@
     // Update the badge to reflect the newly selected person
     const badge = document.getElementById(`edit-${side}-current-name`);
     if (badge) badge.textContent = memberName;
+    const memberData = (gender === 'M' ? males : females).find(m => m.id === memberId);
+    setRankBadge(`edit-${side}-current-rank`, memberData && memberData.rank);
+    renderTagBadges(`edit-${side}-current-tags`, memberData && memberData.tags);
+    setCampaignBadge(`edit-${side}-current-campaign`, memberData && memberData.join_campaign);
   }
 
   function filterPickCards(inputEl, containerId) {
@@ -1406,6 +1453,12 @@
     const femaleData = females.find(m => m.id === femaleId);
     document.getElementById('edit-male-current-name').textContent   = maleData   ? maleData.name   : '—';
     document.getElementById('edit-female-current-name').textContent = femaleData ? femaleData.name : '—';
+    setRankBadge('edit-male-current-rank',   maleData   && maleData.rank);
+    setRankBadge('edit-female-current-rank', femaleData && femaleData.rank);
+    renderTagBadges('edit-male-current-tags',   maleData   && maleData.tags);
+    renderTagBadges('edit-female-current-tags', femaleData && femaleData.tags);
+    setCampaignBadge('edit-male-current-campaign',   maleData   && maleData.join_campaign);
+    setCampaignBadge('edit-female-current-campaign', femaleData && femaleData.join_campaign);
 
     document.getElementById('edit-male-replace-area').classList.add('d-none');
     document.getElementById('edit-female-replace-area').classList.add('d-none');
@@ -1544,6 +1597,12 @@
 
   document.getElementById('edit-group-form')?.addEventListener('submit', function() {
     const btn = document.getElementById('edit-group-save-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> 儲存中…';
+  });
+
+  document.getElementById('edit-draft-form')?.addEventListener('submit', function() {
+    const btn = document.getElementById('edit-draft-save-btn');
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> 儲存中…';
   });
@@ -1761,21 +1820,15 @@
         <h5 class="modal-title"><i class="bi bi-people-fill me-2"></i>建立群組配對</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <form method="POST" action="{{ url_for('admin_bp.create_group') }}" id="create-group-form">
-        <input type="hidden" name="male_ids" id="cg-male-1-id">
-        <input type="hidden" name="male_ids" id="cg-male-2-id">
-        <input type="hidden" name="female_ids" id="cg-female-1-id">
-        <input type="hidden" name="female_ids" id="cg-female-2-id">
+      <form method="POST" action="{{ url_for('admin_bp.create_group') }}" id="create-group-form" style="display:none;"></form>
 
-        <div class="modal-body p-3">
+      <div class="modal-body p-3">
           <!-- Selection summary bar -->
           <div class="d-flex flex-wrap gap-2 align-items-center mb-3 p-2 bg-light rounded border" id="cg-summary">
             <span class="text-muted small">已選：</span>
-            <span class="badge border text-dark bg-white" id="cg-label-m1">♂ 男生 1</span>
-            <span class="badge border text-dark bg-white" id="cg-label-m2">♂ 男生 2</span>
-            <span class="text-muted">·</span>
-            <span class="badge border text-dark bg-white" id="cg-label-f1">♀ 女生 1</span>
-            <span class="badge border text-dark bg-white" id="cg-label-f2">♀ 女生 2</span>
+            <span id="cg-selected-chips" class="d-flex flex-wrap gap-2">
+              <span class="text-muted small">尚未選擇</span>
+            </span>
           </div>
 
           <div class="row g-2">
@@ -1783,18 +1836,19 @@
             <div class="col-md-6">
               <div class="d-flex align-items-center gap-2 mb-2">
                 <i class="bi bi-gender-male text-primary"></i>
-                <span class="fw-semibold small">男生（點選最多 2 位）</span>
+                <span class="fw-semibold small">男生（可複選）</span>
               </div>
               <input type="text" class="form-control form-control-sm mb-2"
                      placeholder="搜尋…" oninput="cgFilter(this,'cg-males')">
-              <div id="cg-males" style="max-height:380px;overflow-y:auto;">
+              <div id="cg-males" style="max-height:380px;overflow-y:auto;overscroll-behavior:contain;">
                 {% for m in members %}{% if m.gender == 'M' %}
                 {% set age = (2026 - m.birthday.year) if m.birthday else none %}
                 {% set region = member_regions.get(m.id) %}
                 {% set days = member_last_seen_days.get(m.id) %}
-                <div class="cg-card card mb-2 p-2" style="cursor:pointer;border:2px solid transparent;"
-                     data-id="{{ m.id }}" data-gender="M" data-name="{{ m.name }}"
-                     onclick="cgSelectCard(this)">
+                <label class="cg-card card mb-2 p-2" style="cursor:pointer;border:2px solid transparent;"
+                       data-name="{{ m.name }}">
+                  <input type="checkbox" class="visually-hidden cg-check" form="create-group-form"
+                         name="male_ids" value="{{ m.id }}" onchange="cgToggleCard(this)">
                   <div class="d-flex justify-content-between align-items-start">
                     <div>
                       <span class="fw-semibold">{{ m.name }}</span>
@@ -1819,7 +1873,7 @@
                       {{ m.label_emoji }} {{ m.companion_score }}分
                     </span>
                   </div>
-                </div>
+                </label>
                 {% endif %}{% endfor %}
               </div>
             </div>
@@ -1828,18 +1882,19 @@
             <div class="col-md-6">
               <div class="d-flex align-items-center gap-2 mb-2">
                 <i class="bi bi-gender-female text-danger"></i>
-                <span class="fw-semibold small">女生（點選最多 2 位）</span>
+                <span class="fw-semibold small">女生（可複選）</span>
               </div>
               <input type="text" class="form-control form-control-sm mb-2"
                      placeholder="搜尋…" oninput="cgFilter(this,'cg-females')">
-              <div id="cg-females" style="max-height:380px;overflow-y:auto;">
+              <div id="cg-females" style="max-height:380px;overflow-y:auto;overscroll-behavior:contain;">
                 {% for m in members %}{% if m.gender == 'F' %}
                 {% set age = (2026 - m.birthday.year) if m.birthday else none %}
                 {% set region = member_regions.get(m.id) %}
                 {% set days = member_last_seen_days.get(m.id) %}
-                <div class="cg-card card mb-2 p-2" style="cursor:pointer;border:2px solid transparent;"
-                     data-id="{{ m.id }}" data-gender="F" data-name="{{ m.name }}"
-                     onclick="cgSelectCard(this)">
+                <label class="cg-card card mb-2 p-2" style="cursor:pointer;border:2px solid transparent;"
+                       data-name="{{ m.name }}">
+                  <input type="checkbox" class="visually-hidden cg-check" form="create-group-form"
+                         name="female_ids" value="{{ m.id }}" onchange="cgToggleCard(this)">
                   <div class="d-flex justify-content-between align-items-start">
                     <div>
                       <span class="fw-semibold">{{ m.name }}</span>
@@ -1863,21 +1918,20 @@
                       {{ m.label_emoji }} {{ m.companion_score }}分
                     </span>
                   </div>
-                </div>
+                </label>
                 {% endif %}{% endfor %}
               </div>
             </div>
           </div>
         </div>
 
-        <div class="modal-footer">
-          <div class="me-auto small text-muted" id="cg-validation-msg">請選擇 2 男 + 2 女</div>
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-          <button type="submit" class="btn btn-success" id="cg-submit-btn" disabled>
-            <i class="bi bi-people-fill me-1"></i> 建立群組
-          </button>
-        </div>
-      </form>
+      <div class="modal-footer">
+        <div class="me-auto small text-muted" id="cg-validation-msg">請至少選擇 2 位會員</div>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="submit" form="create-group-form" class="btn btn-success" id="cg-submit-btn" disabled>
+          <i class="bi bi-people-fill me-1"></i> 建立群組
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -1901,11 +1955,14 @@
               <input type="hidden" name="male_id" id="edit-male-id">
               <div class="d-flex align-items-center gap-2 mb-1">
                 <span class="badge bg-primary fs-6 px-3 py-2" id="edit-male-current-name">—</span>
+                <span class="badge bg-secondary" id="edit-male-current-rank" style="font-size:.7rem;"></span>
+                <span class="badge bg-info text-dark d-none" id="edit-male-current-campaign" style="font-size:.7rem;">🏓 匹克球</span>
                 <button type="button" class="btn btn-sm btn-outline-primary"
                   onclick="toggleDraftReplace('male')">
                   <i class="bi bi-arrow-left-right"></i> 更換
                 </button>
               </div>
+              <div class="d-flex flex-wrap gap-1 mb-2" id="edit-male-current-tags"></div>
               <div id="edit-male-replace-area" class="d-none">
                 <input type="text" class="form-control form-control-sm mb-1" id="edit-male-search"
                   placeholder="搜尋姓名…"
@@ -1922,11 +1979,14 @@
               <input type="hidden" name="female_id" id="edit-female-id">
               <div class="d-flex align-items-center gap-2 mb-1">
                 <span class="badge bg-danger fs-6 px-3 py-2" id="edit-female-current-name">—</span>
+                <span class="badge bg-secondary" id="edit-female-current-rank" style="font-size:.7rem;"></span>
+                <span class="badge bg-info text-dark d-none" id="edit-female-current-campaign" style="font-size:.7rem;">🏓 匹克球</span>
                 <button type="button" class="btn btn-sm btn-outline-danger"
                   onclick="toggleDraftReplace('female')">
                   <i class="bi bi-arrow-left-right"></i> 更換
                 </button>
               </div>
+              <div class="d-flex flex-wrap gap-1 mb-2" id="edit-female-current-tags"></div>
               <div id="edit-female-replace-area" class="d-none">
                 <input type="text" class="form-control form-control-sm mb-1" id="edit-female-search"
                   placeholder="搜尋姓名…"
@@ -1951,7 +2011,7 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-          <button type="submit" class="btn btn-primary">
+          <button type="submit" class="btn btn-primary" id="edit-draft-save-btn">
             <i class="bi bi-save"></i> 儲存變更
           </button>
         </div>
@@ -2289,8 +2349,6 @@ function startAutoForm(form) {
 
 // ── 手動建立群組 card picker ───────────────────────────────────────────────────
 (function() {
-  // Track selections: [card|null, card|null] for each gender
-  const sel = { M: [null, null], F: [null, null] };
   const COLORS = { M: '#0d6efd', F: '#d63384' };
 
   window.cgFilter = function(input, panelId) {
@@ -2300,52 +2358,48 @@ function startAutoForm(form) {
     });
   };
 
-  window.cgSelectCard = function(card) {
-    const id   = card.dataset.id;
-    const g    = card.dataset.gender;
-    const name = card.querySelector('.fw-semibold').textContent.trim();
-    const slots = sel[g];
-
-    // If already selected in either slot, deselect
-    for (let i = 0; i < 2; i++) {
-      if (slots[i] && slots[i].dataset.id === id) {
-        slots[i].style.borderColor = 'transparent';
-        slots[i].style.backgroundColor = '';
-        slots[i] = null;
-        cgUpdateState();
-        return;
-      }
+  window.cgToggleCard = function(checkbox) {
+    const card = checkbox.closest('.cg-card');
+    const g = checkbox.name === 'male_ids' ? 'M' : 'F';
+    if (checkbox.checked) {
+      card.style.borderColor = COLORS[g];
+      card.style.backgroundColor = g === 'M' ? '#f0f5ff' : '#fff0f7';
+    } else {
+      card.style.borderColor = 'transparent';
+      card.style.backgroundColor = '';
     }
-
-    // Fill first empty slot
-    const emptySlot = slots[0] === null ? 0 : (slots[1] === null ? 1 : -1);
-    if (emptySlot === -1) return; // both slots full
-
-    slots[emptySlot] = card;
-    card.style.borderColor = COLORS[g];
-    card.style.backgroundColor = g === 'M' ? '#f0f5ff' : '#fff0f7';
     cgUpdateState();
   };
 
   function cgUpdateState() {
-    const [m1, m2] = sel.M;
-    const [f1, f2] = sel.F;
+    const checked = Array.from(document.querySelectorAll('.cg-check:checked'));
+    const mCount = checked.filter(c => c.name === 'male_ids').length;
+    const fCount = checked.filter(c => c.name === 'female_ids').length;
+    const total = checked.length;
 
-    document.getElementById('cg-male-1-id').value   = m1 ? m1.dataset.id : '';
-    document.getElementById('cg-male-2-id').value   = m2 ? m2.dataset.id : '';
-    document.getElementById('cg-female-1-id').value = f1 ? f1.dataset.id : '';
-    document.getElementById('cg-female-2-id').value = f2 ? f2.dataset.id : '';
+    const chips = document.getElementById('cg-selected-chips');
+    chips.textContent = '';
+    if (total === 0) {
+      const empty = document.createElement('span');
+      empty.className = 'text-muted small';
+      empty.textContent = '尚未選擇';
+      chips.appendChild(empty);
+    } else {
+      checked.forEach(c => {
+        const g = c.name === 'male_ids' ? 'M' : 'F';
+        const name = c.closest('.cg-card').dataset.name;
+        const chip = document.createElement('span');
+        chip.className = 'badge border text-dark bg-white';
+        chip.textContent = (g === 'M' ? '♂ ' : '♀ ') + name;
+        chips.appendChild(chip);
+      });
+    }
 
-    document.getElementById('cg-label-m1').textContent = m1 ? '♂ ' + m1.querySelector('.fw-semibold').textContent.trim() : '♂ 男生 1';
-    document.getElementById('cg-label-m2').textContent = m2 ? '♂ ' + m2.querySelector('.fw-semibold').textContent.trim() : '♂ 男生 2';
-    document.getElementById('cg-label-f1').textContent = f1 ? '♀ ' + f1.querySelector('.fw-semibold').textContent.trim() : '♀ 女生 1';
-    document.getElementById('cg-label-f2').textContent = f2 ? '♀ ' + f2.querySelector('.fw-semibold').textContent.trim() : '♀ 女生 2';
-
-    const ready = m1 && m2 && f1 && f2;
+    const ready = total >= 2;
     document.getElementById('cg-submit-btn').disabled = !ready;
     document.getElementById('cg-validation-msg').textContent = ready
-      ? '✓ 已選好 2 男 + 2 女'
-      : `請選擇 2 男 + 2 女（男 ${sel.M.filter(Boolean).length}/2，女 ${sel.F.filter(Boolean).length}/2）`;
+      ? `✓ 已選 ${total} 人（男 ${mCount}、女 ${fCount}）`
+      : `請至少選擇 2 位會員（目前男 ${mCount}、女 ${fCount}）`;
   }
 
   // Reset state when modal closes
@@ -2353,15 +2407,12 @@ function startAutoForm(form) {
     const modal = document.getElementById('createGroupModal');
     if (modal) {
       modal.addEventListener('hidden.bs.modal', function() {
-        for (const g of ['M', 'F']) {
-          for (let i = 0; i < 2; i++) {
-            if (sel[g][i]) {
-              sel[g][i].style.borderColor = 'transparent';
-              sel[g][i].style.backgroundColor = '';
-              sel[g][i] = null;
-            }
-          }
-        }
+        document.querySelectorAll('.cg-check:checked').forEach(c => {
+          c.checked = false;
+          const card = c.closest('.cg-card');
+          card.style.borderColor = 'transparent';
+          card.style.backgroundColor = '';
+        });
         cgUpdateState();
       });
     }

@@ -1130,18 +1130,18 @@ def create_group():
     session = get_db()
     male_ids = request.form.getlist('male_ids', type=int)
     female_ids = request.form.getlist('female_ids', type=int)
+    all_ids = male_ids + female_ids
 
-    if len(male_ids) != 2 or len(female_ids) != 2:
-        flash('請選擇恰好 2 位男性與 2 位女性', 'danger')
+    if len(all_ids) < 2:
+        flash('請至少選擇 2 位會員', 'danger')
         return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
 
-    all_ids = male_ids + female_ids
-    if len(set(all_ids)) != 4:
+    if len(set(all_ids)) != len(all_ids):
         flash('不能重複選擇同一位會員', 'danger')
         return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
 
     members = session.query(Member).filter(Member.id.in_(all_ids)).all()
-    if len(members) != 4:
+    if len(members) != len(all_ids):
         flash('找不到部分會員', 'danger')
         return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
 
