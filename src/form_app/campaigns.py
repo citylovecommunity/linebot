@@ -1,18 +1,18 @@
 """
 Campaign config for the /join/<slug> flow.
 
-To add a new campaign:
-  1. Add an entry to CAMPAIGNS below.
-  2. Share the URL /join/<slug> with participants.
+New campaigns should be created via the admin panel (Admin → 操作 → 活動管理), which
+stores them in the `campaign` DB table and lets the PM edit wording without a deploy.
 
-No code changes needed beyond this file.
+CAMPAIGNS below is a legacy fallback: slugs launched before the DB-backed editor
+existed. Keep it as-is for backward compatibility; don't add new entries here.
 """
 
 from dataclasses import dataclass, field
 
 
 @dataclass
-class Campaign:
+class StaticCampaign:
     slug: str
     badge: str
     title: str          # can include \n for line breaks
@@ -22,8 +22,8 @@ class Campaign:
     cta: str = "開始填寫個人資料"
 
 
-CAMPAIGNS: dict[str, Campaign] = {
-    "pickle_ball": Campaign(
+CAMPAIGNS: dict[str, StaticCampaign] = {
+    "pickle_ball": StaticCampaign(
         slug="pickle_ball",
         badge="本季活動",
         title="一起相約打皮克球\n一起抽機票",
@@ -37,7 +37,7 @@ CAMPAIGNS: dict[str, Campaign] = {
         note="填寫約 5 分鐘",
         cta="開始填寫個人資料",
     ),
-    "story": Campaign(
+    "story": StaticCampaign(
         slug="story",
         badge="本季活動",
         title="說故事大賽\n一起抽機票",
@@ -51,7 +51,7 @@ CAMPAIGNS: dict[str, Campaign] = {
         note="填寫約 5 分鐘",
         cta="開始填寫個人資料",
     ),
-    "dating": Campaign(
+    "dating": StaticCampaign(
         slug="dating",
         badge="本季活動",
         title="有趣約會\n一起抽機票",
@@ -65,7 +65,7 @@ CAMPAIGNS: dict[str, Campaign] = {
         note="填寫約 5 分鐘",
         cta="開始填寫個人資料",
     ),
-    "casual": Campaign(
+    "casual": StaticCampaign(
         slug="casual",
         badge="本季活動",
         title="輕鬆認識新朋友",
@@ -79,7 +79,7 @@ CAMPAIGNS: dict[str, Campaign] = {
         note="填寫約 5 分鐘",
         cta="開始填寫個人資料",
     ),
-    "default": Campaign(
+    "default": StaticCampaign(
         slug="default",
         badge="CityLove 城遇",
         title="遇見志同道合的夥伴",
@@ -94,8 +94,16 @@ CAMPAIGNS: dict[str, Campaign] = {
 }
 
 
-def get_campaign(slug: str | None) -> Campaign:
-    """Return the campaign for the given slug, falling back to default."""
-    if slug and slug in CAMPAIGNS:
-        return CAMPAIGNS[slug]
+def get_campaign(slug: str | None):
+    """Return the campaign for the given slug: DB-backed (admin-created) first,
+    then the legacy static fallback, then the default."""
+    if slug:
+        from form_app.database import get_db
+        from form_app.models import Campaign
+
+        db_campaign = get_db().query(Campaign).filter_by(slug=slug, is_active=True).first()
+        if db_campaign:
+            return db_campaign
+        if slug in CAMPAIGNS:
+            return CAMPAIGNS[slug]
     return CAMPAIGNS["default"]

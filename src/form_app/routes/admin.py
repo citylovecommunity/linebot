@@ -1,3 +1,4 @@
+import re
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, date, timedelta, timezone
@@ -40,7 +41,7 @@ from form_app.models import (
     DateProposal, ProposalStatus, Line_Info,
     GroupMatching, GroupMatchingStatus, GroupMembership, GroupMessage, GroupDateProposal, GroupBadge,
     LeadSubmission, LeadSubmissionStatus,
-    Tag,
+    Tag, Campaign,
     assign_session_avatars,
 )
 from collections import defaultdict
@@ -1953,3 +1954,162 @@ def remove_member_tag(user_id, tag_id):
         session.commit()
     _invalidate_dashboard_cache()
     return jsonify({'ok': True})
+
+
+# ── Campaign management (PM-editable /join/<slug> wording) ─────────────────
+
+_CAMPAIGN_SLUG_RE = re.compile(r'^[a-z0-9][a-z0-9_-]{1,49}$')
+_CAMPAIGN_FEATURE_ROWS = 6
+
+
+def _campaign_posted_features(form) -> list[dict]:
+    return [
+        {'icon': icon.strip(), 'text': text.strip()}
+        for icon, text in zip(form.getlist('feature_icon'), form.getlist('feature_text'))
+        if text.strip()
+    ]
+
+
+def _campaign_form_values(campaign=None, form=None) -> dict:
+    """Build the field values a create/edit form should display: from a resubmitted
+    (invalid) form if present, else from an existing Campaign, else blank defaults."""
+    if form is not None:
+        values = {
+            'slug': form.get('slug', '').strip(),
+            'badge': form.get('badge', '').strip(),
+            'title': form.get('title', '').strip(),
+            'subtitle': form.get('subtitle', '').strip(),
+            'note': form.get('note', '').strip(),
+            'cta': form.get('cta', '').strip(),
+            'features': [
+                {'icon': icon.strip(), 'text': text.strip()}
+                for icon, text in zip(form.getlist('feature_icon'), form.getlist('feature_text'))
+            ],
+        }
+    elif campaign is not None:
+        values = {
+            'slug': campaign.slug,
+            'badge': campaign.badge,
+            'title': campaign.title,
+            'subtitle': campaign.subtitle,
+            'note': campaign.note,
+            'cta': campaign.cta,
+            'features': list(campaign.features or []),
+        }
+    else:
+        values = {
+            'slug': '', 'badge': '本季活動', 'title': '', 'subtitle': '',
+            'note': '填寫約 5 分鐘', 'cta': '開始填寫個人資料', 'features': [],
+        }
+    rows = values['features'][:_CAMPAIGN_FEATURE_ROWS]
+    while len(rows) < _CAMPAIGN_FEATURE_ROWS:
+        rows.append({'icon': '', 'text': ''})
+    values['feature_rows'] = rows
+    return values
+
+
+@bp.route('/campaigns')
+@login_required
+@admin_required
+def campaigns_list():
+    session = get_db()
+    campaigns = session.query(Campaign).order_by(Campaign.created_at.desc()).all()
+    return render_template('admin_campaigns.html', campaigns=campaigns)
+
+
+@bp.route('/campaigns/new', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def new_campaign():
+    session = get_db()
+    if request.method == 'POST':
+        slug = request.form.get('slug', '').strip().lower()
+        title = request.form.get('title', '').strip()
+        subtitle = request.form.get('subtitle', '').strip()
+        error = None
+        if not _CAMPAIGN_SLUG_RE.match(slug):
+            error = '網址代碼格式錯誤，僅能使用小寫英文、數字、- 與 _，長度 2-50'
+        elif session.query(Campaign).filter_by(slug=slug).first():
+            error = f'網址代碼「{slug}」已存在'
+        elif not title or not subtitle:
+            error = '標題與副標為必填'
+
+        if error:
+            flash(error, 'danger')
+            return render_template('admin_campaign_form.html', campaign=None,
+                                    values=_campaign_form_values(form=request.form))
+
+        campaign = Campaign(
+            slug=slug,
+            badge=request.form.get('badge', '').strip() or '本季活動',
+            title=title,
+            subtitle=subtitle,
+            features=_campaign_posted_features(request.form),
+            note=request.form.get('note', '').strip() or '填寫約 5 分鐘',
+            cta=request.form.get('cta', '').strip() or '開始填寫個人資料',
+            created_by_id=current_user.id,
+        )
+        session.add(campaign)
+        session.commit()
+        flash(f'已建立活動，網址：/join/{slug}', 'success')
+        return redirect(url_for('admin_bp.campaigns_list'))
+
+    return render_template('admin_campaign_form.html', campaign=None, values=_campaign_form_values())
+
+
+@bp.route('/campaigns/<int:campaign_id>/edit', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def edit_campaign(campaign_id):
+    session = get_db()
+    campaign = session.get(Campaign, campaign_id)
+    if not campaign:
+        flash('找不到活動', 'warning')
+        return redirect(url_for('admin_bp.campaigns_list'))
+
+    if request.method == 'POST':
+        title = request.form.get('title', '').strip()
+        subtitle = request.form.get('subtitle', '').strip()
+        if not title or not subtitle:
+            flash('標題與副標為必填', 'danger')
+            return render_template('admin_campaign_form.html', campaign=campaign,
+                                    values=_campaign_form_values(form=request.form))
+
+        campaign.badge = request.form.get('badge', '').strip() or '本季活動'
+        campaign.title = title
+        campaign.subtitle = subtitle
+        campaign.features = _campaign_posted_features(request.form)
+        campaign.note = request.form.get('note', '').strip() or '填寫約 5 分鐘'
+        campaign.cta = request.form.get('cta', '').strip() or '開始填寫個人資料'
+        session.commit()
+        flash('活動已更新', 'success')
+        return redirect(url_for('admin_bp.campaigns_list'))
+
+    return render_template('admin_campaign_form.html', campaign=campaign,
+                            values=_campaign_form_values(campaign=campaign))
+
+
+@bp.route('/campaigns/<int:campaign_id>/toggle', methods=['POST'])
+@login_required
+@admin_required
+def toggle_campaign(campaign_id):
+    session = get_db()
+    campaign = session.get(Campaign, campaign_id)
+    if campaign:
+        campaign.is_active = not campaign.is_active
+        session.commit()
+        flash(f'活動已{"上線" if campaign.is_active else "下線"}', 'info')
+    return redirect(url_for('admin_bp.campaigns_list'))
+
+
+@bp.route('/campaigns/<int:campaign_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_campaign(campaign_id):
+    session = get_db()
+    campaign = session.get(Campaign, campaign_id)
+    if campaign:
+        session.delete(campaign)
+        session.commit()
+        flash('活動已刪除', 'info')
+    return redirect(url_for('admin_bp.campaigns_list'))

@@ -778,6 +778,16 @@
 
       <div class="card mb-3">
         <div class="card-body">
+          <h6 class="card-title">活動管理</h6>
+          <p class="text-muted small">建立/編輯報名活動頁文案（/join/&lt;網址代碼&gt;），PM 可自行修改不需請工程師改網址。</p>
+          <a href="{{ url_for('admin_bp.campaigns_list') }}" class="btn btn-primary">
+            <i class="bi bi-megaphone"></i> 管理活動
+          </a>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-body">
           <h6 class="card-title">發送 LINE 通知</h6>
           <p class="text-muted small">推送未讀訊息與待確認約會提案的 LINE 通知給所有相關會員。</p>
           <form method="POST" action="{{ url_for('admin_bp.send_notifications') }}"

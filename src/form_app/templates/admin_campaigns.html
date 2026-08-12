@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}活動管理{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">活動管理</h2>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('admin_bp.new_campaign') }}" class="btn btn-sm btn-success">
+        <i class="bi bi-plus-lg"></i> 新增活動
+      </a>
+      <a href="{{ url_for('admin_bp.admin_dashboard') }}" class="btn btn-sm btn-outline-secondary">← 返回後台</a>
+    </div>
+  </div>
+  <p class="text-muted small">
+    每個活動對應一組報名頁文案，網址為 <code>/join/&lt;網址代碼&gt;</code>，PM 可自行編輯文案不需請工程師改網址。
+  </p>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+  {% endwith %}
+
+  {% if campaigns %}
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>狀態</th>
+          <th>網址代碼</th>
+          <th>標題</th>
+          <th>建立時間</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in campaigns %}
+        <tr>
+          <td>
+            {% if c.is_active %}
+            <span class="badge bg-success">上線中</span>
+            {% else %}
+            <span class="badge bg-secondary">已下線</span>
+            {% endif %}
+          </td>
+          <td>
+            <code>/join/{{ c.slug }}</code>
+            <button type="button" class="btn btn-sm btn-link p-0 ms-1"
+                    onclick="navigator.clipboard.writeText(window.location.origin + '/join/{{ c.slug }}')"
+                    title="複製網址">
+              <i class="bi bi-clipboard"></i>
+            </button>
+          </td>
+          <td>{{ c.title.split('\n')[0] }}</td>
+          <td class="text-nowrap text-muted small">{{ c.created_at.strftime('%Y/%m/%d %H:%M') }}</td>
+          <td class="text-nowrap">
+            <a href="{{ url_for('join_bp.join', slug=c.slug) }}" target="_blank" class="btn btn-sm btn-outline-secondary">預覽</a>
+            <a href="{{ url_for('admin_bp.edit_campaign', campaign_id=c.id) }}" class="btn btn-sm btn-outline-primary">編輯</a>
+            <form method="POST" action="{{ url_for('admin_bp.toggle_campaign', campaign_id=c.id) }}" class="d-inline">
+              <button type="submit" class="btn btn-sm btn-outline-secondary">{{ '下線' if c.is_active else '上線' }}</button>
+            </form>
+            <form method="POST" action="{{ url_for('admin_bp.delete_campaign', campaign_id=c.id) }}" class="d-inline"
+                  onsubmit="return confirm('確定要刪除活動「{{ c.slug }}」？已分享的網址將失效。')">
+              <button type="submit" class="btn btn-sm btn-outline-danger">刪除</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center text-muted py-5">
+    <p class="mb-0">目前沒有活動，點右上角「新增活動」建立第一個</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

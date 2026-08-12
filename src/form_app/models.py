@@ -865,6 +865,25 @@ class Tag(Base):
     members: Mapped[list['Member']] = relationship('Member', secondary=member_tag, back_populates='tags')
 
 
+class Campaign(Base):
+    """PM-editable /join/<slug> landing page wording. See form_app.campaigns for the
+    legacy hardcoded fallback used when no DB row matches a slug."""
+    __tablename__ = 'campaign'
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    slug: Mapped[str] = mapped_column(unique=True, index=True)
+    badge: Mapped[str] = mapped_column(default='本季活動')
+    title: Mapped[str]        # can include \n for line breaks
+    subtitle: Mapped[str]
+    features: Mapped[List[Dict[str, Any]]] = mapped_column(JSONB, default=list)  # [{"icon": "...", "text": "..."}]
+    note: Mapped[str] = mapped_column(default='填寫約 5 分鐘')
+    cta: Mapped[str] = mapped_column(default='開始填寫個人資料')
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey('member.id'), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.now)
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.now, onupdate=datetime.now)
+
+
 class UserMatchScore(Base):
     __tablename__ = 'user_match_scores'
 

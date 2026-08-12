@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}{{ '編輯活動' if campaign else '新增活動' }} — Admin{% endblock %}
+
+{% block content %}
+<div class="container mt-4" style="max-width: 780px;">
+  <div class="d-flex align-items-center mb-4 gap-3">
+    <a href="{{ url_for('admin_bp.campaigns_list') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> 返回
+    </a>
+    <h3 class="mb-0">{{ '編輯活動' if campaign else '新增活動' }}{% if campaign %} — {{ campaign.slug }}{% endif %}</h3>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+  {% endwith %}
+
+  <form method="POST">
+    <div class="card mb-3">
+      <div class="card-header fw-semibold">網址</div>
+      <div class="card-body">
+        {% if campaign %}
+        <label class="form-label">網址代碼</label>
+        <div class="input-group">
+          <span class="input-group-text">/join/</span>
+          <input type="text" class="form-control" value="{{ campaign.slug }}" disabled>
+        </div>
+        <div class="form-text">建立後無法修改，避免已分享的連結失效。</div>
+        {% else %}
+        <label class="form-label">網址代碼 <span class="text-danger">*</span></label>
+        <div class="input-group">
+          <span class="input-group-text">/join/</span>
+          <input type="text" class="form-control" name="slug" required
+                 pattern="[a-z0-9][a-z0-9_-]{1,49}" maxlength="50"
+                 placeholder="例如 summer_2026" value="{{ values.slug }}">
+        </div>
+        <div class="form-text">僅能使用小寫英文、數字、- 與 _，建立後無法修改。</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header fw-semibold">報名頁文案</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-sm-6">
+            <label class="form-label">徽章文字</label>
+            <input type="text" class="form-control" name="badge" maxlength="20" value="{{ values.badge }}">
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">按鈕文字</label>
+            <input type="text" class="form-control" name="cta" maxlength="20" value="{{ values.cta }}">
+          </div>
+          <div class="col-12">
+            <label class="form-label">主標題 <span class="text-danger">*</span></label>
+            <textarea class="form-control" name="title" rows="2" required>{{ values.title }}</textarea>
+            <div class="form-text">可換行分兩行顯示。</div>
+          </div>
+          <div class="col-12">
+            <label class="form-label">副標題 <span class="text-danger">*</span></label>
+            <textarea class="form-control" name="subtitle" rows="2" required>{{ values.subtitle }}</textarea>
+          </div>
+          <div class="col-12">
+            <label class="form-label">填寫提示</label>
+            <input type="text" class="form-control" name="note" maxlength="30" value="{{ values.note }}">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header fw-semibold">特色列表</div>
+      <div class="card-body">
+        <div class="form-text mb-2">空白列會自動略過。</div>
+        {% for row in values.feature_rows %}
+        <div class="row g-2 mb-2 align-items-center">
+          <div class="col-2 col-sm-1">
+            <input type="text" class="form-control text-center" name="feature_icon" maxlength="8"
+                   placeholder="✨" value="{{ row.icon }}">
+          </div>
+          <div class="col-10 col-sm-11">
+            <input type="text" class="form-control" name="feature_text" maxlength="80"
+                   placeholder="特色說明文字" value="{{ row.text }}">
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2">
+      <a href="{{ url_for('admin_bp.campaigns_list') }}" class="btn btn-outline-secondary">取消</a>
+      <button type="submit" class="btn btn-primary">{{ '儲存變更' if campaign else '建立活動' }}</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
