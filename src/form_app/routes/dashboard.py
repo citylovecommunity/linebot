@@ -428,6 +428,10 @@ def group_submit_proposal(group_id):
         flash('無法提出任務', 'danger')
         return redirect(url_for('dashboard_bp.dashboard'))
 
+    if not group.can_decide(current_user.id):
+        flash(f'本局由 {group.host.proper_name} 主揪，只有他能提出任務', 'danger')
+        return redirect(url_for('dashboard_bp.group_detail', group_id=group_id))
+
     restaurant = request.form.get('restaurant', '').strip()
     date_str = request.form.get('date_time', '').strip()
     if not restaurant or not date_str:
@@ -475,6 +479,10 @@ def group_summary(group_id):
     if group is None or not group.is_active:
         flash('無法提交總結', 'danger')
         return redirect(url_for('dashboard_bp.dashboard'))
+
+    if not group.can_decide(current_user.id):
+        flash(f'本局由 {group.host.proper_name} 主揪，只有他能決定時間地點', 'danger')
+        return redirect(url_for('dashboard_bp.group_detail', group_id=group_id))
 
     location = request.form.get('location', '').strip()
     meet_time_str = request.form.get('meet_time', '').strip()

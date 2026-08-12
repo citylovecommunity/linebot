@@ -578,7 +578,7 @@
                 <td>
                   {% for m in g.members %}
                   <span class="badge {{ 'bg-primary' if m.gender == 'M' else 'bg-danger' }} bg-opacity-75 me-1">
-                    {{ m.name }}
+                    {{ m.name }}{% if g.host_member_id == m.id %} 👑{% endif %}
                   </span>
                   {% endfor %}
                 </td>
@@ -586,6 +586,7 @@
                 <td>
                   {% if g.source_campaign == 'pickle_ball' %}
                   <span class="badge bg-info text-dark">🏓 匹克球</span>
+                  <div class="small text-muted mt-1">主揪：{{ g.host.name if g.host else '未指定' }}</div>
                   {% elif g.source_campaign %}
                   <span class="badge bg-info text-dark">{{ g.source_campaign }}</span>
                   {% else %}
@@ -594,7 +595,7 @@
                 </td>
                 <td>
                   <button type="button" class="btn btn-sm btn-outline-secondary me-1" title="編輯"
-                    onclick="openGroupEdit({{ g.id }}, [{% for gm in g.memberships %}{membershipId:{{ gm.id }}, memberId:{{ gm.member_id }}}{% if not loop.last %},{% endif %}{% endfor %}], '{{ g.cool_name }}')">
+                    onclick="openGroupEdit({{ g.id }}, [{% for gm in g.memberships %}{membershipId:{{ gm.id }}, memberId:{{ gm.member_id }}}{% if not loop.last %},{% endif %}{% endfor %}], '{{ g.cool_name }}', {{ (g.source_campaign or '') | tojson }}, {{ g.host_member_id or 'null' }})">
                     <i class="bi bi-pencil"></i> 編輯
                   </button>
                   <form method="POST" action="{{ url_for('admin_bp.discard_group_draft', group_id=g.id) }}"
@@ -619,6 +620,7 @@
               <th>編號</th>
               <th>代號</th>
               <th>成員</th>
+              <th>主揪</th>
               <th>狀態</th>
               <th>建立日期</th>
               <th>操作</th>
@@ -632,9 +634,26 @@
               <td>
                 {% for m in g.members %}
                 <span class="badge {{ 'bg-primary' if m.gender == 'M' else 'bg-danger' }} bg-opacity-75 me-1">
-                  {{ m.name }}
+                  {{ m.name }}{% if g.host_member_id == m.id %} 👑{% endif %}
                 </span>
                 {% endfor %}
+              </td>
+              <td>
+                {% if g.source_campaign == 'pickle_ball' %}
+                <form method="POST" action="{{ url_for('admin_bp.set_group_host', group_id=g.id) }}" class="d-inline">
+                  <select name="host_member_id" class="form-select form-select-sm" style="min-width:110px;"
+                          onchange="this.form.submit()">
+                    <option value="">（不指定）</option>
+                    {% for m in g.members %}
+                    {% if m.gender == 'M' %}
+                    <option value="{{ m.id }}" {{ 'selected' if g.host_member_id == m.id }}>{{ m.name }}</option>
+                    {% endif %}
+                    {% endfor %}
+                  </select>
+                </form>
+                {% else %}
+                <span class="text-muted small">—</span>
+                {% endif %}
               </td>
               <td>
                 {% if g.status.value == 'ACTIVE' %}
@@ -1522,7 +1541,7 @@
   let _groupEditMembers = [];  // [{membershipId, memberId, gender, name}]
   let _groupPickerBuilt = {};
 
-  function openGroupEdit(groupId, memberships, coolName) {
+  function openGroupEdit(groupId, memberships, coolName, sourceCampaign, hostMemberId) {
     _groupEditMembers = memberships.map(m => {
       const info = membersData[m.memberId] || {};
       return { membershipId: m.membershipId, memberId: m.memberId, gender: info.gender, name: info.name || '—' };
@@ -1531,6 +1550,22 @@
 
     document.getElementById('edit-group-form').action = `/admin/groups/${groupId}/edit-draft`;
     document.getElementById('edit-group-cool-name').value = coolName;
+
+    const hostContainer = document.getElementById('edit-group-host-container');
+    if (sourceCampaign === 'pickle_ball') {
+      const maleMembers = _groupEditMembers.filter(m => m.gender === 'M');
+      const options = ['<option value="">（不指定）</option>'].concat(
+        maleMembers.map(m => `<option value="${m.memberId}" ${m.memberId === hostMemberId ? 'selected' : ''}>${m.name}</option>`)
+      );
+      hostContainer.innerHTML = `
+        <label class="form-label fw-semibold">🏓 主揪（決定時間地點的男性成員）</label>
+        <select class="form-select form-select-sm" name="host_member_id">${options.join('')}</select>
+      `;
+      hostContainer.classList.remove('d-none');
+    } else {
+      hostContainer.innerHTML = '';
+      hostContainer.classList.add('d-none');
+    }
 
     const container = document.getElementById('edit-group-members');
     container.innerHTML = _groupEditMembers.map(m => `
@@ -2051,6 +2086,8 @@
         </div>
         <div class="modal-body">
           <div id="edit-group-members"></div>
+
+          <div id="edit-group-host-container" class="mt-3 d-none"></div>
 
           <div class="mt-3">
             <label class="form-label fw-semibold">群組代號</label>

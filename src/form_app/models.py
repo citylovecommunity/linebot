@@ -674,6 +674,19 @@ class GroupMatching(Base):
     opener_member_id: Mapped[Optional[int]] = mapped_column(ForeignKey("member.id"))
     opener: Mapped[Optional["Member"]] = relationship(foreign_keys=[opener_member_id])
 
+    # 主揪: for pickle_ball groups, the male member who alone decides meet
+    # time/location. None for groups with no designated host (e.g. female-only
+    # pickle_ball groups, or non-pickle_ball groups) — everyone may decide.
+    host_member_id: Mapped[Optional[int]] = mapped_column(ForeignKey("member.id"))
+    host: Mapped[Optional["Member"]] = relationship(foreign_keys=[host_member_id])
+
+    @property
+    def decision_is_restricted(self) -> bool:
+        return self.source_campaign == "pickle_ball" and self.host_member_id is not None
+
+    def can_decide(self, member_id: int) -> bool:
+        return not self.decision_is_restricted or self.host_member_id == member_id
+
     # Phase 2 summary (set when any member submits the summary form)
     meet_location: Mapped[Optional[str]]
     meet_time: Mapped[Optional[datetime]]

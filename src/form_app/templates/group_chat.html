@@ -80,11 +80,16 @@
                     <span class="position-absolute bottom-0 end-0 badge rounded-pill bg-primary"
                           style="font-size:.55rem;padding:2px 5px;">你</span>
                   {% endif %}
+                  {% if group.host_member_id == member.id %}
+                    <span class="position-absolute top-0 start-0 translate-middle" style="font-size:1rem;" title="主揪">👑</span>
+                  {% endif %}
                 </div>
 
                 {# Name + intro link #}
                 <div class="text-center" style="font-size:.72rem;max-width:64px;">
-                  <div class="fw-semibold text-truncate">{{ member.name }}</div>
+                  <div class="fw-semibold text-truncate">
+                    {{ member.name }}{% if group.host_member_id == member.id %}<span class="text-warning">・主揪</span>{% endif %}
+                  </div>
                   {% if member.id != current_user.id and member.introduction_link %}
                     <a href="{{ member.introduction_link }}" target="_blank"
                        class="text-primary text-decoration-none" title="查看介紹卡"
@@ -280,20 +285,36 @@
               <span>🎯</span>
               <span class="fw-bold small">Citylove 同行小看板 🏃</span>
             </div>
-            <div class="rounded-3 p-3 mb-3" style="background:#f8fff8;font-size:.82rem;line-height:1.7;">
+            {% if group.host %}
+              <div class="rounded-3 p-3 mb-3" style="background:#f8fff8;font-size:.82rem;line-height:1.7;">
+                恭喜 {{ group.members|length }} 人局成團！本局由
+                <strong>👑 {{ group.host.name }}</strong>
+                擔任主揪，將負責決定打球的時間與地點。
+                <br><br>
+                大家先在下方聊天室自由聊聊，認識一下彼此吧！等
+                {{ group.host.name }} 按下 <strong>📌 幫大家做個總結</strong> 鎖定行程後，就會顯示在這裡唷！🌱
+                <br><br>
+                期待相見！🙌
+              </div>
+              <p class="text-center text-muted mb-0" style="font-size:.72rem;">
+                ⬇️ 在下方聊天室自由發言，行程由主揪 {{ group.host.name }} 決定
+              </p>
+            {% else %}
               {% set opener_name = group.opener.name if group.opener else '夥伴' %}
-              恭喜 {{ group.members|length }} 人局成團！這局的麥克風我們優先交給
-              <strong>{{ opener_name }}</strong>
-              開球，拋個你想完成的事、想去的地方或美食吧！✨
-              <br><br>
-              如果 {{ opener_name }} 正在忙著拯救世界，大家也別客氣，直接自由敲杯、暢所欲言！
-              喬好時間地點後，任何一人按下 <strong>📌 幫大家做個總結</strong> 鎖定行程就能拿積分唷！🌱
-              <br><br>
-              期待相見！🙌
-            </div>
-            <p class="text-center text-muted mb-0" style="font-size:.72rem;">
-              ⬇️ 在下方聊天室自由發言，隨時按「幫大家做個總結」鎖定行程
-            </p>
+              <div class="rounded-3 p-3 mb-3" style="background:#f8fff8;font-size:.82rem;line-height:1.7;">
+                恭喜 {{ group.members|length }} 人局成團！這局的麥克風我們優先交給
+                <strong>{{ opener_name }}</strong>
+                開球，拋個你想完成的事、想去的地方或美食吧！✨
+                <br><br>
+                如果 {{ opener_name }} 正在忙著拯救世界，大家也別客氣，直接自由敲杯、暢所欲言！
+                喬好時間地點後，任何一人按下 <strong>📌 幫大家做個總結</strong> 鎖定行程就能拿積分唷！🌱
+                <br><br>
+                期待相見！🙌
+              </div>
+              <p class="text-center text-muted mb-0" style="font-size:.72rem;">
+                ⬇️ 在下方聊天室自由發言，隨時按「幫大家做個總結」鎖定行程
+              </p>
+            {% endif %}
           </div>
         </div>
       {% endif %}
@@ -382,11 +403,17 @@
             <div id="chatError" class="text-danger small mb-1" style="display:none;">
               <i class="bi bi-exclamation-circle me-1"></i>傳送失敗，請稍後再試。
             </div>
-            <button class="btn btn-outline-secondary w-100 py-2"
-                    style="border-radius:10px;font-size:.85rem;"
-                    data-bs-toggle="modal" data-bs-target="#summaryModal">
-              📌 幫大家做個總結
-            </button>
+            {% if group.can_decide(current_user.id) %}
+              <button class="btn btn-outline-secondary w-100 py-2"
+                      style="border-radius:10px;font-size:.85rem;"
+                      data-bs-toggle="modal" data-bs-target="#summaryModal">
+                📌 幫大家做個總結
+              </button>
+            {% else %}
+              <div class="text-center text-muted py-2 small">
+                <i class="bi bi-lock me-1"></i>本局由主揪 👑 {{ group.host.name }} 決定時間地點
+              </div>
+            {% endif %}
           {% endif %}
         </div>
 
@@ -401,7 +428,7 @@
 {# ══════════ MODALS ══════════ #}
 
 {# Summary modal #}
-{% if group.is_active %}
+{% if group.is_active and group.can_decide(current_user.id) %}
 <div class="modal fade" id="summaryModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content rounded-4 border-0 shadow">

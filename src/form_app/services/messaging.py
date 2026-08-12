@@ -297,11 +297,19 @@ def collect_new_group_match_texts(session):
                 continue
             others = [m.proper_name for m in members if m.id != member.id]
             if is_pickleball:
+                if group.host_member_id:
+                    host_note = (
+                        "🏓 本局由你主揪，打球時間地點由你決定唷！"
+                        if group.host_member_id == member.id
+                        else f"• 提醒：本局由 {group.host.proper_name} 主揪，打球時間地點由他決定"
+                    )
+                else:
+                    host_note = "• 提醒：打球時間地點由大家自行約定，不限任何特定時間和地點"
                 text = (
                     f"Hi 本週你的新球友來了！\n"
                     f"→ 點此查看 {APP_URL}/dashboard/group/{group.id}\n"
                     f"這週你有 {len(others)} 位新球友！\n"
-                    f"• 提醒：打球時間地點由大家自行約定，不限任何特定時間和地點"
+                    f"{host_note}"
                 )
             else:
                 text = (

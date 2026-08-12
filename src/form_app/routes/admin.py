@@ -844,6 +844,8 @@ def delete_user(user_id):
             {GroupMembership.referred_by_id: None}, synchronize_session=False)
         session.query(GroupMatching).filter(GroupMatching.opener_member_id == user_id).update(
             {GroupMatching.opener_member_id: None}, synchronize_session=False)
+        session.query(GroupMatching).filter(GroupMatching.host_member_id == user_id).update(
+            {GroupMatching.host_member_id: None}, synchronize_session=False)
         session.query(GroupMatching).filter(GroupMatching.summary_submitted_by_id == user_id).update(
             {GroupMatching.summary_submitted_by_id: None}, synchronize_session=False)
 
@@ -1294,6 +1296,30 @@ def edit_group_draft(group_id):
             new_opener = _pick_opener(current_females, session)
             group.opener_member_id = new_opener.id if new_opener else None
 
+    if 'host_member_id' in request.form:
+        # Explicit 主揪 pick from the admin form takes precedence over auto-reassignment.
+        raw_host_id = request.form.get('host_member_id', '').strip()
+        if raw_host_id:
+            new_host_id = int(raw_host_id)
+            final_member_ids = {new_assignments.get(gm.id, gm.member_id) for gm in memberships}
+            host_member = session.get(Member, new_host_id)
+            if new_host_id not in final_member_ids or not host_member or host_member.gender != 'M':
+                flash('主揪必須是本局的男性成員', 'danger')
+                return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+            group.host_member_id = new_host_id
+        else:
+            group.host_member_id = None
+    elif new_assignments:
+        # No explicit pick, but members were swapped — reassign if the host got swapped out.
+        from form_app.services.group_matching import _pick_host
+        current_males = [
+            m for m in (session.get(Member, gm.member_id) for gm in memberships)
+            if m and m.gender == 'M'
+        ]
+        if group.host_member_id not in {m.id for m in current_males}:
+            new_host = _pick_host(current_males, session)
+            group.host_member_id = new_host.id if new_host else None
+
     new_cool_name = request.form.get('cool_name', '').strip()
     if new_cool_name:
         group.cool_name = new_cool_name
@@ -1334,6 +1360,35 @@ def cancel_group(group_id):
     session.commit()
     _invalidate_dashboard_cache()
     flash(f'群組「{group.cool_name}」已取消', 'success')
+    return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+
+
+@bp.route('/groups/<int:group_id>/set-host', methods=['POST'])
+@login_required
+@admin_required
+def set_group_host(group_id):
+    """Reassign the 主揪 (host) on an active or draft group — e.g. when the
+    original host can no longer make it."""
+    session = get_db()
+    group = session.get(GroupMatching, group_id)
+    if group is None:
+        flash('找不到該群組', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+
+    raw_host_id = request.form.get('host_member_id', '').strip()
+    if not raw_host_id:
+        group.host_member_id = None
+    else:
+        new_host_id = int(raw_host_id)
+        current_male_ids = {m.id for m in group.members if m.gender == 'M'}
+        if new_host_id not in current_male_ids:
+            flash('主揪必須是本局的男性成員', 'danger')
+            return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+        group.host_member_id = new_host_id
+
+    session.commit()
+    _invalidate_dashboard_cache()
+    flash(f'已更新群組「{group.cool_name}」的主揪', 'success')
     return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
 
 

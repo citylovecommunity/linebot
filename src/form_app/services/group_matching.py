@@ -499,6 +499,22 @@ def _pick_opener(females: list[Member], session: Session) -> Optional[Member]:
     return min(females, key=lambda f: last_opener[f.id] or datetime.min)
 
 
+def _pick_host(males: list[Member], session: Session) -> Optional[Member]:
+    """Pick the male in a pickle_ball group who has been 主揪 least recently."""
+    if not males:
+        return None
+    from sqlalchemy import func
+    last_host: dict[int, Optional[datetime]] = {}
+    for m in males:
+        ts = (
+            session.query(func.max(GroupMatching.created_at))
+            .filter(GroupMatching.host_member_id == m.id)
+            .scalar()
+        )
+        last_host[m.id] = ts
+    return min(males, key=lambda m: last_host[m.id] or datetime.min)
+
+
 # ── Persistence ───────────────────────────────────────────────────────────────
 
 def _create_group(
@@ -513,6 +529,12 @@ def _create_group(
     all_members = females + males
     avatars = assign_session_avatars(len(all_members))
     opener = _pick_opener(females, session) if females else None
+    # pickle_ball groups get a male 主揪 who alone decides meet time/location.
+    # Female-only pickle_ball groups (no males) have no host — everyone decides.
+    host = (
+        _pick_host(males, session)
+        if source_campaign == PICKLE_BALL_CAMPAIGN and males else None
+    )
 
     group = GroupMatching(
         cool_name=generate_funny_name(),
@@ -524,6 +546,7 @@ def _create_group(
         is_notified=is_draft,
         expires_at=datetime.now() + timedelta(days=15),
         opener_member_id=opener.id if opener else None,
+        host_member_id=host.id if host else None,
         memberships=[
             GroupMembership(member_id=m.id, session_avatar=avatars[i])
             for i, m in enumerate(all_members)
@@ -535,10 +558,13 @@ def _create_group(
         # Flush so `group.id` exists for the message FK, then post the
         # welcome announcement as the group's opening system message.
         session.flush()
+        announcement_content = PICKLE_BALL_CHAT_ANNOUNCEMENT
+        if host:
+            announcement_content += f"\n\n🏓 本局由 {host.name} 主揪，時間地點由他決定唷！"
         announcement = GroupMessage(
             group_id=group.id,
             sender_id=opener.id,
-            content=PICKLE_BALL_CHAT_ANNOUNCEMENT,
+            content=announcement_content,
             is_system_notification=True,
             # Already covered by the dedicated "新球友" LINE push below —
             # don't also fire the generic "you have unread messages" push.
