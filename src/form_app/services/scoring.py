@@ -16,6 +16,10 @@ PICKLE_BALL_TAG_NAME = "匹克球賽季"
 PICKLE_BALL_CAMPAIGN_SLUG = "pickle_ball"
 PICKLE_BALL_MATCH_BONUS = 25
 
+# Members who joined via the "casual" campaign (輕鬆認識新朋友) opt out of the
+# weekly 1:1 auto-matching pool entirely — they're excluded in get_eligible_matching_pool.
+CASUAL_CAMPAIGN_SLUG = "casual"
+
 
 def has_pickle_ball_affinity(member: "Member") -> bool:
     """Males are manually tagged '匹克球賽季'; females opt in via the pickle_ball campaign form."""
@@ -183,6 +187,7 @@ def get_eligible_matching_pool(session: Session, defer_user_info: bool = False):
     4. Membership is not expired (expiration_date is null OR >= today)
     5. Matching window: matching_start_date is null OR <= today
     6. Matching window: matching_end_date is null OR >= today
+    7. Did not join via the "casual" campaign (they opt out of weekly auto-matching)
     """
     from datetime import date
     today = date.today()
@@ -205,6 +210,9 @@ def get_eligible_matching_pool(session: Session, defer_user_info: bool = False):
 
         # Rule 6: Matching window has not ended
         (Member.matching_end_date == None) | (Member.matching_end_date >= today),
+
+        # Rule 7: Casual-campaign members opt out of auto-matching
+        (Member.join_campaign == None) | (Member.join_campaign != CASUAL_CAMPAIGN_SLUG),
     ).options(selectinload(Member.tags))
     if defer_user_info:
         q = q.options(sa_defer(Member.user_info))
