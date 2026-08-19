@@ -1053,10 +1053,7 @@ def broadcast_message():
             if not target_line_id:
                 return None
 
-        if len(mid_list) == 1:
-            chat_link = f"🔗 前往對話：{settings.APP_URL}/dashboard/{mid_list[0]}"
-        else:
-            chat_link = f"🔗 你在 {len(mid_list)} 個配對中收到本通知，前往查看：{settings.APP_URL}/dashboard/"
+        chat_link = f"🔗 前往對話：{settings.APP_URL}/dashboard/{mid_list[0]}"
 
         line_text = f"📢 系統通知\n\n{content}\n\n{chat_link}"
         try:
