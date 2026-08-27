@@ -20,7 +20,7 @@
     {% endfor %}
   {% endwith %}
 
-  <form method="POST">
+  <form method="POST" enctype="multipart/form-data">
     <div class="card mb-3">
       <div class="card-header fw-semibold">網址</div>
       <div class="card-body">
@@ -68,6 +68,39 @@
           <div class="col-12">
             <label class="form-label">填寫提示</label>
             <input type="text" class="form-control" name="note" maxlength="30" value="{{ values.note }}">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header fw-semibold">頂部橫幅圖片</div>
+      <div class="card-body">
+        <div class="form-text mb-3">橫幅由左右兩張圖片並排組成。未上傳則使用預設圖片。</div>
+        <div class="row g-3">
+          <div class="col-sm-6">
+            <label class="form-label">左側圖片</label>
+            <img src="{{ (campaign.photo1_url if campaign else None) or url_for('static', filename='citylove-banner-left.jpg') }}"
+                 class="d-block mb-2 rounded border" style="max-width:100%; max-height:160px; object-fit:cover;">
+            <input type="file" class="form-control" name="photo1" accept="image/*">
+            {% if campaign and campaign.photo1_url %}
+            <div class="form-check mt-2">
+              <input class="form-check-input" type="checkbox" name="reset_photo1" id="reset_photo1" value="1">
+              <label class="form-check-label" for="reset_photo1">還原為預設圖片</label>
+            </div>
+            {% endif %}
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">右側圖片</label>
+            <img src="{{ (campaign.photo2_url if campaign else None) or url_for('static', filename='citylove-banner-right.jpg') }}"
+                 class="d-block mb-2 rounded border" style="max-width:100%; max-height:160px; object-fit:cover;">
+            <input type="file" class="form-control" name="photo2" accept="image/*">
+            {% if campaign and campaign.photo2_url %}
+            <div class="form-check mt-2">
+              <input class="form-check-input" type="checkbox" name="reset_photo2" id="reset_photo2" value="1">
+              <label class="form-check-label" for="reset_photo2">還原為預設圖片</label>
+            </div>
+            {% endif %}
           </div>
         </div>
       </div>

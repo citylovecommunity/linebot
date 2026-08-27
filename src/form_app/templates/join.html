@@ -22,8 +22,8 @@
     }
 
     /* ── Banner ── */
-    .hero-banner { width: 100%; display: block; }
-    .hero-banner img { width: 100%; height: auto; display: block; }
+    .hero-banner { width: 100%; display: flex; }
+    .hero-banner img { width: 50%; height: auto; display: block; }
 
     /* ── Wizard card ── */
     .wizard-wrap { max-width: 480px; margin: 0 auto; padding: 0 1rem 4rem; }
@@ -189,7 +189,8 @@
 
 <!-- Hero banner -->
 <div class="hero-banner">
-  <img src="{{ url_for('static', filename='citylove-banner.jpg') }}" alt="CityLove 城遇">
+  <img src="{{ campaign.photo1_url or url_for('static', filename='citylove-banner-left.jpg') }}" alt="CityLove 城遇">
+  <img src="{{ campaign.photo2_url or url_for('static', filename='citylove-banner-right.jpg') }}" alt="CityLove 城遇">
 </div>
 
 <div class="wizard-wrap">

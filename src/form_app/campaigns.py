@@ -20,6 +20,8 @@ class StaticCampaign:
     features: list      # list of {"icon": "...", "text": "..."}
     note: str = "填寫約 5 分鐘"
     cta: str = "開始填寫個人資料"
+    photo1_url: str | None = None
+    photo2_url: str | None = None
 
 
 CAMPAIGNS: dict[str, StaticCampaign] = {

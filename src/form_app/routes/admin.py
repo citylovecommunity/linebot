@@ -3,6 +3,8 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, date, timedelta, timezone
 
+import cloudinary
+import cloudinary.uploader
 from flask import Blueprint, jsonify, render_template, redirect, url_for, flash, request, session as flask_session
 from flask_login import login_required, current_user
 from sqlalchemy.orm import joinedload, defer, selectinload
@@ -53,6 +55,12 @@ from form_app.services.scoring import UserProfileAdapter, calculate_match_score,
 from form_app.services.matching import update_unmatched_counters
 from form_app.services.security import hash_password
 from form_app.config import settings
+
+cloudinary.config(
+    cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+    api_key=settings.CLOUDINARY_API_KEY,
+    api_secret=settings.CLOUDINARY_API_SECRET,
+)
 
 
 bp = Blueprint('admin_bp', __name__, url_prefix='/admin')
@@ -2014,6 +2022,21 @@ _CAMPAIGN_SLUG_RE = re.compile(r'^[a-z0-9][a-z0-9_-]{1,49}$')
 _CAMPAIGN_FEATURE_ROWS = 6
 
 
+def _campaign_uploaded_photo_url(files, field_name: str) -> str | None:
+    """Upload a campaign banner photo if one was submitted for `field_name`.
+    Returns the new Cloudinary URL, or None if no file was submitted (caller
+    should then keep whatever URL was already stored, if any)."""
+    photo = files.get(field_name)
+    if not photo or not photo.filename:
+        return None
+    result = cloudinary.uploader.upload(
+        photo,
+        upload_preset=settings.CLOUDINARY_UPLOAD_PRESET,
+        folder="citylove/campaigns",
+    )
+    return result['secure_url']
+
+
 def _campaign_posted_features(form) -> list[dict]:
     return [
         {'icon': icon.strip(), 'text': text.strip()}
@@ -2099,6 +2122,8 @@ def new_campaign():
             features=_campaign_posted_features(request.form),
             note=request.form.get('note', '').strip() or '填寫約 5 分鐘',
             cta=request.form.get('cta', '').strip() or '開始填寫個人資料',
+            photo1_url=_campaign_uploaded_photo_url(request.files, 'photo1'),
+            photo2_url=_campaign_uploaded_photo_url(request.files, 'photo2'),
             created_by_id=current_user.id,
         )
         session.add(campaign)
@@ -2133,6 +2158,19 @@ def edit_campaign(campaign_id):
         campaign.features = _campaign_posted_features(request.form)
         campaign.note = request.form.get('note', '').strip() or '填寫約 5 分鐘'
         campaign.cta = request.form.get('cta', '').strip() or '開始填寫個人資料'
+
+        new_photo1 = _campaign_uploaded_photo_url(request.files, 'photo1')
+        if new_photo1:
+            campaign.photo1_url = new_photo1
+        elif request.form.get('reset_photo1'):
+            campaign.photo1_url = None
+
+        new_photo2 = _campaign_uploaded_photo_url(request.files, 'photo2')
+        if new_photo2:
+            campaign.photo2_url = new_photo2
+        elif request.form.get('reset_photo2'):
+            campaign.photo2_url = None
+
         session.commit()
         flash('活動已更新', 'success')
         return redirect(url_for('admin_bp.campaigns_list'))

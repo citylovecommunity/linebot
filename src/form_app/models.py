@@ -891,6 +891,8 @@ class Campaign(Base):
     features: Mapped[List[Dict[str, Any]]] = mapped_column(JSONB, default=list)  # [{"icon": "...", "text": "..."}]
     note: Mapped[str] = mapped_column(default='填寫約 5 分鐘')
     cta: Mapped[str] = mapped_column(default='開始填寫個人資料')
+    photo1_url: Mapped[Optional[str]] = mapped_column(nullable=True)  # hero banner left half; falls back to default image if unset
+    photo2_url: Mapped[Optional[str]] = mapped_column(nullable=True)  # hero banner right half; falls back to default image if unset
     is_active: Mapped[bool] = mapped_column(default=True)
     created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey('member.id'), nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.now)
