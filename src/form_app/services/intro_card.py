@@ -7,6 +7,7 @@ from pathlib import Path
 import cloudinary
 import cloudinary.uploader
 import requests
+from fontTools.ttLib import TTFont
 from PIL import Image, ImageDraw, ImageFont
 
 from form_app.config import settings
@@ -38,20 +39,86 @@ ROW2_Y      = 1010
 INTERESTS_Y = 1090
 TEXT_RIGHT  = 820             # right-hand wrap boundary for interests/bio
 LINE_H      = 42
+BODY_MAX_Y  = 1500            # interests/bio stop here so they never hit the footer
 
 FONTS_DIR   = Path(__file__).parent.parent / "static" / "fonts"
 DOODLES_PNG = Path(__file__).parent.parent / "static" / "images" / "intro_card_doodles.png"
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# ── Fonts & per-glyph fallback ────────────────────────────────────────────────
+# NotoSansTC covers Traditional Chinese + Latin + CJK punctuation only. Member
+# free-text answers (bio / interests) routinely contain emoji and Simplified-
+# only hanzi, which have no glyph in that font and render as ".notdef" tofu
+# boxes that visually collide. We resolve every character against a stack —
+# Traditional → Simplified → monochrome emoji — and draw each maximal run with
+# the first font that has the glyph. Characters covered by none (ZWJ joiners,
+# variation selectors, skin-tone modifiers, unknown symbols) are dropped.
 
-def _font(weight: str, size: int) -> ImageFont.FreeTypeFont:
-    names = {
-        "bold":    "NotoSansTC-Bold.otf",
-        "medium":  "NotoSansTC-Medium.otf",
-        "regular": "NotoSansTC-Regular.otf",
-    }
-    return ImageFont.truetype(str(FONTS_DIR / names[weight]), size)
+FONT_STACK = {
+    "bold":    ("NotoSansTC-Bold.otf",    "NotoSansSC-Bold.otf",    "NotoEmoji-Regular.ttf"),
+    "medium":  ("NotoSansTC-Medium.otf",  "NotoSansSC-Medium.otf",  "NotoEmoji-Regular.ttf"),
+    "regular": ("NotoSansTC-Regular.otf", "NotoSansSC-Regular.otf", "NotoEmoji-Regular.ttf"),
+}
+
+_font_cache: dict[tuple[str, int], ImageFont.FreeTypeFont] = {}
+_cmap_cache: dict[str, set[int]] = {}
+
+
+def _cmap(filename: str) -> set[int]:
+    if filename not in _cmap_cache:
+        _cmap_cache[filename] = set(TTFont(str(FONTS_DIR / filename)).getBestCmap())
+    return _cmap_cache[filename]
+
+
+def _load(filename: str, size: int) -> ImageFont.FreeTypeFont:
+    key = (filename, size)
+    if key not in _font_cache:
+        _font_cache[key] = ImageFont.truetype(str(FONTS_DIR / filename), size)
+    return _font_cache[key]
+
+
+def _resolve(ch: str, weight: str, size: int) -> ImageFont.FreeTypeFont | None:
+    cp = ord(ch)
+    for filename in FONT_STACK[weight]:
+        if cp in _cmap(filename):
+            return _load(filename, size)
+    return None
+
+
+def _runs(text: str, weight: str, size: int) -> list[tuple[str, ImageFont.FreeTypeFont]]:
+    """Split text into consecutive same-font runs, dropping unrenderable chars."""
+    runs: list[tuple[str, ImageFont.FreeTypeFont]] = []
+    for ch in text:
+        fnt = _resolve(ch, weight, size)
+        if fnt is None:
+            continue
+        if runs and runs[-1][1] is fnt:
+            runs[-1] = (runs[-1][0] + ch, fnt)
+        else:
+            runs.append((ch, fnt))
+    return runs
+
+
+def _measure(text: str, weight: str, size: int) -> float:
+    return sum(f.getlength(s) for s, f in _runs(text, weight, size))
+
+
+def _text(draw: ImageDraw.ImageDraw, xy: tuple[int, int], text: str, *,
+          weight: str, size: int, fill, anchor: str = "la") -> None:
+    """draw.text() replacement that renders mixed-font runs on one baseline."""
+    x, y = xy
+    ha, va = anchor[0], anchor[1]
+    runs = _runs(text, weight, size)
+    if not runs:
+        return
+    widths = [f.getlength(s) for s, f in runs]
+    if ha == "m":
+        x -= sum(widths) / 2
+    elif ha == "r":
+        x -= sum(widths)
+    for (s, f), w in zip(runs, widths):
+        draw.text((x, y), s, font=f, fill=fill, anchor="l" + va)
+        x += w
 
 
 def _cover_crop(img: Image.Image, w: int, h: int) -> Image.Image:
@@ -68,7 +135,7 @@ def _cover_crop(img: Image.Image, w: int, h: int) -> Image.Image:
     return img.resize((w, h), Image.LANCZOS)
 
 
-def _wrap(text: str, font: ImageFont.FreeTypeFont, max_w: int) -> list[str]:
+def _wrap(text: str, weight: str, size: int, max_w: int) -> list[str]:
     # Collapse embedded newlines/tabs/runs of spaces first — form answers
     # sometimes contain literal "\r\n". A raw newline passed into draw.text()
     # renders as its own multi-line block with tight internal spacing, which
@@ -78,7 +145,7 @@ def _wrap(text: str, font: ImageFont.FreeTypeFont, max_w: int) -> list[str]:
     lines, current = [], ""
     for ch in text:
         test = current + ch
-        if font.getbbox(test)[2] > max_w and current:
+        if _measure(test, weight, size) > max_w and current:
             lines.append(current)
             current = ch
         else:
@@ -109,8 +176,8 @@ def generate_intro_card(member) -> str:
     surname = (member.name or "")[0] if member.name else ""
     honorific = "先生" if member.gender == "M" else "小姐"
     display_name = f"{surname}{honorific}" if surname else honorific
-    draw.text((W // 2, 102), display_name,
-              font=_font("bold", 50), fill=DARK, anchor="mm")
+    _text(draw, (W // 2, 102), display_name,
+          weight="bold", size=50, fill=DARK, anchor="mm")
 
     # 3. Profile photo — flush rectangle, no ring/shadow (matches template)
     photo_url = user_info.get("相片網址") or member.introduction_link
@@ -132,34 +199,34 @@ def generate_intro_card(member) -> str:
     city_raw = user_info.get("可約會地區 (可複選)", "")
     city = city_raw.split(",")[0].strip() if city_raw else "—"
 
-    fn_value = _font("medium", 34)
-    draw.text((LEFT_COL_X,  ROW1_Y), _birth(member.birthday),             font=fn_value, fill=DARK, anchor="lm")
-    draw.text((RIGHT_COL_X, ROW1_Y), user_info.get("會員之職業類別", "—"), font=fn_value, fill=DARK, anchor="lm")
-    draw.text((LEFT_COL_X,  ROW2_Y), f"{member.height} cm" if member.height else "—", font=fn_value, fill=DARK, anchor="lm")
-    draw.text((RIGHT_COL_X, ROW2_Y), city,                                font=fn_value, fill=DARK, anchor="lm")
+    _V = dict(fill=DARK, anchor="lm")
+    _text(draw, (LEFT_COL_X,  ROW1_Y), _birth(member.birthday),                        weight="medium", size=34, **_V)
+    _text(draw, (RIGHT_COL_X, ROW1_Y), user_info.get("會員之職業類別", "—"),           weight="medium", size=34, **_V)
+    _text(draw, (LEFT_COL_X,  ROW2_Y), f"{member.height} cm" if member.height else "—", weight="medium", size=34, **_V)
+    _text(draw, (RIGHT_COL_X, ROW2_Y), city,                                            weight="medium", size=34, **_V)
 
-    # 5. Interests — plain wrapped line(s)
+    # 5. Interests + 6. Bio — plain wrapped line(s), never drawn onto the footer
     cursor_y = INTERESTS_Y
     interests = [i.strip() for i in user_info.get("興趣", "").split(",") if i.strip()]
     if interests:
-        fn_interests = _font("medium", 28)
-        lines = _wrap("、".join(interests), fn_interests, TEXT_RIGHT - LEFT_COL_X)
-        for line in lines:
-            draw.text((LEFT_COL_X, cursor_y), line, font=fn_interests, fill=DARK, anchor="la")
+        for line in _wrap("、".join(interests), "medium", 28, TEXT_RIGHT - LEFT_COL_X):
+            if cursor_y > BODY_MAX_Y:
+                break
+            _text(draw, (LEFT_COL_X, cursor_y), line, weight="medium", size=28, fill=DARK, anchor="la")
             cursor_y += LINE_H
 
-    # 6. Bio — plain wrapped text
     bio = user_info.get("簡單介紹自己", "").strip()
     if bio:
         bio_y = cursor_y + 40
-        fn_bio = _font("regular", 27)
-        for line in _wrap(bio, fn_bio, TEXT_RIGHT - LEFT_COL_X):
-            draw.text((LEFT_COL_X, bio_y), line, font=fn_bio, fill=BIO_COLOR, anchor="la")
+        for line in _wrap(bio, "regular", 27, TEXT_RIGHT - LEFT_COL_X):
+            if bio_y > BODY_MAX_Y:
+                break
+            _text(draw, (LEFT_COL_X, bio_y), line, weight="regular", size=27, fill=BIO_COLOR, anchor="la")
             bio_y += LINE_H
 
     # 7. Footer wordmark (sparkle mark is already baked into the doodle overlay)
-    draw.text((W // 2, 1546), "CityLove 城遇",
-              font=_font("medium", 26), fill=MUTED, anchor="mm")
+    _text(draw, (W // 2, 1546), "CityLove 城遇",
+          weight="medium", size=26, fill=MUTED, anchor="mm")
 
     # 8. Upload to Cloudinary
     buf = io.BytesIO()
