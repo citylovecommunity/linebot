@@ -595,7 +595,7 @@
                 </td>
                 <td>
                   <button type="button" class="btn btn-sm btn-outline-secondary me-1" title="編輯"
-                    onclick="openGroupEdit({{ g.id }}, [{% for gm in g.memberships %}{membershipId:{{ gm.id }}, memberId:{{ gm.member_id }}}{% if not loop.last %},{% endif %}{% endfor %}], '{{ g.cool_name }}', {{ (g.source_campaign or '') | tojson }}, {{ g.host_member_id or 'null' }})">
+                    onclick='openGroupEdit({{ g.id }}, [{% for gm in g.memberships %}{membershipId:{{ gm.id }}, memberId:{{ gm.member_id }}}{% if not loop.last %},{% endif %}{% endfor %}], {{ g.cool_name | tojson }}, {{ (g.source_campaign or "") | tojson }}, {{ g.host_member_id or "null" }})'>
                     <i class="bi bi-pencil"></i> 編輯
                   </button>
                   <form method="POST" action="{{ url_for('admin_bp.discard_group_draft', group_id=g.id) }}"
