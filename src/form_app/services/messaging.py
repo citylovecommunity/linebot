@@ -381,6 +381,39 @@ def collect_group_message_texts(session):
     return updates
 
 
+def collect_group_coach_note_texts(session):
+    """Private admin->member notes (recipient_id set) — one recipient per note,
+    so unlike collect_group_message_texts there's no fan-out/partial-delivery set logic."""
+    updates = defaultdict(list)
+    unnotified = (
+        session.query(GroupMessage)
+        .filter(
+            GroupMessage.recipient_id.is_not(None),
+            GroupMessage.is_notified.is_not(True),
+        )
+        .options(joinedload(GroupMessage.group))
+        .all()
+    )
+    if not unnotified:
+        return updates
+
+    delivered = _delivered_map(session, 'group_coach_note', [m.id for m in unnotified])
+
+    for note in unnotified:
+        if note.recipient_id in delivered.get(note.id, set()):
+            note.is_notified = True
+            continue
+        group = note.group
+        text = (
+            f"🎯 群組 {group.cool_name} — 小編給你一個小提醒！\n\n"
+            f"{_trim(note.content)}\n\n"
+            f"🔗 查看詳情: {APP_URL}/dashboard/group/{group.id}"
+        )
+        updates[note.recipient_id].append(NotifItem(text, [('group_coach_note', note.id)]))
+
+    return updates
+
+
 def collect_group_proposal_texts(session):
     updates = defaultdict(list)
     proposals = (
@@ -427,6 +460,7 @@ _COLLECTORS = [
     collect_confirmed_date_proposal_texts,
     collect_new_group_match_texts,
     collect_group_message_texts,
+    collect_group_coach_note_texts,
     collect_group_proposal_texts,
 ]
 

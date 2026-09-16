@@ -780,7 +780,14 @@ class GroupMessage(Base):
     is_notified: Mapped[Optional[bool]]
     is_system_notification: Mapped[bool] = mapped_column(default=False)
 
+    # Set only for a private admin->member note (a "mission"/hint); None means
+    # a normal message shared with the whole group. Never touches
+    # GroupMembership.message_count (that's only bumped for member-authored sends).
+    recipient_id: Mapped[Optional[int]] = mapped_column(ForeignKey("member.id"), nullable=True)
+    is_coach_note: Mapped[bool] = mapped_column(default=False)
+
     sender: Mapped["Member"] = relationship(foreign_keys=[sender_id])
+    recipient: Mapped[Optional["Member"]] = relationship(foreign_keys=[recipient_id])
     group: Mapped["GroupMatching"] = relationship(
         "GroupMatching", back_populates="messages", foreign_keys=[group_id]
     )

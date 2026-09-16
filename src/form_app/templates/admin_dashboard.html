@@ -62,7 +62,7 @@
     <li class="nav-item" role="presentation">
       <button class="nav-link" id="matchings-tab" data-bs-toggle="tab" data-bs-target="#matchings"
         type="button" role="tab">
-        配對 <span class="badge bg-secondary ms-1">{{ matchings|length }}</span>
+        配對 <span class="badge bg-secondary ms-1">{{ matchings_total_count }}</span>
       </button>
     </li>
     <li class="nav-item" role="presentation">
@@ -518,6 +518,20 @@
           </tbody>
         </table>
       </div>
+
+      {% if matchings_total_pages > 1 %}
+      <div class="d-flex justify-content-between align-items-center mt-2">
+        <span class="text-muted small">
+          第 {{ matchings_page }} / {{ matchings_total_pages }} 頁（共 {{ matchings_total_count }} 筆）
+        </span>
+        <div class="btn-group">
+          <a href="{{ url_for('admin_bp.admin_dashboard', tab='matchings', mpage=matchings_page - 1) }}"
+             class="btn btn-sm btn-outline-secondary {{ 'disabled' if matchings_page <= 1 }}">上一頁</a>
+          <a href="{{ url_for('admin_bp.admin_dashboard', tab='matchings', mpage=matchings_page + 1) }}"
+             class="btn btn-sm btn-outline-secondary {{ 'disabled' if matchings_page >= matchings_total_pages }}">下一頁</a>
+        </div>
+      </div>
+      {% endif %}
     </div>
 
     <!-- 群組頁籤 -->
@@ -664,7 +678,7 @@
               </td>
               <td class="small">{{ g.created_at.strftime('%Y-%m-%d') }}</td>
               <td>
-                <a href="{{ url_for('dashboard_bp.group_detail', group_id=g.id) }}"
+                <a href="{{ url_for('admin_bp.admin_group_detail', group_id=g.id) }}"
                   class="btn btn-sm btn-outline-secondary me-1" target="_blank">
                   <i class="bi bi-chat-dots"></i>
                 </a>
@@ -676,6 +690,14 @@
                   <button type="submit" class="btn btn-sm btn-outline-danger">取消</button>
                 </form>
                 {% endif %}
+                <form method="POST"
+                  action="{{ url_for('admin_bp.delete_group', group_id=g.id) }}"
+                  class="d-inline"
+                  onsubmit="return confirm('確定要永久刪除群組「{{ g.cool_name }}」嗎？所有對話、私訊提醒與紀錄都會一併刪除，無法復原。')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger" title="永久刪除">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
               </td>
             </tr>
             {% endfor %}
@@ -1818,9 +1840,7 @@
                      value="all" checked onchange="toggleMatchingPicker()">
               <label class="form-check-label" for="targetAll">
                 所有進行中的配對
-                <span class="badge bg-success ms-1">
-                  {{ matchings | selectattr('status.value', 'equalto', 'ACTIVE') | list | length }} 個
-                </span>
+                <span class="badge bg-success ms-1">{{ active_matchings }} 個</span>
               </label>
             </div>
             <div class="form-check">
@@ -1836,21 +1856,10 @@
               <button type="button" class="btn btn-sm btn-outline-secondary"
                       onclick="toggleAllMatchings()">全選／取消全選</button>
             </div>
-            <div class="border rounded p-2" style="max-height:260px;overflow-y:auto;">
-              {% for m in matchings %}{% if m.status.value == 'ACTIVE' %}
-              {% set subj = members_by_id.get(m.subject_id) %}
-              {% set obj  = members_by_id.get(m.object_id) %}
-              <div class="form-check py-1 border-bottom">
-                <input class="form-check-input matching-cb" type="checkbox"
-                       name="matching_ids" value="{{ m.id }}" id="mcb_{{ m.id }}">
-                <label class="form-check-label" for="mcb_{{ m.id }}">
-                  <span class="fw-semibold">{{ m.cool_name }}</span>
-                  <span class="text-muted small ms-2">
-                    {{ subj.name if subj else '—' }} ♥ {{ obj.name if obj else '—' }}
-                  </span>
-                </label>
-              </div>
-              {% endif %}{% endfor %}
+            <input type="text" class="form-control form-control-sm mb-2"
+                   placeholder="搜尋…" id="matchingPickerSearch" oninput="filterMatchingPicker(this)">
+            <div class="border rounded p-2" style="max-height:260px;overflow-y:auto;" id="matchingPickerList">
+              <div class="text-muted small p-2">載入中…</div>
             </div>
           </div>
         </div>
@@ -1875,7 +1884,7 @@
         <h5 class="modal-title"><i class="bi bi-people-fill me-2"></i>建立群組配對</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <form method="POST" action="{{ url_for('admin_bp.create_group') }}" id="create-group-form" style="display:none;"></form>
+      <form method="POST" action="{{ url_for('admin_bp.create_group') }}" id="create-group-form" autocomplete="off" style="display:none;"></form>
 
       <div class="modal-body p-3">
           <!-- Selection summary bar -->
@@ -1903,7 +1912,7 @@
                 <label class="cg-card card mb-2 p-2" style="cursor:pointer;border:2px solid transparent;"
                        data-name="{{ m.name }}">
                   <input type="checkbox" class="visually-hidden cg-check" form="create-group-form"
-                         name="male_ids" value="{{ m.id }}" onchange="cgToggleCard(this)">
+                         name="male_ids" value="{{ m.id }}" autocomplete="off" onchange="cgToggleCard(this)">
                   <div class="d-flex justify-content-between align-items-start">
                     <div>
                       <span class="fw-semibold">{{ m.name }}</span>
@@ -1949,7 +1958,7 @@
                 <label class="cg-card card mb-2 p-2" style="cursor:pointer;border:2px solid transparent;"
                        data-name="{{ m.name }}">
                   <input type="checkbox" class="visually-hidden cg-check" form="create-group-form"
-                         name="female_ids" value="{{ m.id }}" onchange="cgToggleCard(this)">
+                         name="female_ids" value="{{ m.id }}" autocomplete="off" onchange="cgToggleCard(this)">
                   <div class="d-flex justify-content-between align-items-start">
                     <div>
                       <span class="fw-semibold">{{ m.name }}</span>
@@ -1978,6 +1987,14 @@
               </div>
             </div>
           </div>
+
+          <!-- Per-member private notes ("missions"/hints), sent right after the group is created -->
+          <div class="mt-3" id="cg-notes-section" style="display:none;">
+            <label class="form-label fw-semibold small mb-2">
+              🎯 私訊提醒 / 任務（選填，建立群組後立即發送給對應成員）
+            </label>
+            <div id="cg-notes-list" class="d-flex flex-column gap-2"></div>
+          </div>
         </div>
 
       <div class="modal-footer">
@@ -1986,6 +2003,14 @@
         <button type="submit" form="create-group-form" class="btn btn-success" id="cg-submit-btn" disabled>
           <i class="bi bi-people-fill me-1"></i> 建立群組
         </button>
+      </div>
+
+      <!-- Full-modal overlay shown while the group is being created (server round-trip can take a few seconds) -->
+      <div id="cg-loading-overlay"
+           class="d-none flex-column align-items-center justify-content-center gap-3"
+           style="position:absolute;inset:0;background:rgba(255,255,255,.92);z-index:10;border-radius:inherit;">
+        <div class="spinner-border text-success" style="width:4rem;height:4rem;" role="status"></div>
+        <div class="fw-semibold">建立群組中，請稍候…</div>
       </div>
     </div>
   </div>
@@ -2203,9 +2228,47 @@ function confirmAndLockGroupDrafts(form, confirmMsg, spinnerLabel) {
   return true;
 }
 
+let _matchingPickerLoaded = false;
+
 function toggleMatchingPicker() {
   const selected = document.getElementById('targetSelected').checked;
   document.getElementById('matchingPicker').style.display = selected ? '' : 'none';
+  if (selected && !_matchingPickerLoaded) {
+    _matchingPickerLoaded = true;
+    fetch('/admin/matchings/active-list')
+      .then(r => r.json())
+      .then(renderMatchingPicker)
+      .catch(() => {
+        document.getElementById('matchingPickerList').innerHTML =
+          '<div class="text-danger small p-2">載入失敗，請重新開啟視窗再試一次</div>';
+        _matchingPickerLoaded = false;
+      });
+  }
+}
+
+function renderMatchingPicker(items) {
+  const list = document.getElementById('matchingPickerList');
+  if (!items.length) {
+    list.innerHTML = '<div class="text-muted small p-2">目前沒有進行中的配對</div>';
+    return;
+  }
+  list.innerHTML = items.map(m => `
+    <div class="form-check py-1 border-bottom" data-name="${(m.cool_name + m.subject_name + m.object_name).toLowerCase()}">
+      <input class="form-check-input matching-cb" type="checkbox"
+             name="matching_ids" value="${m.id}" id="mcb_${m.id}">
+      <label class="form-check-label" for="mcb_${m.id}">
+        <span class="fw-semibold">${m.cool_name}</span>
+        <span class="text-muted small ms-2">${m.subject_name} ♥ ${m.object_name}</span>
+      </label>
+    </div>
+  `).join('');
+}
+
+function filterMatchingPicker(input) {
+  const q = input.value.toLowerCase();
+  document.querySelectorAll('#matchingPickerList [data-name]').forEach(row => {
+    row.style.display = row.dataset.name.includes(q) ? '' : 'none';
+  });
 }
 
 function toggleAllMatchings() {
@@ -2221,8 +2284,7 @@ function confirmBroadcast() {
     if (checked === 0) { alert('請選擇至少一個配對'); return false; }
     return confirm(`確定要廣播訊息至 ${checked} 個配對嗎？`);
   }
-  const total = document.querySelectorAll('.matching-cb').length;
-  return confirm(`確定要廣播訊息至全部 ${total} 個進行中的配對嗎？`);
+  return confirm(`確定要廣播訊息至全部 {{ active_matchings }} 個進行中的配對嗎？`);
 }
 </script>
 
@@ -2407,6 +2469,7 @@ function startAutoForm(form) {
 // ── 手動建立群組 card picker ───────────────────────────────────────────────────
 (function() {
   const COLORS = { M: '#0d6efd', F: '#d63384' };
+  const cgNoteDrafts = {}; // memberId -> draft text, kept across accidental uncheck/recheck
 
   window.cgFilter = function(input, panelId) {
     const q = input.value.toLowerCase();
@@ -2426,7 +2489,61 @@ function startAutoForm(form) {
       card.style.backgroundColor = '';
     }
     cgUpdateState();
+    cgSyncNotes();
   };
+
+  // memberId -> row element currently in the DOM. Kept so toggling one
+  // checkbox doesn't tear down and recreate every other member's textarea —
+  // each recreated textarea is a "new" form-associated control, and browsers
+  // re-run form/autofill analysis over the whole form when that happens, which
+  // was making the first keystroke into a note feel laggy.
+  const cgNoteRows = {};
+
+  function cgSyncNotes() {
+    const checkedIds = new Set(Array.from(document.querySelectorAll('.cg-check:checked')).map(c => c.value));
+    const section = document.getElementById('cg-notes-section');
+    const list = document.getElementById('cg-notes-list');
+    section.style.display = checkedIds.size ? '' : 'none';
+
+    // Drop rows for members that got unchecked, saving their draft text first
+    Object.keys(cgNoteRows).forEach(id => {
+      if (checkedIds.has(id)) return;
+      const row = cgNoteRows[id];
+      cgNoteDrafts[id] = row.querySelector('textarea').value;
+      row.remove();
+      delete cgNoteRows[id];
+    });
+
+    // Add rows only for newly-checked members; leave existing rows untouched
+    document.querySelectorAll('.cg-check:checked').forEach(c => {
+      const id = c.value;
+      if (cgNoteRows[id]) return;
+      const name = c.closest('.cg-card').dataset.name;
+
+      const row = document.createElement('div');
+      row.className = 'd-flex gap-2 align-items-start';
+
+      const label = document.createElement('div');
+      label.className = 'small text-muted flex-shrink-0';
+      label.style.minWidth = '70px';
+      label.style.paddingTop = '6px';
+      label.textContent = name;
+
+      const textarea = document.createElement('textarea');
+      textarea.className = 'form-control form-control-sm';
+      textarea.rows = 2;
+      textarea.autocomplete = 'off';
+      textarea.setAttribute('form', 'create-group-form');
+      textarea.name = `note_${id}`;
+      textarea.placeholder = `給 ${name} 的提醒或任務…（選填）`;
+      textarea.value = cgNoteDrafts[id] || '';
+
+      row.appendChild(label);
+      row.appendChild(textarea);
+      list.appendChild(row);
+      cgNoteRows[id] = row;
+    });
+  }
 
   function cgUpdateState() {
     const checked = Array.from(document.querySelectorAll('.cg-check:checked'));
@@ -2471,6 +2588,17 @@ function startAutoForm(form) {
           card.style.backgroundColor = '';
         });
         cgUpdateState();
+        cgSyncNotes();
+        Object.keys(cgNoteDrafts).forEach(k => delete cgNoteDrafts[k]);
+        document.getElementById('cg-loading-overlay').classList.replace('d-flex', 'd-none');
+      });
+    }
+
+    const form = document.getElementById('create-group-form');
+    if (form) {
+      form.addEventListener('submit', function() {
+        document.getElementById('cg-loading-overlay').classList.replace('d-none', 'd-flex');
+        document.getElementById('cg-submit-btn').disabled = true;
       });
     }
   });

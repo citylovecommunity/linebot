@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}群組詳情 — {{ group.cool_name }} — Admin{% endblock %}
+
+{% block content %}
+<div class="container mt-4" style="max-width: 1100px;">
+
+  <!-- Back -->
+  <div class="d-flex align-items-center mb-4 gap-3">
+    <a href="{{ url_for('admin_bp.admin_dashboard', tab='groups') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+    <h3 class="mb-0">✨ {{ group.cool_name }}</h3>
+    {% if group.status.value == 'ACTIVE' %}
+      <span class="badge bg-success">進行中</span>
+    {% elif group.status.value == 'DRAFT' %}
+      <span class="badge bg-warning text-dark">草稿</span>
+    {% elif group.status.value == 'FEEDBACK' %}
+      <span class="badge bg-info text-dark">評分中</span>
+    {% elif group.status.value == 'CLOSED' %}
+      <span class="badge bg-secondary">已封存</span>
+    {% else %}
+      <span class="badge bg-secondary">已取消</span>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('admin_bp.delete_group', group_id=group.id) }}" class="ms-auto"
+          onsubmit="return confirm('確定要永久刪除群組「{{ group.cool_name }}」嗎？所有對話、私訊提醒與紀錄都會一併刪除，無法復原。')">
+      <button type="submit" class="btn btn-sm btn-outline-danger">
+        <i class="bi bi-trash me-1"></i>永久刪除
+      </button>
+    </form>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+    <div class="alert alert-{{ 'danger' if cat == 'danger' else 'success' }} alert-dismissible fade show" role="alert">
+      {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+  {% endwith %}
+
+  <!-- Member avatar row -->
+  <div class="d-flex flex-wrap gap-3 mb-4">
+    {% for member in group.members %}
+      {% set gm = memberships_by_id.get(member.id) %}
+      <div class="d-flex flex-column align-items-center" style="min-width:64px;">
+        <div class="rounded-circle d-flex align-items-center justify-content-center mb-1"
+             style="width:44px;height:44px;font-size:1.3rem;
+               background:{{ '#e8f0ff' if member.gender == 'M' else '#fce8ff' }};
+               border:1.5px solid #dee2e6;">
+          {{ gm.session_avatar if gm and gm.session_avatar else member.name[0] }}
+        </div>
+        <div class="small text-center">
+          {{ member.name }}{% if group.host_member_id == member.id %} 👑{% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="row g-4">
+    <!-- ── Shared chat (read-only, for context) ── -->
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm rounded-4 d-flex flex-column" style="height:70vh;min-height:420px;">
+        <div class="card-header bg-white border-0 rounded-top-4 px-4 py-3">
+          <span class="fw-semibold"><i class="bi bi-chat-dots me-2 text-primary"></i>群組對話（僅供查閱）</span>
+        </div>
+        <div class="flex-grow-1 overflow-auto px-3 py-2">
+          {% for msg in shared_messages %}
+            {% set gm = memberships_by_id.get(msg.sender_id) %}
+            {% if msg.is_system_notification %}
+              <div class="text-center my-3">
+                <span class="badge bg-light text-muted fw-normal border px-3 py-2"
+                      style="white-space:pre-wrap;text-align:left;display:inline-block;max-width:320px;">{{ msg.content }}</span>
+              </div>
+            {% else %}
+              <div class="d-flex justify-content-start mb-2">
+                <div class="rounded-circle d-flex align-items-center justify-content-center me-2 flex-shrink-0"
+                     style="width:32px;height:32px;font-size:1.1rem;
+                       background:{{ '#e8f0ff' if msg.sender.gender == 'M' else '#fce8ff' }};
+                       border:1.5px solid #dee2e6;align-self:flex-end;">
+                  {{ gm.session_avatar if gm and gm.session_avatar else msg.sender.name[0] }}
+                </div>
+                <div style="max-width:70%;">
+                  <div class="fw-semibold mb-1" style="font-size:.72rem;color:#888;">
+                    {{ msg.sender.proper_name }}
+                  </div>
+                  <div class="px-3 py-2 rounded-3" style="background:#f0f2f5;border-radius:18px 18px 18px 4px;">
+                    <span style="font-size:.9rem;">{{ msg.content }}</span>
+                    <div class="mt-1" style="font-size:.65rem;opacity:.65;">
+                      {{ msg.timestamp.strftime('%m/%d %H:%M') }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {% endif %}
+          {% else %}
+            <div class="text-center text-muted py-5 small">目前尚無對話</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Per-member private notes ── -->
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-header bg-white border-0 rounded-top-4 px-4 py-3">
+          <span class="fw-semibold"><i class="bi bi-megaphone me-2 text-warning"></i>私訊提醒 / 任務</span>
+        </div>
+        <div class="card-body p-3">
+
+          {% if not group.members %}
+            <div class="text-muted small text-center py-4">此群組尚無成員</div>
+          {% else %}
+          <ul class="nav nav-tabs small" role="tablist">
+            {% for member in group.members %}
+            <li class="nav-item" role="presentation">
+              <button class="nav-link {{ 'active' if loop.first }}" id="tab-btn-{{ member.id }}"
+                      data-bs-toggle="tab" data-bs-target="#tab-{{ member.id }}"
+                      type="button" role="tab">
+                {{ member.name }}
+                {% if notes_by_member.get(member.id) %}
+                  <span class="badge bg-secondary ms-1">{{ notes_by_member[member.id]|length }}</span>
+                {% endif %}
+              </button>
+            </li>
+            {% endfor %}
+          </ul>
+
+          <div class="tab-content pt-3">
+            {% for member in group.members %}
+            <div class="tab-pane fade {{ 'show active' if loop.first }}" id="tab-{{ member.id }}" role="tabpanel">
+
+              <div class="mb-3" style="max-height:260px;overflow-y:auto;">
+                {% for note in notes_by_member.get(member.id, []) %}
+                  <div class="small mb-2 pb-2 border-bottom">
+                    <div style="white-space:pre-wrap;">{{ note.content }}</div>
+                    <div class="text-muted" style="font-size:.7rem;">{{ note.timestamp.strftime('%Y-%m-%d %H:%M') }}</div>
+                  </div>
+                {% else %}
+                  <div class="text-muted small">尚未發送任何提醒</div>
+                {% endfor %}
+              </div>
+
+              {% if group.status.value == 'ACTIVE' %}
+              <form method="POST" action="{{ url_for('admin_bp.admin_send_group_note', group_id=group.id) }}">
+                <input type="hidden" name="recipient_id" value="{{ member.id }}">
+                <textarea name="content" class="form-control form-control-sm mb-2" rows="3"
+                          placeholder="給 {{ member.name }} 的提醒或任務…" required></textarea>
+                <button type="submit" class="btn btn-sm btn-warning">
+                  <i class="bi bi-send me-1"></i>送出提醒
+                </button>
+              </form>
+              {% else %}
+              <div class="text-muted small">僅能在進行中的群組發送提醒</div>
+              {% endif %}
+
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

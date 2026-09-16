@@ -5,7 +5,7 @@ from datetime import datetime, date, timedelta, timezone
 
 import cloudinary
 import cloudinary.uploader
-from flask import Blueprint, jsonify, render_template, redirect, url_for, flash, request, session as flask_session
+from flask import Blueprint, jsonify, render_template, redirect, url_for, flash, request, abort, session as flask_session
 from flask_login import login_required, current_user
 from sqlalchemy.orm import joinedload, defer, selectinload
 from sqlalchemy.orm.attributes import flag_modified
@@ -209,13 +209,19 @@ def _diagnose_unmatched(eligible_pool, draft_matchings, all_matchings, session):
     return results
 
 
+MATCHINGS_PAGE_SIZE = 50
+
+
 @bp.route('/dashboard')
 @login_required
 @admin_required
 def admin_dashboard():
     cache = _get_redis()
     has_flash = bool(flask_session.get('_flashes'))
-    bypass_cache = request.args.get('generated') == '1'
+    mpage = request.args.get('mpage', 1, type=int)
+    # Cache only holds the default (page 1) render — paginating elsewhere would
+    # otherwise silently serve page-1 HTML for a page-2+ request.
+    bypass_cache = request.args.get('generated') == '1' or mpage != 1
     if not has_flash and not bypass_cache and cache:
         cached = cache.get(_DASHBOARD_CACHE_KEY)
         if cached:
@@ -243,6 +249,13 @@ def admin_dashboard():
         .order_by(Matching.id.desc())
         .all()
     )
+
+    # The matchings TABLE only renders one page's worth (below) — all other uses of
+    # all_matchings (breakdowns, per-member counts, stats) need the full list.
+    matchings_total_count = len(all_matchings)
+    matchings_total_pages = max(1, -(-matchings_total_count // MATCHINGS_PAGE_SIZE))
+    mpage = min(max(mpage, 1), matchings_total_pages)
+    matchings_page_items = all_matchings[(mpage - 1) * MATCHINGS_PAGE_SIZE: mpage * MATCHINGS_PAGE_SIZE]
 
     draft_matchings = (
         session.query(Matching)
@@ -526,7 +539,10 @@ def admin_dashboard():
         member_date_counts=member_date_counts,
         non_eligible_map=non_eligible_map,
         members=all_members,
-        matchings=all_matchings,
+        matchings=matchings_page_items,
+        matchings_page=mpage,
+        matchings_total_pages=matchings_total_pages,
+        matchings_total_count=matchings_total_count,
         draft_matchings=draft_matchings,
         non_eligible=non_eligible,
         total_users=total_users,
@@ -1102,6 +1118,35 @@ def broadcast_message():
     return redirect(url_for('admin_bp.admin_dashboard', tab='matchings'))
 
 
+@bp.route('/matchings/active-list', methods=['GET'])
+@login_required
+@admin_required
+def matchings_active_list():
+    """Lightweight JSON list of ACTIVE matchings for the broadcast modal's
+    "選擇特定配對" picker — fetched on demand instead of rendering all of them
+    into the dashboard page on every load."""
+    session = get_db()
+    active = (
+        session.query(Matching)
+        .filter(Matching.status == MatchingStatus.ACTIVE)
+        .order_by(Matching.id.desc())
+        .all()
+    )
+    involved_ids = {uid for m in active for uid in (m.subject_id, m.object_id)}
+    names = dict(
+        session.query(Member.id, Member.name).filter(Member.id.in_(involved_ids)).all()
+    )
+    return jsonify([
+        {
+            'id': m.id,
+            'cool_name': m.cool_name,
+            'subject_name': names.get(m.subject_id, '—'),
+            'object_name': names.get(m.object_id, '—'),
+        }
+        for m in active
+    ])
+
+
 @bp.route('/matchings/<int:matching_id>/cancel', methods=['POST'])
 @login_required
 @admin_required
@@ -1179,10 +1224,30 @@ def create_group():
         ],
     )
     session.add(group)
+
+    # Optional per-member private notes ("missions"/hints), set up while creating
+    # the group and sent immediately once it exists — same mechanism as
+    # admin_send_group_note, just batched at creation time instead of after.
+    notes_created = 0
+    for member in members:
+        content = request.form.get(f'note_{member.id}', '').strip()
+        if content:
+            session.add(GroupMessage(
+                group=group,
+                sender_id=current_user.id,
+                recipient_id=member.id,
+                content=content,
+                is_coach_note=True,
+            ))
+            notes_created += 1
+
     session.commit()
     process_all_notifications(session)
     _invalidate_dashboard_cache()
-    flash(f'群組「{group.cool_name}」已建立', 'success')
+    flash_msg = f'群組「{group.cool_name}」已建立'
+    if notes_created:
+        flash_msg += f'，已發送 {notes_created} 則私訊提醒'
+    flash(flash_msg, 'success')
     return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
 
 
@@ -1382,6 +1447,38 @@ def cancel_group(group_id):
     return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
 
 
+@bp.route('/groups/<int:group_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_group(group_id):
+    """Permanently remove a group and everything tied to it (messages, private
+    notes, badges, date proposals, memberships) — unlike cancel_group, this is
+    not reversible. Meant for cleaning up test/mistaken groups."""
+    session = get_db()
+    group = session.get(GroupMatching, group_id)
+    if group is None:
+        flash('找不到該群組', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+
+    cool_name = group.cool_name
+
+    # Manual ordered delete: GroupDateProposal/GroupBadge have no ORM cascade
+    # from GroupMatching, and GroupMatching.last_message_id must be cleared
+    # before the GroupMessage rows it may point to can be removed.
+    session.query(GroupBadge).filter_by(group_id=group_id).delete()
+    session.query(GroupDateProposal).filter_by(group_id=group_id).delete()
+    session.query(GroupMembership).filter_by(group_id=group_id).delete()
+    group.last_message_id = None
+    session.flush()
+    session.query(GroupMessage).filter_by(group_id=group_id).delete()
+    session.delete(group)
+    session.commit()
+
+    _invalidate_dashboard_cache()
+    flash(f'群組「{cool_name}」已永久刪除', 'success')
+    return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+
+
 @bp.route('/groups/<int:group_id>/set-host', methods=['POST'])
 @login_required
 @admin_required
@@ -1409,6 +1506,77 @@ def set_group_host(group_id):
     _invalidate_dashboard_cache()
     flash(f'已更新群組「{group.cool_name}」的主揪', 'success')
     return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+
+
+@bp.route('/groups/<int:group_id>', methods=['GET'])
+@login_required
+@admin_required
+def admin_group_detail(group_id):
+    session = get_db()
+    group = session.get(GroupMatching, group_id)
+    if group is None:
+        flash('找不到該群組', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+
+    memberships_by_id = {gm.member_id: gm for gm in group.memberships}
+    shared_messages = [m for m in group.messages if m.recipient_id is None]
+    notes_by_member = defaultdict(list)
+    for m in group.messages:
+        if m.recipient_id is not None:
+            notes_by_member[m.recipient_id].append(m)
+
+    return render_template(
+        'admin_group_detail.html',
+        group=group,
+        memberships_by_id=memberships_by_id,
+        shared_messages=shared_messages,
+        notes_by_member=notes_by_member,
+    )
+
+
+@bp.route('/groups/<int:group_id>/note', methods=['POST'])
+@login_required
+@admin_required
+def admin_send_group_note(group_id):
+    session = get_db()
+    if not (current_user.is_admin or current_user.is_developer):
+        abort(403)
+
+    group = session.get(GroupMatching, group_id)
+    if group is None:
+        flash('找不到該群組', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+
+    if not group.is_active:
+        flash('僅能在進行中的群組發送提醒', 'danger')
+        return redirect(url_for('admin_bp.admin_group_detail', group_id=group_id))
+
+    recipient_id = request.form.get('recipient_id', type=int)
+    valid_member_ids = {m.id for m in group.members}
+    content = request.form.get('content', '').strip()
+
+    if recipient_id not in valid_member_ids:
+        flash('收件人不在此群組', 'danger')
+        return redirect(url_for('admin_bp.admin_group_detail', group_id=group_id))
+    if not content:
+        flash('請輸入內容', 'danger')
+        return redirect(url_for('admin_bp.admin_group_detail', group_id=group_id))
+
+    # Admin-authored note: intentionally never touches GroupMembership.message_count
+    # (that only tracks member-authored sends for ghost/no-show detection).
+    note = GroupMessage(
+        group_id=group.id,
+        sender_id=current_user.id,
+        recipient_id=recipient_id,
+        content=content,
+        is_coach_note=True,
+    )
+    session.add(note)
+    session.commit()
+    process_all_notifications(session)
+    _invalidate_dashboard_cache()
+    flash('已送出提醒', 'success')
+    return redirect(url_for('admin_bp.admin_group_detail', group_id=group_id))
 
 
 def _compute_and_save_score(session, source: Member, target: Member) -> UserMatchScore:
