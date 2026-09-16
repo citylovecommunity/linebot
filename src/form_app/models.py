@@ -198,6 +198,8 @@ class Member(Base):
         return self.name[0] + surname
 
     introduction_link: Mapped[Optional[str]]
+    photo_url: Mapped[Optional[str]]
+    photo_public_id: Mapped[Optional[str]]
 
     @property
     def blind_introduction_link(self):

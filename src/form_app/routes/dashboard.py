@@ -1,6 +1,9 @@
 
 from typing import Optional
 
+import cloudinary
+import cloudinary.uploader
+from cloudinary import CloudinaryImage
 from flask import (Blueprint, abort, flash, jsonify, redirect, render_template,
                    request, url_for)
 from flask_login import current_user, login_required
@@ -12,7 +15,14 @@ from form_app.models import (
 )
 from form_app.services.security import verify_password, hash_password
 from form_app.services.liff_token import make_liff_token, load_member_token
+from form_app.services.intro_card import generate_intro_card
 from form_app.config import settings
+
+cloudinary.config(
+    cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+    api_key=settings.CLOUDINARY_API_KEY,
+    api_secret=settings.CLOUDINARY_API_SECRET,
+)
 
 bp = Blueprint('dashboard_bp', __name__, url_prefix="/dashboard")
 
@@ -653,6 +663,43 @@ def save_pref_locks():
     }
     db.commit()
     flash('偏好設定已更新', 'success')
+    return redirect(url_for('dashboard_bp.profile'))
+
+
+@bp.route('/profile/photo', methods=['POST'])
+@login_required
+def update_photo():
+    photo = request.files.get('photo')
+    if not photo or not photo.filename:
+        flash('請選擇一張照片', 'danger')
+        return redirect(url_for('dashboard_bp.profile'))
+
+    result = cloudinary.uploader.upload(
+        photo,
+        upload_preset=settings.CLOUDINARY_UPLOAD_PRESET,
+        folder="citylove/members",
+    )
+    photo_url = CloudinaryImage(result['public_id']).build_url(
+        width=400, height=400, crop='fill',
+        quality='auto', format='webp', flags='awebp',
+        secure=True,
+    )
+
+    db = get_db()
+    user = db.get(Member, current_user.id)
+    user.photo_url = photo_url
+    user.photo_public_id = result['public_id']
+    db.commit()
+
+    try:
+        card_url = generate_intro_card(user)
+        user.introduction_link = card_url
+        user.user_info = {**user.user_info, '會員介紹頁網址': card_url}
+        db.commit()
+    except Exception:
+        pass
+
+    flash('照片已更新', 'success')
     return redirect(url_for('dashboard_bp.profile'))
 
 

@@ -54,6 +54,7 @@ from form_app.services.messaging import process_all_notifications
 from form_app.services.scoring import UserProfileAdapter, calculate_match_score, get_eligible_matching_pool
 from form_app.services.matching import update_unmatched_counters
 from form_app.services.security import hash_password
+from form_app.services.photo import derive_face_cropped_photo
 from form_app.config import settings
 
 cloudinary.config(
@@ -634,6 +635,13 @@ def new_user():
         if blind_intro_link:
             user_info['盲約介紹卡一'] = blind_intro_link
 
+        photo_url = None
+        photo_public_id = None
+        if intro_link:
+            derived = derive_face_cropped_photo(intro_link)
+            if derived:
+                photo_url, photo_public_id = derived
+
         # Matchmaking profile fields → stored in user_info for scoring engine
         _populate_matchmaking_info(user_info, request.form)
 
@@ -683,6 +691,8 @@ def new_user():
             fill_form_at=datetime.now(),
             user_info=user_info,
             introduction_link=intro_link or None,
+            photo_url=photo_url,
+            photo_public_id=photo_public_id,
             expiration_date=expiration_date,
             matching_start_date=_parse_date('matching_start_date'),
             matching_end_date=_parse_date('matching_end_date'),
@@ -791,6 +801,10 @@ def edit_user(user_id):
         user.introduction_link = intro_link or None
         user.user_info['會員介紹頁網址'] = intro_link or None
         user.user_info['盲約介紹卡一'] = blind_intro_link or None
+        if intro_link and not user.photo_url:
+            derived = derive_face_cropped_photo(intro_link)
+            if derived:
+                user.photo_url, user.photo_public_id = derived
         _populate_matchmaking_info(user.user_info, request.form)
         flag_modified(user, 'user_info')
 

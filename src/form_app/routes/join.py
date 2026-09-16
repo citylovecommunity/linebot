@@ -75,6 +75,8 @@ def join(slug: str):
 
         photo = request.files.get('profile_photo')
         introduction_link = None
+        photo_url = None
+        photo_public_id = None
         if photo and photo.filename:
             result = cloudinary.uploader.upload(
                 photo,
@@ -82,13 +84,15 @@ def join(slug: str):
                 folder="citylove/members",
             )
             transformed_url = CloudinaryImage(result['public_id']).build_url(
-                width=400, height=400, crop='fill', gravity='face',
+                width=400, height=400, crop='thumb', gravity='face',
                 quality='auto', format='webp', flags='awebp',
                 secure=True,
             )
             user_info['相片網址'] = transformed_url
             user_info['相片公開ID'] = result['public_id']
             introduction_link = transformed_url
+            photo_url = transformed_url
+            photo_public_id = result['public_id']
 
         password_plain = birthday.strftime('%Y%m%d') if birthday else None
 
@@ -104,6 +108,8 @@ def join(slug: str):
             join_campaign=campaign_slug,
             user_info=user_info,
             introduction_link=introduction_link,
+            photo_url=photo_url,
+            photo_public_id=photo_public_id,
             password_hash=hash_password(password_plain) if password_plain else None,
         )
         db = get_db()

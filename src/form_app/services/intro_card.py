@@ -180,7 +180,7 @@ def generate_intro_card(member) -> str:
           weight="bold", size=50, fill=DARK, anchor="mm")
 
     # 3. Profile photo — flush rectangle, no ring/shadow (matches template)
-    photo_url = user_info.get("相片網址") or member.introduction_link
+    photo_url = member.photo_url or user_info.get("相片網址") or member.introduction_link
     pasted = False
     if photo_url:
         try:

@@ -47,10 +47,15 @@
                         {% endif %}
                     </div>
 
+                    {% if partner.photo_url %}
+                    <img src="{{ partner.photo_url }}" class="mx-auto mb-3 rounded-circle shadow-sm d-block"
+                        style="width: 64px; height: 64px; object-fit: cover;">
+                    {% else %}
                     <div class="mx-auto mb-3 bg-gradient-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm"
                         style="width: 64px; height: 64px; font-size: 1.5rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
                         {{ partner.name[0] | upper }}
                     </div>
+                    {% endif %}
 
                     <h5 class="fw-bold mb-1">{{ partner.proper_name }}</h5>
 

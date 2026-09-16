@@ -68,14 +68,20 @@
             {% for member in group.members %}
               {% set gm = memberships_by_id.get(member.id) %}
               <div class="d-flex flex-column align-items-center" style="min-width:64px;">
-                {# Avatar circle with emoji #}
+                {# Avatar circle: photo when available, otherwise emoji #}
                 <div class="position-relative mb-1">
+                  {% if member.photo_url %}
+                  <img src="{{ member.photo_url }}" class="rounded-circle shadow-sm"
+                       style="width:56px;height:56px;object-fit:cover;
+                         {{ 'border:2.5px solid #0d6efd;' if member.id == current_user.id else 'border:2px solid #dee2e6;' }}">
+                  {% else %}
                   <div class="rounded-circle d-flex align-items-center justify-content-center shadow-sm"
                        style="width:56px;height:56px;font-size:1.8rem;
                          background:{{ '#e8f0ff' if member.gender == 'M' else '#fce8ff' }};
                          {{ 'border:2.5px solid #0d6efd;' if member.id == current_user.id else 'border:2px solid #dee2e6;' }}">
                     {{ gm.session_avatar if gm and gm.session_avatar else ('🧑' if member.gender == 'M' else '👩') }}
                   </div>
+                  {% endif %}
                   {% if member.id == current_user.id %}
                     <span class="position-absolute bottom-0 end-0 badge rounded-pill bg-primary"
                           style="font-size:.55rem;padding:2px 5px;">你</span>
