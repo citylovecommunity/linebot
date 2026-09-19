@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}劇本殺管理{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">🎭 劇本殺管理</h2>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('admin_bp.new_script_kill_campaign') }}" class="btn btn-sm btn-success">
+        <i class="bi bi-plus-lg"></i> 新增劇本殺
+      </a>
+      <a href="{{ url_for('admin_bp.admin_dashboard', tab='actions') }}" class="btn btn-sm btn-outline-secondary">← 返回後台</a>
+    </div>
+  </div>
+  <p class="text-muted small">
+    每個劇本殺對應一組角色與任務文字，可重複使用。編輯好角色後，將現有的群組（草稿或進行中）加入劇本殺，
+    按下發送即可為該群組成員隨機分配角色，並透過私訊提醒功能各自送出對應的任務內容。
+  </p>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+  {% endwith %}
+
+  {% if campaigns %}
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>名稱</th>
+          <th>角色</th>
+          <th>已加入群組</th>
+          <th>建立時間</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in campaigns %}
+        <tr>
+          <td class="fw-semibold">{{ c.name }}</td>
+          <td>
+            {% for r in c.roles %}
+            <span class="badge bg-secondary me-1">{{ r.label }}</span>
+            {% else %}
+            <span class="text-muted small">尚無角色</span>
+            {% endfor %}
+          </td>
+          <td>
+            {% set sent_count = c.group_links|selectattr('sent_at')|list|length %}
+            {{ c.group_links|length }} 個群組
+            {% if sent_count %}<span class="badge bg-success ms-1">已發送 {{ sent_count }}</span>{% endif %}
+          </td>
+          <td class="text-nowrap text-muted small">{{ c.created_at.strftime('%Y/%m/%d %H:%M') }}</td>
+          <td class="text-nowrap">
+            <a href="{{ url_for('admin_bp.script_kill_campaign_detail', campaign_id=c.id) }}" class="btn btn-sm btn-outline-primary">管理</a>
+            <a href="{{ url_for('admin_bp.edit_script_kill_campaign', campaign_id=c.id) }}" class="btn btn-sm btn-outline-secondary">編輯</a>
+            <form method="POST" action="{{ url_for('admin_bp.delete_script_kill_campaign', campaign_id=c.id) }}" class="d-inline"
+                  onsubmit="return confirm('確定要刪除劇本殺「{{ c.name }}」？所有角色設定與加入的群組紀錄將一併刪除。')">
+              <button type="submit" class="btn btn-sm btn-outline-danger">刪除</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center text-muted py-5">
+    <p class="mb-0">目前沒有劇本殺，點右上角「新增劇本殺」建立第一個</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from form_app.config import settings
 from form_app.extensions import line_bot_helper
 from form_app.models import (
-    ActivityLabel, COMPANION_AVATARS,
+    ActivityLabel, COMPANION_AVATARS, Campaign,
     GroupMatching, GroupMembership, GroupMatchingStatus, GroupMessage,
     Line_Info, Member, assign_session_avatars,
 )
@@ -201,6 +201,8 @@ def get_eligible_group_pool(session: Session) -> tuple[list[Member], list[Member
     - Not an Observer (🍂)
     - Female cadence: < 3 sessions in last 14 days
     - Male cadence: < 1 session in last 7 days
+    - Did not join via a channel whose Campaign.pause_group_pairing is set —
+      unless the member has Member.force_group_pairing set as an individual override
     """
     from sqlalchemy.sql.expression import exists
     from sqlalchemy import func
@@ -210,6 +212,9 @@ def get_eligible_group_pool(session: Session) -> tuple[list[Member], list[Member
     now = datetime.now()
     cutoff_f = now - timedelta(days=14)
     cutoff_m = now - timedelta(days=7)
+
+    paused_slugs = session.query(Campaign.slug).filter(Campaign.pause_group_pairing == True)
+    excluded_by_channel = (Member.join_campaign != None) & Member.join_campaign.in_(paused_slugs)
 
     base = (
         session.query(Member)
@@ -223,6 +228,8 @@ def get_eligible_group_pool(session: Session) -> tuple[list[Member], list[Member
             (Member.expiration_date == None) | (Member.expiration_date >= today),
             (Member.matching_start_date == None) | (Member.matching_start_date <= today),
             (Member.matching_end_date == None) | (Member.matching_end_date >= today),
+            # Channel-level auto-pairing pause, unless individually re-enabled
+            (Member.force_group_pairing == True) | (~excluded_by_channel),
         )
         .all()
     )

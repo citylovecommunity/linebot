@@ -1,3 +1,4 @@
+import random
 import re
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -7,6 +8,7 @@ import cloudinary
 import cloudinary.uploader
 from flask import Blueprint, jsonify, render_template, redirect, url_for, flash, request, abort, session as flask_session
 from flask_login import login_required, current_user
+from sqlalchemy import or_
 from sqlalchemy.orm import joinedload, defer, selectinload
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.exc import IntegrityError
@@ -44,6 +46,7 @@ from form_app.models import (
     GroupMatching, GroupMatchingStatus, GroupMembership, GroupMessage, GroupDateProposal, GroupBadge,
     LeadSubmission, LeadSubmissionStatus,
     Tag, Campaign,
+    ScriptKillCampaign, ScriptKillCampaignGroup,
     assign_session_avatars,
 )
 from collections import defaultdict
@@ -438,6 +441,7 @@ def admin_dashboard():
     no_candidate_users = []
 
     all_tags = session.query(Tag).order_by(Tag.name).all()
+    script_kill_campaigns = session.query(ScriptKillCampaign).order_by(ScriptKillCampaign.name).all()
 
     # ── 統計頁籤 ──────────────────────────────────────────────────────────
     _today = date.today()
@@ -528,10 +532,14 @@ def admin_dashboard():
     stats_all = _compute_member_stats(real_members)
     stats_eligible = _compute_member_stats(eligible_members)
 
+    join_channels = sorted({m.join_campaign for m in all_members if m.join_campaign})
+
     response = render_template(
         'admin_dashboard.html',
         today=date.today(),
         all_tags=all_tags,
+        join_channels=join_channels,
+        script_kill_campaigns=script_kill_campaigns,
         match_ready_ids=match_ready_ids,
         members_by_id=members_by_id,
         matchings_by_id=matchings_by_id,
@@ -704,6 +712,8 @@ def new_user():
             is_test='is_test' in request.form,
             is_admin='is_admin' in request.form,
             is_developer='is_developer' in request.form and current_user.is_developer,
+            force_one_on_one_pairing='force_one_on_one_pairing' in request.form,
+            force_group_pairing='force_group_pairing' in request.form,
             fill_form_at=datetime.now(),
             user_info=user_info,
             introduction_link=intro_link or None,
@@ -752,6 +762,8 @@ def edit_user(user_id):
         user.is_member_active = 'is_active' in request.form
         user.is_test = 'is_test' in request.form
         user.is_admin = 'is_admin' in request.form
+        user.force_one_on_one_pairing = 'force_one_on_one_pairing' in request.form
+        user.force_group_pairing = 'force_group_pairing' in request.form
         if current_user.is_developer:
             user.is_developer = 'is_developer' in request.form
 
@@ -852,7 +864,14 @@ def edit_user(user_id):
         .all()
     )
     all_tags = session.query(Tag).order_by(Tag.name).all()
-    return render_template('admin_user_form.html', user=user, matchings=matchings, all_tags=all_tags)
+    channel_campaign = (
+        session.query(Campaign).filter_by(slug=user.join_campaign).first()
+        if user.join_campaign else None
+    )
+    return render_template(
+        'admin_user_form.html', user=user, matchings=matchings, all_tags=all_tags,
+        channel_campaign=channel_campaign,
+    )
 
 
 @bp.route('/users/<int:user_id>/delete', methods=['POST'])
@@ -1118,6 +1137,76 @@ def broadcast_message():
     return redirect(url_for('admin_bp.admin_dashboard', tab='matchings'))
 
 
+@bp.route('/line-group-broadcast', methods=['POST'])
+@login_required
+@admin_required
+def send_group_line_broadcast():
+    """Push a free-text LINE message to members selected by tag and/or join
+    channel (join_campaign). Unlike broadcast_message, this does not touch
+    the in-app chat — it's a pure LINE push to an admin-picked audience."""
+    session = get_db()
+    content = request.form.get('content', '').strip()
+    audience = request.form.get('audience', 'filtered')
+    tag_ids = request.form.getlist('tag_ids', type=int)
+    channels = request.form.getlist('channels')
+
+    if not content:
+        flash('訊息內容不能為空', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='actions'))
+
+    query = (
+        session.query(Member)
+        .join(Line_Info, Member.phone_number == Line_Info.phone_number)
+        .options(joinedload(Member.line_info))
+    )
+
+    if audience == 'filtered':
+        if not tag_ids and not channels:
+            flash('請至少選擇一個標籤或加入管道', 'danger')
+            return redirect(url_for('admin_bp.admin_dashboard', tab='actions'))
+        conditions = []
+        if tag_ids:
+            conditions.append(Member.tags.any(Tag.id.in_(tag_ids)))
+        if channels:
+            conditions.append(Member.join_campaign.in_(channels))
+        query = query.filter(or_(*conditions))
+
+    members = query.all()
+    line_id_by_uid = {m.id: m.line_info.user_id for m in members if m.line_info}
+
+    if not line_id_by_uid:
+        flash('沒有符合條件、且已綁定 LINE 的會員', 'warning')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='actions'))
+
+    from linebot import LineBotApi
+    from linebot.models import TextSendMessage
+    from form_app.extensions import line_bot_helper
+
+    line_bot_api = LineBotApi(line_bot_helper.configuration.access_token)
+    dev = settings.is_dev
+
+    def _send(uid):
+        target_line_id = settings.LINE_TEST_USER_ID if dev else line_id_by_uid[uid]
+        try:
+            line_bot_api.push_message(target_line_id, TextSendMessage(text=content))
+            return True
+        except Exception as e:
+            print(f"[line-group-broadcast] Failed to notify user {uid}: {e}")
+            return False
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        results = list(executor.map(_send, line_id_by_uid.keys()))
+    sent = sum(1 for r in results if r is True)
+    failed = sum(1 for r in results if r is False)
+
+    flash(
+        f'群發訊息已推送給 {len(line_id_by_uid)} 位會員'
+        f'（成功 {sent} 人{"、失敗 " + str(failed) + " 人" if failed else ""}）',
+        'success'
+    )
+    return redirect(url_for('admin_bp.admin_dashboard', tab='actions'))
+
+
 @bp.route('/matchings/active-list', methods=['GET'])
 @login_required
 @admin_required
@@ -1319,8 +1408,6 @@ def edit_group_draft(group_id):
         flash('找不到草稿群組', 'danger')
         return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
 
-    from sqlalchemy import or_
-
     memberships = group.memberships
     new_assignments = {}  # membership.id -> new member_id
     for gm in memberships:
@@ -1346,27 +1433,9 @@ def edit_group_draft(group_id):
                 flash(f'「{new_member.name}」性別與原成員不符，無法替換', 'danger')
                 return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
 
-            matching_conflict = session.query(Matching).filter(
-                or_(Matching.subject_id == new_member.id, Matching.object_id == new_member.id),
-                Matching.status.in_([MatchingStatus.ACTIVE, MatchingStatus.DRAFT]),
-            ).first()
-            if matching_conflict:
-                flash(f'「{new_member.name}」已有進行中的一對一配對，無法加入群組', 'danger')
-                return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
-
-            group_conflict = (
-                session.query(GroupMembership)
-                .join(GroupMatching)
-                .filter(
-                    GroupMembership.member_id == new_member.id,
-                    GroupMatching.status.in_([GroupMatchingStatus.ACTIVE, GroupMatchingStatus.DRAFT]),
-                    GroupMatching.id != group_id,
-                )
-                .first()
-            )
-            if group_conflict:
-                flash(f'「{new_member.name}」已在其他進行中的群組，無法加入', 'danger')
-                return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+            # Admin has final say on who goes in a draft group — she may deliberately
+            # want someone who already has a 1:1 match or another group this cycle
+            # (e.g. reassigning them off it), so we no longer hard-block on that here.
 
             gm.member_id = new_member.id
 
@@ -1428,6 +1497,32 @@ def discard_group_draft(group_id):
     session.commit()
     _invalidate_dashboard_cache()
     flash(f'已捨棄群組「{cool_name}」', 'success')
+    return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+
+
+@bp.route('/groups/<int:group_id>/script-kill/attach', methods=['POST'])
+@login_required
+@admin_required
+def attach_group_to_script_kill(group_id):
+    """Quick-attach a group to a 劇本殺 campaign directly from the 草稿群組／群組
+    dashboard rows, without needing to go to the campaign's own detail page."""
+    session = get_db()
+    group = session.get(GroupMatching, group_id)
+    campaign_id = request.form.get('campaign_id', type=int)
+    campaign = session.get(ScriptKillCampaign, campaign_id) if campaign_id else None
+    if not group or not campaign:
+        flash('請選擇要加入的劇本殺', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+
+    exists = session.query(ScriptKillCampaignGroup).filter_by(
+        campaign_id=campaign_id, group_id=group_id
+    ).first()
+    if exists:
+        flash(f'「{group.cool_name}」已加入劇本殺「{campaign.name}」', 'warning')
+    else:
+        session.add(ScriptKillCampaignGroup(campaign_id=campaign_id, group_id=group_id))
+        session.commit()
+        flash(f'已將「{group.cool_name}」加入劇本殺「{campaign.name}」', 'success')
     return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
 
 
@@ -2238,6 +2333,8 @@ def _campaign_form_values(campaign=None, form=None) -> dict:
             'subtitle': form.get('subtitle', '').strip(),
             'note': form.get('note', '').strip(),
             'cta': form.get('cta', '').strip(),
+            'pause_one_on_one_pairing': 'pause_one_on_one_pairing' in form,
+            'pause_group_pairing': 'pause_group_pairing' in form,
             'features': [
                 {'icon': icon.strip(), 'text': text.strip()}
                 for icon, text in zip(form.getlist('feature_icon'), form.getlist('feature_text'))
@@ -2251,12 +2348,15 @@ def _campaign_form_values(campaign=None, form=None) -> dict:
             'subtitle': campaign.subtitle,
             'note': campaign.note,
             'cta': campaign.cta,
+            'pause_one_on_one_pairing': campaign.pause_one_on_one_pairing,
+            'pause_group_pairing': campaign.pause_group_pairing,
             'features': list(campaign.features or []),
         }
     else:
         values = {
             'slug': '', 'badge': '本季活動', 'title': '', 'subtitle': '',
-            'note': '填寫約 5 分鐘', 'cta': '開始填寫個人資料', 'features': [],
+            'note': '填寫約 5 分鐘', 'cta': '開始填寫個人資料',
+            'pause_one_on_one_pairing': False, 'pause_group_pairing': False, 'features': [],
         }
     rows = values['features'][:_CAMPAIGN_FEATURE_ROWS]
     while len(rows) < _CAMPAIGN_FEATURE_ROWS:
@@ -2306,6 +2406,8 @@ def new_campaign():
             cta=request.form.get('cta', '').strip() or '開始填寫個人資料',
             photo1_url=_campaign_uploaded_photo_url(request.files, 'photo1'),
             photo2_url=_campaign_uploaded_photo_url(request.files, 'photo2'),
+            pause_one_on_one_pairing='pause_one_on_one_pairing' in request.form,
+            pause_group_pairing='pause_group_pairing' in request.form,
             created_by_id=current_user.id,
         )
         session.add(campaign)
@@ -2340,6 +2442,8 @@ def edit_campaign(campaign_id):
         campaign.features = _campaign_posted_features(request.form)
         campaign.note = request.form.get('note', '').strip() or '填寫約 5 分鐘'
         campaign.cta = request.form.get('cta', '').strip() or '開始填寫個人資料'
+        campaign.pause_one_on_one_pairing = 'pause_one_on_one_pairing' in request.form
+        campaign.pause_group_pairing = 'pause_group_pairing' in request.form
 
         new_photo1 = _campaign_uploaded_photo_url(request.files, 'photo1')
         if new_photo1:
@@ -2385,3 +2489,274 @@ def delete_campaign(campaign_id):
         session.commit()
         flash('活動已刪除', 'info')
     return redirect(url_for('admin_bp.campaigns_list'))
+
+
+# ── 劇本殺管理 (script-kill campaigns) ───────────────────────────────────────
+# A reusable script (name + roles, each with its own mission text), managed
+# like Campaign. Admin attaches existing GroupMatching groups (draft or
+# active) to a campaign, then sends: each attached group's members are
+# randomly assigned one of the campaign's roles and privately notified via
+# the same GroupMessage/coach-note pipeline as admin_send_group_note.
+
+_SCRIPT_KILL_ROLE_ROWS = 8
+
+
+def _script_kill_posted_roles(form) -> list[dict]:
+    return [
+        {'label': label.strip(), 'mission_text': text.strip()}
+        for label, text in zip(form.getlist('role_label'), form.getlist('role_mission_text'))
+        if label.strip() and text.strip()
+    ]
+
+
+def _script_kill_form_values(campaign=None, form=None) -> dict:
+    if form is not None:
+        values = {
+            'name': form.get('name', '').strip(),
+            'roles': [
+                {'label': l.strip(), 'mission_text': t.strip()}
+                for l, t in zip(form.getlist('role_label'), form.getlist('role_mission_text'))
+            ],
+        }
+    elif campaign is not None:
+        values = {'name': campaign.name, 'roles': list(campaign.roles or [])}
+    else:
+        values = {'name': '', 'roles': []}
+    rows = values['roles'][:_SCRIPT_KILL_ROLE_ROWS]
+    while len(rows) < _SCRIPT_KILL_ROLE_ROWS:
+        rows.append({'label': '', 'mission_text': ''})
+    values['role_rows'] = rows
+    return values
+
+
+def _random_assign_roles(members: list[Member], roles: list[dict]) -> dict[int, dict]:
+    """Shuffle members and cycle them evenly across the role list so admin
+    never has to specify who gets what. If members outnumber roles, roles
+    repeat; if roles outnumber members, some roles simply go unused."""
+    shuffled = list(members)
+    random.shuffle(shuffled)
+    return {m.id: roles[i % len(roles)] for i, m in enumerate(shuffled)}
+
+
+@bp.route('/script-kill')
+@login_required
+@admin_required
+def script_kill_list():
+    session = get_db()
+    campaigns = (
+        session.query(ScriptKillCampaign)
+        .options(selectinload(ScriptKillCampaign.group_links).joinedload(ScriptKillCampaignGroup.group))
+        .order_by(ScriptKillCampaign.created_at.desc())
+        .all()
+    )
+    return render_template('admin_script_kill_list.html', campaigns=campaigns)
+
+
+@bp.route('/script-kill/new', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def new_script_kill_campaign():
+    session = get_db()
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        roles = _script_kill_posted_roles(request.form)
+        if not name or not roles:
+            flash('請輸入劇本名稱，並至少新增一個角色與任務內容', 'danger')
+            return render_template('admin_script_kill_form.html', campaign=None,
+                                    values=_script_kill_form_values(form=request.form))
+        campaign = ScriptKillCampaign(name=name, roles=roles, created_by_id=current_user.id)
+        session.add(campaign)
+        session.commit()
+        flash(f'已建立劇本殺「{campaign.name}」', 'success')
+        return redirect(url_for('admin_bp.script_kill_campaign_detail', campaign_id=campaign.id))
+    return render_template('admin_script_kill_form.html', campaign=None, values=_script_kill_form_values())
+
+
+@bp.route('/script-kill/<int:campaign_id>/edit', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def edit_script_kill_campaign(campaign_id):
+    session = get_db()
+    campaign = session.get(ScriptKillCampaign, campaign_id)
+    if not campaign:
+        flash('找不到劇本殺', 'danger')
+        return redirect(url_for('admin_bp.script_kill_list'))
+
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        roles = _script_kill_posted_roles(request.form)
+        if not name or not roles:
+            flash('請輸入劇本名稱，並至少新增一個角色與任務內容', 'danger')
+            return render_template('admin_script_kill_form.html', campaign=campaign,
+                                    values=_script_kill_form_values(form=request.form))
+        campaign.name = name
+        campaign.roles = roles
+        session.commit()
+        flash('劇本殺已更新', 'success')
+        return redirect(url_for('admin_bp.script_kill_campaign_detail', campaign_id=campaign.id))
+
+    return render_template('admin_script_kill_form.html', campaign=campaign,
+                            values=_script_kill_form_values(campaign=campaign))
+
+
+@bp.route('/script-kill/<int:campaign_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_script_kill_campaign(campaign_id):
+    session = get_db()
+    campaign = session.get(ScriptKillCampaign, campaign_id)
+    if campaign:
+        session.delete(campaign)
+        session.commit()
+        flash('已刪除劇本殺', 'info')
+    return redirect(url_for('admin_bp.script_kill_list'))
+
+
+@bp.route('/script-kill/<int:campaign_id>')
+@login_required
+@admin_required
+def script_kill_campaign_detail(campaign_id):
+    session = get_db()
+    campaign = session.get(ScriptKillCampaign, campaign_id)
+    if not campaign:
+        flash('找不到劇本殺', 'danger')
+        return redirect(url_for('admin_bp.script_kill_list'))
+
+    attached_group_ids = {link.group_id for link in campaign.group_links}
+    query = session.query(GroupMatching).filter(
+        GroupMatching.status.in_([GroupMatchingStatus.DRAFT, GroupMatchingStatus.ACTIVE])
+    )
+    if attached_group_ids:
+        query = query.filter(~GroupMatching.id.in_(attached_group_ids))
+    candidate_groups = query.order_by(GroupMatching.created_at.desc()).limit(200).all()
+
+    return render_template(
+        'admin_script_kill_detail.html',
+        campaign=campaign,
+        candidate_groups=candidate_groups,
+    )
+
+
+@bp.route('/script-kill/<int:campaign_id>/groups/add', methods=['POST'])
+@login_required
+@admin_required
+def script_kill_campaign_add_group(campaign_id):
+    session = get_db()
+    campaign = session.get(ScriptKillCampaign, campaign_id)
+    if not campaign:
+        flash('找不到劇本殺', 'danger')
+        return redirect(url_for('admin_bp.script_kill_list'))
+
+    group_id = request.form.get('group_id', type=int)
+    group = session.get(GroupMatching, group_id) if group_id else None
+    if not group:
+        flash('找不到群組', 'danger')
+        return redirect(url_for('admin_bp.script_kill_campaign_detail', campaign_id=campaign_id))
+
+    exists = session.query(ScriptKillCampaignGroup).filter_by(
+        campaign_id=campaign_id, group_id=group_id
+    ).first()
+    if exists:
+        flash(f'「{group.cool_name}」已經加入此劇本殺', 'warning')
+    else:
+        session.add(ScriptKillCampaignGroup(campaign_id=campaign_id, group_id=group_id))
+        session.commit()
+        flash(f'已將「{group.cool_name}」加入「{campaign.name}」', 'success')
+    return redirect(url_for('admin_bp.script_kill_campaign_detail', campaign_id=campaign_id))
+
+
+@bp.route('/script-kill/<int:campaign_id>/groups/<int:group_id>/remove', methods=['POST'])
+@login_required
+@admin_required
+def script_kill_campaign_remove_group(campaign_id, group_id):
+    session = get_db()
+    link = session.query(ScriptKillCampaignGroup).filter_by(
+        campaign_id=campaign_id, group_id=group_id
+    ).first()
+    if link:
+        session.delete(link)
+        session.commit()
+        flash('已移除群組', 'info')
+    return redirect(url_for('admin_bp.script_kill_campaign_detail', campaign_id=campaign_id))
+
+
+@bp.route('/script-kill/<int:campaign_id>/groups/<int:group_id>/send', methods=['POST'])
+@login_required
+@admin_required
+def script_kill_campaign_send_group(campaign_id, group_id):
+    session = get_db()
+    campaign = session.get(ScriptKillCampaign, campaign_id)
+    link = session.query(ScriptKillCampaignGroup).filter_by(
+        campaign_id=campaign_id, group_id=group_id
+    ).first()
+    if not campaign or not link:
+        flash('找不到劇本殺或群組', 'danger')
+        return redirect(url_for('admin_bp.script_kill_list'))
+    if not campaign.roles:
+        flash('請先為此劇本殺新增至少一個角色', 'danger')
+        return redirect(url_for('admin_bp.script_kill_campaign_detail', campaign_id=campaign_id))
+
+    group = link.group
+    members = group.members
+    if not members:
+        flash(f'「{group.cool_name}」尚無成員', 'warning')
+        return redirect(url_for('admin_bp.script_kill_campaign_detail', campaign_id=campaign_id))
+
+    assignment = _random_assign_roles(members, campaign.roles)
+    for member_id, role in assignment.items():
+        session.add(GroupMessage(
+            group_id=group.id,
+            sender_id=current_user.id,
+            recipient_id=member_id,
+            content=role['mission_text'],
+            is_coach_note=True,
+        ))
+    link.sent_at = datetime.now()
+    session.commit()
+    process_all_notifications(session)
+    _invalidate_dashboard_cache()
+    flash(f'已隨機分配角色並發送任務給「{group.cool_name}」的 {len(members)} 位成員', 'success')
+    return redirect(url_for('admin_bp.script_kill_campaign_detail', campaign_id=campaign_id))
+
+
+@bp.route('/script-kill/<int:campaign_id>/send-all', methods=['POST'])
+@login_required
+@admin_required
+def script_kill_campaign_send_all(campaign_id):
+    session = get_db()
+    campaign = session.get(ScriptKillCampaign, campaign_id)
+    if not campaign:
+        flash('找不到劇本殺', 'danger')
+        return redirect(url_for('admin_bp.script_kill_list'))
+    if not campaign.roles:
+        flash('請先為此劇本殺新增至少一個角色', 'danger')
+        return redirect(url_for('admin_bp.script_kill_campaign_detail', campaign_id=campaign_id))
+
+    sent_groups = 0
+    sent_members = 0
+    for link in campaign.group_links:
+        members = link.group.members
+        if not members:
+            continue
+        assignment = _random_assign_roles(members, campaign.roles)
+        for member_id, role in assignment.items():
+            session.add(GroupMessage(
+                group_id=link.group_id,
+                sender_id=current_user.id,
+                recipient_id=member_id,
+                content=role['mission_text'],
+                is_coach_note=True,
+            ))
+        link.sent_at = datetime.now()
+        sent_groups += 1
+        sent_members += len(members)
+
+    if not sent_groups:
+        flash('目前沒有可發送的群組（尚未加入任何有成員的群組）', 'warning')
+        return redirect(url_for('admin_bp.script_kill_campaign_detail', campaign_id=campaign_id))
+
+    session.commit()
+    process_all_notifications(session)
+    _invalidate_dashboard_cache()
+    flash(f'已對 {sent_groups} 個群組、共 {sent_members} 位成員隨機分配角色並發送任務', 'success')
+    return redirect(url_for('admin_bp.script_kill_campaign_detail', campaign_id=campaign_id))

@@ -47,6 +47,16 @@
             {% else %}
             <span class="badge bg-secondary">已下線</span>
             {% endif %}
+            {% if c.pause_one_on_one_pairing %}
+            <span class="badge bg-warning text-dark" title="此管道會員預設不進入每週 1:1 自動配對池">
+              <i class="bi bi-pause-circle"></i> 停用 1:1 配對
+            </span>
+            {% endif %}
+            {% if c.pause_group_pairing %}
+            <span class="badge bg-warning text-dark" title="此管道會員預設不進入自動群組配對池">
+              <i class="bi bi-pause-circle"></i> 停用群組配對
+            </span>
+            {% endif %}
           </td>
           <td>
             <code>/join/{{ c.slug }}</code>

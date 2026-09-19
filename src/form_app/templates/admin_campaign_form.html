@@ -44,6 +44,31 @@
       </div>
     </div>
 
+    <div class="card mb-3 {% if values.pause_one_on_one_pairing or values.pause_group_pairing %}border-warning{% endif %}">
+      <div class="card-header fw-semibold">自動配對設定</div>
+      <div class="card-body">
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" name="pause_one_on_one_pairing" id="pause_one_on_one_pairing"
+                 {% if values.pause_one_on_one_pairing %}checked{% endif %}>
+          <label class="form-check-label" for="pause_one_on_one_pairing">
+            此管道的會員預設不進入每週 1:1 自動配對池
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="pause_group_pairing" id="pause_group_pairing"
+                 {% if values.pause_group_pairing %}checked{% endif %}>
+          <label class="form-check-label" for="pause_group_pairing">
+            此管道的會員預設不進入自動群組配對池
+          </label>
+        </div>
+        <div class="form-text">
+          開啟後，透過此管道（/join/{{ campaign.slug if campaign else '網址代碼' }}）加入的會員，
+          預設不會被排入所選的自動配對流程。兩者可獨立設定。
+          如需讓特定會員仍參與配對，可到該會員的編輯頁分別勾選「強制加入 1:1 自動配對池」／「強制加入自動群組配對池」。
+        </div>
+      </div>
+    </div>
+
     <div class="card mb-3">
       <div class="card-header fw-semibold">報名頁文案</div>
       <div class="card-body">

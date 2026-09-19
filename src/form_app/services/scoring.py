@@ -4,7 +4,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.sql.expression import exists
 
-from form_app.models import Line_Info, Member, UserMatchScore
+from form_app.models import Campaign, Line_Info, Member, UserMatchScore
 
 # Returned when a hard dealbreaker is triggered — ensures the pair is excluded
 # by the score <= 0 check in generate_weekly_matches
@@ -188,11 +188,23 @@ def get_eligible_matching_pool(session: Session, defer_user_info: bool = False):
     5. Matching window: matching_start_date is null OR <= today
     6. Matching window: matching_end_date is null OR >= today
     7. Did not join via the "casual" campaign (they opt out of weekly auto-matching)
+    8. Did not join via a channel whose Campaign.pause_one_on_one_pairing is set —
+       unless the member has Member.force_one_on_one_pairing set as an individual override
     """
     from datetime import date
     today = date.today()
 
     from sqlalchemy.orm import defer as sa_defer
+
+    paused_slugs = session.query(Campaign.slug).filter(Campaign.pause_one_on_one_pairing == True)
+    excluded_by_channel = (
+        (Member.join_campaign != None) &
+        (
+            (Member.join_campaign == CASUAL_CAMPAIGN_SLUG) |
+            Member.join_campaign.in_(paused_slugs)
+        )
+    )
+
     q = session.query(Member).filter(
         Member.is_member_active == True,
         Member.is_test == False,
@@ -211,8 +223,9 @@ def get_eligible_matching_pool(session: Session, defer_user_info: bool = False):
         # Rule 6: Matching window has not ended
         (Member.matching_end_date == None) | (Member.matching_end_date >= today),
 
-        # Rule 7: Casual-campaign members opt out of auto-matching
-        (Member.join_campaign == None) | (Member.join_campaign != CASUAL_CAMPAIGN_SLUG),
+        # Rule 7 & 8: Casual-campaign or pause_one_on_one_pairing-flagged channel
+        # members opt out of weekly auto-matching, unless individually re-enabled
+        (Member.force_one_on_one_pairing == True) | (~excluded_by_channel),
     ).options(selectinload(Member.tags))
     if defer_user_info:
         q = q.options(sa_defer(Member.user_info))

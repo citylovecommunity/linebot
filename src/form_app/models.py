@@ -210,6 +210,14 @@ class Member(Base):
     matching_start_date: Mapped[Optional[date]]
     matching_end_date: Mapped[Optional[date]]
 
+    # Per-member overrides: when True, this member is kept in the given
+    # auto-matching pool even if their join_campaign's Campaign row has the
+    # matching pause_*_pairing flag set. Lets admins re-enable auto pairing for
+    # a single user without changing the channel-wide default. Independent of
+    # each other — a member can be forced into 1:1 matching, group matching, or both.
+    force_one_on_one_pairing: Mapped[bool] = mapped_column(default=False)
+    force_group_pairing: Mapped[bool] = mapped_column(default=False)
+
     # Tracks how many consecutive matching cycles this member was eligible but unmatched.
     # Reset to 0 each time they are successfully paired.
     # Used to give priority boosts and unlock re-matching with historical partners.
@@ -903,6 +911,15 @@ class Campaign(Base):
     photo1_url: Mapped[Optional[str]] = mapped_column(nullable=True)  # hero banner left half; falls back to default image if unset
     photo2_url: Mapped[Optional[str]] = mapped_column(nullable=True)  # hero banner right half; falls back to default image if unset
     is_active: Mapped[bool] = mapped_column(default=True)
+    # When True, members whose join_campaign matches this campaign's slug are
+    # excluded by default from the weekly 1:1 auto-matching pool
+    # (see get_eligible_matching_pool). A member can still be individually
+    # re-enabled via Member.force_one_on_one_pairing.
+    pause_one_on_one_pairing: Mapped[bool] = mapped_column(default=False)
+    # Same idea, but for the auto group-matching pool
+    # (see get_eligible_group_pool). Overridden per-member via
+    # Member.force_group_pairing. Independent of pause_one_on_one_pairing.
+    pause_group_pairing: Mapped[bool] = mapped_column(default=False)
     created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey('member.id'), nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(default=datetime.now, onupdate=datetime.now)
@@ -926,5 +943,42 @@ class UserMatchScore(Base):
     # Optional: Store WHY they got this score?
     # useful for debugging: {"hobbies": +10, "height": -5}
     breakdown: Mapped[Dict[str, Any]] = mapped_column(JSONB, nullable=True)
+
+
+class ScriptKillCampaign(Base):
+    """A reusable 劇本殺 (murder-mystery game night) script: a name plus a set of
+    roles, each with its own mission/hint text. Admin manages these centrally
+    (like Campaign for /join pages), then attaches existing GroupMatching groups
+    to a campaign and sends — each attached group's members are randomly
+    assigned one of the campaign's roles and privately notified via the
+    existing GroupMessage/coach-note pipeline (same LINE delivery as
+    admin_send_group_note)."""
+    __tablename__ = 'script_kill_campaign'
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str]
+    roles: Mapped[List[Dict[str, Any]]] = mapped_column(JSONB, default=list)  # [{"label": "...", "mission_text": "..."}]
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey('member.id'), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.now)
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.now, onupdate=datetime.now)
+    group_links: Mapped[list['ScriptKillCampaignGroup']] = relationship(
+        'ScriptKillCampaignGroup', back_populates='campaign', cascade='all, delete-orphan',
+    )
+
+
+class ScriptKillCampaignGroup(Base):
+    """Attaches one GroupMatching group to a ScriptKillCampaign. sent_at is set
+    once roles have been randomly assigned and mission notes sent to this
+    group's members for this campaign."""
+    __tablename__ = 'script_kill_campaign_group'
+    __table_args__ = (UniqueConstraint('campaign_id', 'group_id', name='uq_script_kill_campaign_group'),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    campaign_id: Mapped[int] = mapped_column(ForeignKey('script_kill_campaign.id', ondelete='CASCADE'))
+    group_id: Mapped[int] = mapped_column(ForeignKey('group_matching.id', ondelete='CASCADE'))
+    added_at: Mapped[datetime] = mapped_column(default=datetime.now)
+    sent_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    campaign: Mapped['ScriptKillCampaign'] = relationship('ScriptKillCampaign', back_populates='group_links')
+    group: Mapped['GroupMatching'] = relationship('GroupMatching')
 
 
