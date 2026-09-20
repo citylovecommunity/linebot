@@ -443,6 +443,15 @@ def admin_dashboard():
     all_tags = session.query(Tag).order_by(Tag.name).all()
     script_kill_campaigns = session.query(ScriptKillCampaign).order_by(ScriptKillCampaign.name).all()
 
+    # Which 劇本殺 campaigns each group is already attached to — lets the
+    # dashboard drop "已加入" options from the picker and show a confirmation
+    # badge instead of leaving the 加入劇本殺 button re-clickable with no
+    # feedback once the attach has already succeeded.
+    group_script_kill_ids: dict[int, list[int]] = defaultdict(list)
+    for link in session.query(ScriptKillCampaignGroup).all():
+        group_script_kill_ids[link.group_id].append(link.campaign_id)
+    group_script_kill_ids = dict(group_script_kill_ids)
+
     # ── 統計頁籤 ──────────────────────────────────────────────────────────
     _today = date.today()
 
@@ -540,6 +549,7 @@ def admin_dashboard():
         all_tags=all_tags,
         join_channels=join_channels,
         script_kill_campaigns=script_kill_campaigns,
+        group_script_kill_ids=group_script_kill_ids,
         match_ready_ids=match_ready_ids,
         members_by_id=members_by_id,
         matchings_by_id=matchings_by_id,

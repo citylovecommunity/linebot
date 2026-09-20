@@ -537,6 +537,27 @@
       {% endif %}
     </div>
 
+    {% macro script_kill_attach(g) %}
+      {% set joined_ids = group_script_kill_ids.get(g.id, []) %}
+      {% for c in script_kill_campaigns if c.id in joined_ids %}
+      <span class="badge bg-success bg-opacity-75 me-1 mt-1">🎭 已加入「{{ c.name }}」</span>
+      {% endfor %}
+      {% if script_kill_campaigns %}
+        {% set remaining = script_kill_campaigns | rejectattr('id', 'in', joined_ids) | list %}
+        {% if remaining %}
+        <form method="POST" action="{{ url_for('admin_bp.attach_group_to_script_kill', group_id=g.id) }}"
+          class="d-inline-flex gap-1 mt-1 sk-attach-form">
+          <select name="campaign_id" class="form-select form-select-sm" style="width:auto;">
+            {% for c in remaining %}
+            <option value="{{ c.id }}">🎭 {{ c.name }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn btn-sm btn-outline-primary">加入劇本殺</button>
+        </form>
+        {% endif %}
+      {% endif %}
+    {% endmacro %}
+
     <!-- 群組頁籤 -->
     <div class="tab-pane fade" id="groups" role="tabpanel">
       <div class="d-flex justify-content-between align-items-center mb-3">
@@ -620,17 +641,7 @@
                     onsubmit="return confirm('確定捨棄群組「{{ g.cool_name }}」？')">
                     <button type="submit" class="btn btn-sm btn-outline-danger">捨棄</button>
                   </form>
-                  {% if script_kill_campaigns %}
-                  <form method="POST" action="{{ url_for('admin_bp.attach_group_to_script_kill', group_id=g.id) }}"
-                    class="d-inline-flex gap-1 mt-1 sk-attach-form">
-                    <select name="campaign_id" class="form-select form-select-sm" style="width:auto;">
-                      {% for c in script_kill_campaigns %}
-                      <option value="{{ c.id }}">🎭 {{ c.name }}</option>
-                      {% endfor %}
-                    </select>
-                    <button type="submit" class="btn btn-sm btn-outline-primary">加入劇本殺</button>
-                  </form>
-                  {% endif %}
+                  {{ script_kill_attach(g) }}
                 </td>
               </tr>
               {% endfor %}
@@ -712,17 +723,7 @@
                     <i class="bi bi-trash"></i>
                   </button>
                 </form>
-                {% if script_kill_campaigns %}
-                <form method="POST" action="{{ url_for('admin_bp.attach_group_to_script_kill', group_id=g.id) }}"
-                  class="d-inline-flex gap-1 mt-1 sk-attach-form">
-                  <select name="campaign_id" class="form-select form-select-sm" style="width:auto;">
-                    {% for c in script_kill_campaigns %}
-                    <option value="{{ c.id }}">🎭 {{ c.name }}</option>
-                    {% endfor %}
-                  </select>
-                  <button type="submit" class="btn btn-sm btn-outline-primary">加入劇本殺</button>
-                </form>
-                {% endif %}
+                {{ script_kill_attach(g) }}
               </td>
             </tr>
             {% endfor %}
