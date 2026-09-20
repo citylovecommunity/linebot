@@ -541,6 +541,12 @@
       {% set joined_ids = group_script_kill_ids.get(g.id, []) %}
       {% for c in script_kill_campaigns if c.id in joined_ids %}
       <span class="badge bg-success bg-opacity-75 me-1 mt-1">🎭 已加入「{{ c.name }}」</span>
+      <form method="POST" action="{{ url_for('admin_bp.detach_group_from_script_kill', group_id=g.id) }}"
+        class="d-inline sk-detach-form"
+        onsubmit="return confirm('確定要將「{{ g.cool_name }}」移出劇本殺「{{ c.name }}」？')">
+        <input type="hidden" name="campaign_id" value="{{ c.id }}">
+        <button type="submit" class="btn btn-sm btn-outline-danger mt-1">移除劇本殺</button>
+      </form>
       {% endfor %}
       {% if script_kill_campaigns %}
         {% set remaining = script_kill_campaigns | rejectattr('id', 'in', joined_ids) | list %}
@@ -1724,6 +1730,16 @@
       // here (before the browser serializes the form) would drop campaign_id
       // from the POST, so the server sees no campaign selected.
       if (select) setTimeout(() => { select.disabled = true; }, 0);
+    }
+    if (e.target && e.target.classList.contains('sk-detach-form')) {
+      // onsubmit="confirm(...)" runs first; if the admin cancelled, it already
+      // prevented the default and we must not show the spinner.
+      if (e.defaultPrevented) return;
+      const btn = e.target.querySelector('button[type="submit"]');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> 移除中…';
+      }
     }
     if (e.target && e.target.id === 'edit-draft-form') {
       const btn = document.getElementById('edit-draft-save-btn');

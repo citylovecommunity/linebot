@@ -1532,6 +1532,30 @@ def attach_group_to_script_kill(group_id):
     return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
 
 
+@bp.route('/groups/<int:group_id>/script-kill/detach', methods=['POST'])
+@login_required
+@admin_required
+def detach_group_from_script_kill(group_id):
+    """Quick-remove a group from a 劇本殺 campaign directly from the 草稿群組／
+    群組 dashboard rows, without needing to go to the campaign's own detail page."""
+    session = get_db()
+    group = session.get(GroupMatching, group_id)
+    campaign_id = request.form.get('campaign_id', type=int)
+    campaign = session.get(ScriptKillCampaign, campaign_id) if campaign_id else None
+    if not group or not campaign:
+        flash('找不到指定的劇本殺', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+
+    link = session.query(ScriptKillCampaignGroup).filter_by(
+        campaign_id=campaign_id, group_id=group_id
+    ).first()
+    if link:
+        session.delete(link)
+        session.commit()
+        flash(f'已將「{group.cool_name}」移出劇本殺「{campaign.name}」', 'info')
+    return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+
+
 @bp.route('/groups/<int:group_id>/cancel', methods=['POST'])
 @login_required
 @admin_required
