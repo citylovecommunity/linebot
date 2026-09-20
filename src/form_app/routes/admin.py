@@ -1425,12 +1425,8 @@ def edit_group_draft(group_id):
             if gm.id not in new_assignments:
                 continue
             new_member = session.get(Member, new_assignments[gm.id])
-            old_member = session.get(Member, gm.member_id)
             if not new_member:
                 flash('找不到指定會員', 'danger')
-                return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
-            if old_member and new_member.gender != old_member.gender:
-                flash(f'「{new_member.name}」性別與原成員不符，無法替換', 'danger')
                 return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
 
             # Admin has final say on who goes in a draft group — she may deliberately
@@ -2617,13 +2613,20 @@ def delete_script_kill_campaign(campaign_id):
 @admin_required
 def script_kill_campaign_detail(campaign_id):
     session = get_db()
-    campaign = session.get(ScriptKillCampaign, campaign_id)
+    campaign = session.query(ScriptKillCampaign).options(
+        selectinload(ScriptKillCampaign.group_links)
+        .joinedload(ScriptKillCampaignGroup.group)
+        .selectinload(GroupMatching.memberships)
+        .joinedload(GroupMembership.member)
+    ).filter_by(id=campaign_id).first()
     if not campaign:
         flash('找不到劇本殺', 'danger')
         return redirect(url_for('admin_bp.script_kill_list'))
 
     attached_group_ids = {link.group_id for link in campaign.group_links}
-    query = session.query(GroupMatching).filter(
+    query = session.query(GroupMatching).options(
+        selectinload(GroupMatching.memberships).joinedload(GroupMembership.member)
+    ).filter(
         GroupMatching.status.in_([GroupMatchingStatus.DRAFT, GroupMatchingStatus.ACTIVE])
     )
     if attached_group_ids:

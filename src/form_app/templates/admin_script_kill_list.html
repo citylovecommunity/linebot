@@ -57,7 +57,8 @@
           </td>
           <td class="text-nowrap text-muted small">{{ c.created_at.strftime('%Y/%m/%d %H:%M') }}</td>
           <td class="text-nowrap">
-            <a href="{{ url_for('admin_bp.script_kill_campaign_detail', campaign_id=c.id) }}" class="btn btn-sm btn-outline-primary">管理</a>
+            <a href="{{ url_for('admin_bp.script_kill_campaign_detail', campaign_id=c.id) }}"
+               class="btn btn-sm btn-outline-primary sk-manage-link">管理</a>
             <a href="{{ url_for('admin_bp.edit_script_kill_campaign', campaign_id=c.id) }}" class="btn btn-sm btn-outline-secondary">編輯</a>
             <form method="POST" action="{{ url_for('admin_bp.delete_script_kill_campaign', campaign_id=c.id) }}" class="d-inline"
                   onsubmit="return confirm('確定要刪除劇本殺「{{ c.name }}」？所有角色設定與加入的群組紀錄將一併刪除。')">
@@ -75,4 +76,19 @@
   </div>
   {% endif %}
 </div>
+
+<div id="sk-manage-overlay"
+     class="d-none flex-column align-items-center justify-content-center gap-3"
+     style="position:fixed;inset:0;background:rgba(255,255,255,.85);z-index:1050;">
+  <div class="spinner-border text-primary" style="width:4rem;height:4rem;" role="status"></div>
+  <div class="fw-semibold">載入中，請稍候…</div>
+</div>
+
+<script>
+document.querySelectorAll('.sk-manage-link').forEach(link => {
+  link.addEventListener('click', () => {
+    document.getElementById('sk-manage-overlay').classList.replace('d-none', 'd-flex');
+  });
+});
+</script>
 {% endblock %}

@@ -622,7 +622,7 @@
                   </form>
                   {% if script_kill_campaigns %}
                   <form method="POST" action="{{ url_for('admin_bp.attach_group_to_script_kill', group_id=g.id) }}"
-                    class="d-inline-flex gap-1 mt-1">
+                    class="d-inline-flex gap-1 mt-1 sk-attach-form">
                     <select name="campaign_id" class="form-select form-select-sm" style="width:auto;">
                       {% for c in script_kill_campaigns %}
                       <option value="{{ c.id }}">🎭 {{ c.name }}</option>
@@ -714,7 +714,7 @@
                 </form>
                 {% if script_kill_campaigns %}
                 <form method="POST" action="{{ url_for('admin_bp.attach_group_to_script_kill', group_id=g.id) }}"
-                  class="d-inline-flex gap-1 mt-1">
+                  class="d-inline-flex gap-1 mt-1 sk-attach-form">
                   <select name="campaign_id" class="form-select form-select-sm" style="width:auto;">
                     {% for c in script_kill_campaigns %}
                     <option value="{{ c.id }}">🎭 {{ c.name }}</option>
@@ -1642,21 +1642,22 @@
     const listEl = document.getElementById(`edit-group-list-${membershipId}`);
     listEl.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-secondary" role="status"><span class="visually-hidden">載入中…</span></div></div>';
     setTimeout(() => {
-      const pool = gender === 'M' ? males : females;
+      // Not restricted to the slot's own gender — any member can be swapped in.
+      const pool = males.concat(females);
       const currentIds = new Set(_groupEditMembers.map(m => m.memberId));
       const selectedId = parseInt(document.getElementById(`edit-group-member-${membershipId}`).value, 10);
       const candidates = pool.filter(p => p.id === selectedId || !currentIds.has(p.id));
-      buildGroupPickCards(candidates, selectedId, membershipId, `edit-group-list-${membershipId}`, gender);
+      buildGroupPickCards(candidates, selectedId, membershipId, `edit-group-list-${membershipId}`);
       _groupPickerBuilt[membershipId] = true;
       document.getElementById(`edit-group-search-${membershipId}`).focus();
     }, 50);
   }
 
-  function buildGroupPickCards(list, selectedId, membershipId, containerId, gender) {
-    const selClass = gender === 'M' ? 'selected-m' : 'selected-f';
+  function buildGroupPickCards(list, selectedId, membershipId, containerId) {
     const container = document.getElementById(containerId);
     let html = '';
     list.forEach(m => {
+      const selClass = m.gender === 'M' ? 'selected-m' : 'selected-f';
       const parts = [];
       if (m.age)     parts.push(m.age + '歲');
       if (m.height)  parts.push(m.height + 'cm');
@@ -1666,13 +1667,14 @@
       const isSel = m.id === selectedId;
       html += `<div class="member-pick-card${isSel ? ' ' + selClass : ''}"
         data-id="${m.id}" data-name="${m.name}"
-        onclick="selectGroupPickCard(${m.id}, '${m.name}', ${membershipId}, '${containerId}', '${gender}')">
+        onclick="selectGroupPickCard(${m.id}, '${m.name}', ${membershipId}, '${containerId}', '${m.gender}')">
+        <span class="badge ${m.gender === 'M' ? 'bg-primary' : 'bg-danger'} bg-opacity-50 me-1" style="font-size:.65rem;">${m.gender === 'M' ? '男' : '女'}</span>
         <span class="fw-semibold">${m.name}</span>
         <span class="text-muted small ms-2">${info}</span>
       </div>`;
     });
     container.innerHTML = html;
-    const sel = container.querySelector('.' + selClass);
+    const sel = container.querySelector('.member-pick-card.selected-m, .member-pick-card.selected-f');
     if (sel) sel.scrollIntoView({ block: 'nearest' });
   }
 
@@ -1684,16 +1686,20 @@
     const card = document.querySelector('#' + containerId + ' [data-id="' + memberId + '"]');
     if (card) card.classList.add(selClass);
     document.getElementById(`edit-group-member-${membershipId}`).value = memberId;
-    document.getElementById(`edit-group-name-${membershipId}`).textContent = memberName;
+    const nameEl = document.getElementById(`edit-group-name-${membershipId}`);
+    nameEl.textContent = memberName;
+    nameEl.className = `badge ${gender === 'M' ? 'bg-primary' : 'bg-danger'} fs-6 px-3 py-2`;
     const idx = _groupEditMembers.findIndex(m => m.membershipId === membershipId);
-    if (idx !== -1) _groupEditMembers[idx].memberId = memberId;
+    if (idx !== -1) { _groupEditMembers[idx].memberId = memberId; _groupEditMembers[idx].gender = gender; }
   }
 
-  // Delegated on `document` (not the form elements directly) because these two
-  // forms live inside modals defined further down in this same HTML file —
-  // by the time this script tag runs, they don't exist in the DOM yet, so a
-  // direct getElementById(...)?.addEventListener(...) here would silently
-  // attach to nothing and never fire.
+  // Delegated on `document` (not the form elements directly): the edit-group
+  // and edit-draft forms live inside modals defined further down in this same
+  // HTML file, so by the time this script tag runs they don't exist in the DOM
+  // yet — a direct getElementById(...)?.addEventListener(...) here would
+  // silently attach to nothing and never fire. The sk-attach-form rows are
+  // repeated per group (server-rendered in a loop), so delegation also avoids
+  // having to re-bind a listener to every row individually.
   document.addEventListener('submit', function(e) {
     if (e.target && e.target.id === 'edit-group-form') {
       const modalContent = e.target.closest('.modal-content');
@@ -1701,6 +1707,15 @@
       const overlay = document.getElementById('edit-group-saving-overlay');
       overlay.classList.remove('d-none');
       overlay.classList.add('d-flex');
+    }
+    if (e.target && e.target.classList.contains('sk-attach-form')) {
+      const btn = e.target.querySelector('button[type="submit"]');
+      const select = e.target.querySelector('select');
+      if (select) select.disabled = true;
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> 加入中…';
+      }
     }
     if (e.target && e.target.id === 'edit-draft-form') {
       const btn = document.getElementById('edit-draft-save-btn');
