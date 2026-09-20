@@ -1391,7 +1391,7 @@
   // Build member lookup from template data
   const allMembers = [
     {% for m in members %}
-    {% if m.is_member_active and not m.is_test %}
+    {% if m.is_member_active %}
     { id: {{ m.id }}, name: {{ m.name | tojson }}, gender: {{ m.gender | tojson }},
       age: {% if m.birthday %}{{ today.year - m.birthday.year }}{% else %}null{% endif %},
       height: {{ m.height or 'null' }},
@@ -1399,6 +1399,7 @@
       job: {{ (job_by_id.get(m.id, '') or '') | tojson }},
       rank: {{ (m.rank or '') | tojson }},
       join_campaign: {{ (m.join_campaign or '') | tojson }},
+      isTest: {{ m.is_test | tojson }},
       tags: [{% for t in m.tags %}{ name: {{ t.name | tojson }}, color: {{ t.color | tojson }} }{% if not loop.last %}, {% endif %}{% endfor %}] },
     {% endif %}
     {% endfor %}
@@ -1463,6 +1464,7 @@
       const info = parts.join(' · ');
       const rankBadge = m.rank ? `<span class="badge bg-secondary ms-2" style="font-size:.7rem;">${escapeHtml(m.rank)}</span>` : '';
       const campaignBadge = m.join_campaign === 'pickle_ball' ? '<span class="badge bg-info text-dark ms-2" style="font-size:.7rem;">🏓 匹克球</span>' : '';
+      const testBadge = m.isTest ? '<span class="badge bg-warning text-dark ms-2" style="font-size:.7rem;">測試</span>' : '';
       const tagsHtml = (m.tags || [])
         .map(t => `<span class="badge bg-${escapeHtml(t.color)}" style="font-size:.65rem;">${escapeHtml(t.name)}</span>`)
         .join(' ');
@@ -1471,7 +1473,7 @@
         data-id="${m.id}" data-name="${m.name}"
         onclick="selectPickCard(${m.id}, '${m.name}', '${gender}', '${containerId}')">
         <div class="d-flex align-items-center justify-content-between">
-          <span class="fw-semibold">${m.name}</span>${rankBadge}${campaignBadge}
+          <span class="fw-semibold">${m.name}</span>${rankBadge}${campaignBadge}${testBadge}
         </div>
         <div class="text-muted small">${info}</div>
         ${tagsHtml ? `<div class="d-flex flex-wrap gap-1 mt-1">${tagsHtml}</div>` : ''}
@@ -1664,12 +1666,13 @@
       if (m.marital) parts.push(m.marital);
       if (m.job)     parts.push(m.job);
       const info = parts.join(' · ');
+      const testBadge = m.isTest ? '<span class="badge bg-warning text-dark ms-1" style="font-size:.65rem;">測試</span>' : '';
       const isSel = m.id === selectedId;
       html += `<div class="member-pick-card${isSel ? ' ' + selClass : ''}"
         data-id="${m.id}" data-name="${m.name}"
         onclick="selectGroupPickCard(${m.id}, '${m.name}', ${membershipId}, '${containerId}', '${m.gender}')">
         <span class="badge ${m.gender === 'M' ? 'bg-primary' : 'bg-danger'} bg-opacity-50 me-1" style="font-size:.65rem;">${m.gender === 'M' ? '男' : '女'}</span>
-        <span class="fw-semibold">${m.name}</span>
+        <span class="fw-semibold">${m.name}</span>${testBadge}
         <span class="text-muted small ms-2">${info}</span>
       </div>`;
     });
@@ -1711,11 +1714,15 @@
     if (e.target && e.target.classList.contains('sk-attach-form')) {
       const btn = e.target.querySelector('button[type="submit"]');
       const select = e.target.querySelector('select');
-      if (select) select.disabled = true;
       if (btn) {
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> 加入中…';
       }
+      // Defer disabling the <select> to the next tick: a disabled field is
+      // excluded from the submitted form data, and disabling it synchronously
+      // here (before the browser serializes the form) would drop campaign_id
+      // from the POST, so the server sees no campaign selected.
+      if (select) setTimeout(() => { select.disabled = true; }, 0);
     }
     if (e.target && e.target.id === 'edit-draft-form') {
       const btn = document.getElementById('edit-draft-save-btn');
