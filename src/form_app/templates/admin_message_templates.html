@@ -13,7 +13,7 @@
     文案中的 <code>{{ '{url}' }}</code> 會自動替換為對應的連結。
   </p>
 
-  <form method="POST" action="{{ url_for('admin_bp.message_templates') }}">
+  <form id="message-templates-form" method="POST" action="{{ url_for('admin_bp.message_templates') }}">
     {% for t in templates %}
     <div class="card mb-3">
       <div class="card-body">
@@ -24,9 +24,17 @@
     </div>
     {% endfor %}
 
-    <button type="submit" class="btn btn-danger">
+    <button type="submit" class="btn btn-danger" id="save-templates-btn">
       <i class="bi bi-save"></i> 儲存文案
     </button>
   </form>
 </div>
+
+<script>
+  document.getElementById('message-templates-form').addEventListener('submit', function() {
+    const btn = document.getElementById('save-templates-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> 儲存中…';
+  });
+</script>
 {% endblock %}
