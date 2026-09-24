@@ -9,6 +9,9 @@ _LIFF_MAX_AGE = 7 * 24 * 3600  # 7 days
 _PREF_SALT = "member-pref"
 _PREF_MAX_AGE = 2 * 3600  # 2 hours
 
+_RESET_SALT = "password-reset"
+_RESET_MAX_AGE = 30 * 60  # 30 minutes
+
 
 def make_liff_token(phone_number: str) -> str:
     s = URLSafeTimedSerializer(settings.SECRET_KEY)
@@ -34,5 +37,19 @@ def load_member_token(token: str) -> int | None:
     s = URLSafeTimedSerializer(settings.SECRET_KEY)
     try:
         return s.loads(token, salt=_PREF_SALT, max_age=_PREF_MAX_AGE)
+    except (BadSignature, SignatureExpired):
+        return None
+
+
+def make_reset_token(member_id: int) -> str:
+    s = URLSafeTimedSerializer(settings.SECRET_KEY)
+    return s.dumps(member_id, salt=_RESET_SALT)
+
+
+def load_reset_token(token: str) -> int | None:
+    """Returns member_id, or None if the token is invalid or expired."""
+    s = URLSafeTimedSerializer(settings.SECRET_KEY)
+    try:
+        return s.loads(token, salt=_RESET_SALT, max_age=_RESET_MAX_AGE)
     except (BadSignature, SignatureExpired):
         return None
