@@ -41,7 +41,7 @@ def _invalidate_dashboard_cache():
         r.delete(_DASHBOARD_CACHE_KEY)
 
 from form_app.models import (
-    ActivityLabel, Invite, Member, Matching, MatchingStatus, Message, UserMatchScore,
+    ActivityLabel, Invite, Member, Matching, MatchingStatus, Message, MessageTemplate, UserMatchScore,
     DateProposal, ProposalStatus, Line_Info,
     GroupMatching, GroupMatchingStatus, GroupMembership, GroupMessage, GroupDateProposal, GroupBadge,
     LeadSubmission, LeadSubmissionStatus,
@@ -53,7 +53,7 @@ from collections import defaultdict
 from form_app.decorators import admin_required, developer_required
 from form_app.database import get_db
 from form_app.services.cool_name import generate_funny_name
-from form_app.services.messaging import process_all_notifications
+from form_app.services.messaging import MESSAGE_TEMPLATE_DEFAULTS, process_all_notifications
 from form_app.services.scoring import UserProfileAdapter, calculate_match_score, get_eligible_matching_pool
 from form_app.services.matching import update_unmatched_counters
 from form_app.services.security import hash_password
@@ -2393,6 +2393,54 @@ def _campaign_form_values(campaign=None, form=None) -> dict:
         rows.append({'icon': '', 'text': ''})
     values['feature_rows'] = rows
     return values
+
+
+# key -> (label, description) shown on the admin edit page. Every template
+# supports {url}, replaced with a link to the relevant page when the message
+# is sent (e.g. the pairing's chat page).
+MESSAGE_TEMPLATE_INFO = {
+    'new_match_default': (
+        '新配對通知（一般）',
+        '配對成立時推送給雙方的 LINE 訊息。',
+    ),
+    'new_match_pickleball': (
+        '新配對通知（匹克球球友）',
+        '雙方皆對匹克球有興趣時，取代一般版本推送的 LINE 訊息。',
+    ),
+}
+
+
+@bp.route('/message-templates', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def message_templates():
+    session = get_db()
+
+    if request.method == 'POST':
+        for key in MESSAGE_TEMPLATE_INFO:
+            content = request.form.get(key, '').strip()
+            if not content:
+                continue
+            row = session.get(MessageTemplate, key)
+            if row:
+                row.content = content
+            else:
+                session.add(MessageTemplate(key=key, content=content))
+        session.commit()
+        flash('已更新訊息文案', 'success')
+        return redirect(url_for('admin_bp.message_templates'))
+
+    rows = {row.key: row.content for row in session.query(MessageTemplate).all()}
+    templates = [
+        {
+            'key': key,
+            'label': label,
+            'description': description,
+            'content': rows.get(key, MESSAGE_TEMPLATE_DEFAULTS[key]),
+        }
+        for key, (label, description) in MESSAGE_TEMPLATE_INFO.items()
+    ]
+    return render_template('admin_message_templates.html', templates=templates)
 
 
 @bp.route('/campaigns')

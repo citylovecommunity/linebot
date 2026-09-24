@@ -12,7 +12,7 @@ from sqlalchemy.orm import joinedload
 from form_app.config import settings
 from form_app.extensions import line_bot_helper
 from form_app.models import (
-    DateProposal, Matching, Member, Message, NotificationDelivery,
+    DateProposal, Matching, Member, Message, MessageTemplate, NotificationDelivery,
     GroupMatching, GroupMessage, GroupDateProposal,
 )
 from form_app.services.group_matching import PICKLE_BALL_CAMPAIGN
@@ -23,6 +23,33 @@ APP_URL = settings.APP_URL
 
 _MAX_CONTENT_LEN = 50
 _SILENCE_WINDOW_SECONDS = 10 * 60  # 10 minutes
+
+# Fallback wording if the message_template row is missing (e.g. migration not
+# yet applied). Kept in sync with the seed data in the migration that creates
+# the table; admins edit the actual wording via /admin/message-templates.
+MESSAGE_TEMPLATE_DEFAULTS = {
+    'new_match_default': (
+        "推薦你認識新朋友的時間來囉！\n\n"
+        "您們可以一起相約喝個咖啡，\n"
+        "或是本季我們主打大家一起認識現火熱的匹克球運動，\n"
+        "歡迎你們一起相約共襄盛舉！\n"
+        "詳見對話框的任務牆～\n\n"
+        "{url}"
+    ),
+    'new_match_pickleball': (
+        "Hi 本週你的新球友來了！\n"
+        "→ 點此查看 {url}\n"
+        "提醒：打球時間地點由大家自行約定，不限任何特定時間和地點"
+    ),
+}
+
+
+def get_message_template(session, key: str, url: str) -> str:
+    """Loads an admin-editable message template and substitutes `{url}`."""
+    row = session.get(MessageTemplate, key)
+    content = row.content if row else MESSAGE_TEMPLATE_DEFAULTS[key]
+    return content.replace('{url}', url)
+
 
 # A queued notification for one recipient. `keys` lists the (event_type,
 # event_id) pairs this text covers — once the push actually succeeds, a
@@ -244,20 +271,9 @@ def collect_new_match_texts(session):
         if (matching.subject and matching.object
                 and has_pickle_ball_affinity(matching.subject)
                 and has_pickle_ball_affinity(matching.object)):
-            text = (
-                f"Hi 本週你的新球友來了！\n"
-                f"→ 點此查看 {url}\n"
-                f"提醒：打球時間地點由大家自行約定，不限任何特定時間和地點"
-            )
+            text = get_message_template(session, 'new_match_pickleball', url)
         else:
-            text = (
-                f"推薦你認識新朋友的時間來囉！\n\n"
-                f"您們可以一起相約喝個咖啡，\n"
-                f"或是本季我們主打大家一起認識現火熱的匹克球運動，\n"
-                f"歡迎你們一起相約共襄盛舉！\n"
-                f"詳見對話框的任務牆～\n\n"
-                f"{url}"
-            )
+            text = get_message_template(session, 'new_match_default', url)
 
         for member, partner in (
             (matching.subject, matching.object),

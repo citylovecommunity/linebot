@@ -982,3 +982,16 @@ class ScriptKillCampaignGroup(Base):
     group: Mapped['GroupMatching'] = relationship('GroupMatching')
 
 
+class MessageTemplate(Base):
+    """Admin-editable wording for LINE messages the app pushes automatically
+    (e.g. the new-pairing notification). `key` identifies which message this
+    is; `content` may contain `{url}`, substituted with the relevant link
+    when the message is sent. Row absence falls back to a hardcoded default
+    so a missing/undeployed migration never breaks notifications."""
+    __tablename__ = 'message_template'
+
+    key: Mapped[str] = mapped_column(primary_key=True)
+    content: Mapped[str]
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.now, onupdate=datetime.now)
+
+

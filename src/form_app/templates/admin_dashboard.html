@@ -861,6 +861,16 @@
 
       <div class="card mb-3">
         <div class="card-body">
+          <h6 class="card-title">📨 訊息文案管理</h6>
+          <p class="text-muted small">編輯配對成立時自動推送的 LINE 訊息文案，PM 可自行修改不需請工程師改程式碼。</p>
+          <a href="{{ url_for('admin_bp.message_templates') }}" class="btn btn-primary">
+            <i class="bi bi-chat-square-text"></i> 管理訊息文案
+          </a>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-body">
           <h6 class="card-title">🎭 劇本殺管理</h6>
           <p class="text-muted small">
             編輯劇本的角色與任務文字，將群組（草稿或進行中）加入劇本殺，發送時系統會隨機分配角色並透過私訊發送任務。
