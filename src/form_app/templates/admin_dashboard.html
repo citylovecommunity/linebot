@@ -2059,7 +2059,7 @@
               </div>
               <input type="text" class="form-control form-control-sm mb-2"
                      placeholder="搜尋…" oninput="cgFilter(this,'cg-males')">
-              <div id="cg-males" style="max-height:380px;overflow-y:auto;overscroll-behavior:contain;">
+              <div id="cg-males" style="max-height:380px;overflow-y:auto;">
                 {% for m in members %}{% if m.gender == 'M' %}
                 {% set age = (2026 - m.birthday.year) if m.birthday else none %}
                 {% set region = member_regions.get(m.id) %}
@@ -2105,7 +2105,7 @@
               </div>
               <input type="text" class="form-control form-control-sm mb-2"
                      placeholder="搜尋…" oninput="cgFilter(this,'cg-females')">
-              <div id="cg-females" style="max-height:380px;overflow-y:auto;overscroll-behavior:contain;">
+              <div id="cg-females" style="max-height:380px;overflow-y:auto;">
                 {% for m in members %}{% if m.gender == 'F' %}
                 {% set age = (2026 - m.birthday.year) if m.birthday else none %}
                 {% set region = member_regions.get(m.id) %}
