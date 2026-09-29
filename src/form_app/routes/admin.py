@@ -1639,7 +1639,15 @@ def set_group_host(group_id):
 @admin_required
 def admin_group_detail(group_id):
     session = get_db()
-    group = session.get(GroupMatching, group_id)
+    group = (
+        session.query(GroupMatching)
+        .filter(GroupMatching.id == group_id)
+        .options(
+            selectinload(GroupMatching.memberships).joinedload(GroupMembership.member),
+            selectinload(GroupMatching.messages).joinedload(GroupMessage.sender),
+        )
+        .first()
+    )
     if group is None:
         flash('找不到該群組', 'danger')
         return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
