@@ -350,13 +350,15 @@ def group_detail(group_id):
             key = badge.badge_type.value
             bucket[key] = bucket.get(key, 0) + 1
 
-    shared_messages = [m for m in group.messages if m.recipient_id is None]
+    broadcast = next((m for m in group.messages if m.is_broadcast), None)
+    shared_messages = [m for m in group.messages if m.recipient_id is None and not m.is_broadcast]
     my_notes = [m for m in group.messages if m.recipient_id == current_user.id]
 
     return render_template('group_chat.html',
                            group=group,
                            my_membership=my_membership,
                            memberships_by_id=memberships_by_id,
+                           broadcast=broadcast,
                            messages=shared_messages,
                            my_notes=my_notes,
                            days_remaining=days_remaining,
@@ -416,6 +418,7 @@ def group_get_messages(group_id):
             GroupMessage.group_id == group_id,
             GroupMessage.id > after_id,
             GroupMessage.recipient_id.is_(None),
+            GroupMessage.is_broadcast.is_(False),
         )
         .order_by(GroupMessage.id)
         .all()

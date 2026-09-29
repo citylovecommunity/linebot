@@ -794,6 +794,12 @@ class GroupMessage(Base):
     recipient_id: Mapped[Optional[int]] = mapped_column(ForeignKey("member.id"), nullable=True)
     is_coach_note: Mapped[bool] = mapped_column(default=False)
 
+    # Marks the single pinned, admin-editable announcement for the group (at
+    # most one such row per group_id, enforced in application code). Edited
+    # in place rather than accumulating a new row per edit, and rendered
+    # separately from the normal chat feed (excluded from `shared_messages`).
+    is_broadcast: Mapped[bool] = mapped_column(default=False)
+
     sender: Mapped["Member"] = relationship(foreign_keys=[sender_id])
     recipient: Mapped[Optional["Member"]] = relationship(foreign_keys=[recipient_id])
     group: Mapped["GroupMatching"] = relationship(

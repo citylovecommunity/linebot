@@ -44,6 +44,7 @@ from form_app.models import (
     ActivityLabel, Invite, Member, Matching, MatchingStatus, Message, MessageTemplate, UserMatchScore,
     DateProposal, ProposalStatus, Line_Info,
     GroupMatching, GroupMatchingStatus, GroupMembership, GroupMessage, GroupDateProposal, GroupBadge,
+    NotificationDelivery,
     LeadSubmission, LeadSubmissionStatus,
     Tag, Campaign,
     ScriptKillCampaign, ScriptKillCampaignGroup,
@@ -1644,7 +1645,8 @@ def admin_group_detail(group_id):
         return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
 
     memberships_by_id = {gm.member_id: gm for gm in group.memberships}
-    shared_messages = [m for m in group.messages if m.recipient_id is None]
+    broadcast = next((m for m in group.messages if m.is_broadcast), None)
+    shared_messages = [m for m in group.messages if m.recipient_id is None and not m.is_broadcast]
     notes_by_member = defaultdict(list)
     for m in group.messages:
         if m.recipient_id is not None:
@@ -1654,6 +1656,7 @@ def admin_group_detail(group_id):
         'admin_group_detail.html',
         group=group,
         memberships_by_id=memberships_by_id,
+        broadcast=broadcast,
         shared_messages=shared_messages,
         notes_by_member=notes_by_member,
     )
@@ -1701,6 +1704,69 @@ def admin_send_group_note(group_id):
     process_all_notifications(session)
     _invalidate_dashboard_cache()
     flash('已送出提醒', 'success')
+    return redirect(url_for('admin_bp.admin_group_detail', group_id=group_id))
+
+
+@bp.route('/groups/<int:group_id>/broadcast', methods=['POST'])
+@login_required
+@admin_required
+def admin_broadcast_group_message(group_id):
+    """Edit the group's single pinned announcement (shown to every member,
+    separate from the regular chat feed — see admin_send_group_note for the
+    private single-recipient variant). Editing it in place, rather than
+    posting a fresh message each time, means members always see one current
+    version. Submitting an empty textarea clears/removes the announcement."""
+    session = get_db()
+    if not (current_user.is_admin or current_user.is_developer):
+        abort(403)
+
+    group = session.get(GroupMatching, group_id)
+    if group is None:
+        flash('找不到該群組', 'danger')
+        return redirect(url_for('admin_bp.admin_dashboard', tab='groups'))
+
+    if not group.is_active:
+        flash('僅能在進行中的群組編輯公告', 'danger')
+        return redirect(url_for('admin_bp.admin_group_detail', group_id=group_id))
+
+    content = request.form.get('content', '').strip()
+    broadcast = next((m for m in group.messages if m.is_broadcast), None)
+
+    if not content:
+        if broadcast:
+            session.delete(broadcast)
+            session.commit()
+            _invalidate_dashboard_cache()
+            flash('已移除公告', 'success')
+        else:
+            flash('目前尚無公告', 'info')
+        return redirect(url_for('admin_bp.admin_group_detail', group_id=group_id))
+
+    if broadcast:
+        broadcast.content = content
+        broadcast.timestamp = datetime.now(timezone.utc)
+        # Clear prior delivery records for this row so the edited content is
+        # re-sent to everyone instead of being treated as already delivered.
+        session.query(NotificationDelivery).filter(
+            NotificationDelivery.event_type == 'group_message',
+            NotificationDelivery.event_id == broadcast.id,
+        ).delete(synchronize_session=False)
+        broadcast.is_notified = False
+    else:
+        broadcast = GroupMessage(
+            group_id=group.id,
+            sender_id=current_user.id,
+            recipient_id=None,
+            content=content,
+            is_system_notification=True,
+            is_broadcast=True,
+        )
+        session.add(broadcast)
+
+    session.commit()
+    process_all_notifications(session)
+    _invalidate_dashboard_cache()
+    flash('已更新公告並通知全體成員', 'success')
     return redirect(url_for('admin_bp.admin_group_detail', group_id=group_id))
 
 

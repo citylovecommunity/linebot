@@ -362,6 +362,18 @@
           </span>
         </div>
 
+        {# Pinned announcement from admin #}
+        {% if broadcast %}
+        <div class="px-3 pt-2">
+          <div class="border rounded-3 p-2 px-3" style="background:#fff9e6;border-color:#ffe69c!important;">
+            <div class="small fw-semibold text-warning-emphasis mb-1">
+              <i class="bi bi-pin-angle-fill me-1"></i>置頂公告
+            </div>
+            <div class="small" style="white-space:pre-wrap;">{{ broadcast.content }}</div>
+          </div>
+        </div>
+        {% endif %}
+
         {# Message area #}
         <div class="flex-grow-1 overflow-auto px-3 py-2" id="messageBox"
              style="scroll-behavior:smooth;">

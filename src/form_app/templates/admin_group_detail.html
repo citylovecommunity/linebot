@@ -62,8 +62,26 @@
     <div class="col-lg-6">
       <div class="card border-0 shadow-sm rounded-4 d-flex flex-column" style="height:70vh;min-height:420px;">
         <div class="card-header bg-white border-0 rounded-top-4 px-4 py-3">
-          <span class="fw-semibold"><i class="bi bi-chat-dots me-2 text-primary"></i>群組對話（僅供查閱）</span>
+          <span class="fw-semibold"><i class="bi bi-chat-dots me-2 text-primary"></i>群組對話</span>
         </div>
+
+        <!-- ── Pinned announcement: what members see, editable any time ── -->
+        <div class="px-3 pt-2">
+          <div class="border rounded-3 p-2 px-3 mb-1" style="background:#fff9e6;border-color:#ffe69c!important;">
+            <div class="d-flex align-items-center justify-content-between mb-1">
+              <span class="small fw-semibold text-warning-emphasis"><i class="bi bi-pin-angle-fill me-1"></i>置頂公告（所有成員可見）</span>
+              {% if broadcast %}
+                <span class="text-muted" style="font-size:.68rem;">最後更新 {{ broadcast.timestamp.strftime('%m/%d %H:%M') }}</span>
+              {% endif %}
+            </div>
+            {% if broadcast %}
+              <div class="small" style="white-space:pre-wrap;">{{ broadcast.content }}</div>
+            {% else %}
+              <div class="small text-muted">尚未設定公告</div>
+            {% endif %}
+          </div>
+        </div>
+
         <div class="flex-grow-1 overflow-auto px-3 py-2">
           {% for msg in shared_messages %}
             {% set gm = memberships_by_id.get(msg.sender_id) %}
@@ -97,6 +115,20 @@
             <div class="text-center text-muted py-5 small">目前尚無對話</div>
           {% endfor %}
         </div>
+
+        {% if group.status.value == 'ACTIVE' %}
+        <div class="border-top bg-white rounded-bottom-4 p-3">
+          <form method="POST" action="{{ url_for('admin_bp.admin_broadcast_group_message', group_id=group.id) }}"
+                class="js-spinner-form">
+            <textarea name="content" class="form-control form-control-sm mb-2" rows="2"
+                      placeholder="置頂公告內容…（留空並送出可移除公告）">{{ broadcast.content if broadcast else '' }}</textarea>
+            <button type="submit" class="btn btn-sm btn-primary js-spinner-btn"
+                    data-spinner-label="儲存中…">
+              <i class="bi bi-pin-angle-fill me-1"></i>{{ '更新公告並通知全體成員' if broadcast else '發布公告並通知全體成員' }}
+            </button>
+          </form>
+        </div>
+        {% endif %}
       </div>
     </div>
 
@@ -142,11 +174,13 @@
               </div>
 
               {% if group.status.value == 'ACTIVE' %}
-              <form method="POST" action="{{ url_for('admin_bp.admin_send_group_note', group_id=group.id) }}">
+              <form method="POST" action="{{ url_for('admin_bp.admin_send_group_note', group_id=group.id) }}"
+                    class="js-spinner-form">
                 <input type="hidden" name="recipient_id" value="{{ member.id }}">
                 <textarea name="content" class="form-control form-control-sm mb-2" rows="3"
                           placeholder="給 {{ member.name }} 的提醒或任務…" required></textarea>
-                <button type="submit" class="btn btn-sm btn-warning">
+                <button type="submit" class="btn btn-sm btn-warning js-spinner-btn"
+                        data-spinner-label="送出中…">
                   <i class="bi bi-send me-1"></i>送出提醒
                 </button>
               </form>
@@ -165,4 +199,15 @@
   </div>
 
 </div>
+
+<script>
+  document.querySelectorAll('.js-spinner-form').forEach(function (form) {
+    form.addEventListener('submit', function () {
+      const btn = form.querySelector('.js-spinner-btn');
+      if (!btn) return;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>' + btn.dataset.spinnerLabel;
+    });
+  });
+</script>
 {% endblock %}
