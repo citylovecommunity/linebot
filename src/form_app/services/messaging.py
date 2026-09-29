@@ -378,7 +378,8 @@ def collect_group_message_texts(session):
             count = len(pending_msgs)
             if count <= 3:
                 lines = "\n".join(
-                    f"  {m.sender.proper_name}: {_trim(m.content)}" for m in pending_msgs
+                    f"  {'小編' if m.is_system_notification else m.sender.proper_name}: {_trim(m.content)}"
+                    for m in pending_msgs
                 )
                 text = (
                     f"📩 群組 {group.cool_name} — {count} 則未讀\n"
