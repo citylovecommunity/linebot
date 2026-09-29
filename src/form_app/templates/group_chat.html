@@ -301,43 +301,15 @@
         </div>
 
       {% else %}
-        {# Phase 1: Opening text board #}
+        {# Phase 1: Opening text board — text admin-editable via
+           /admin/message-templates (group_open_board_with_host / _no_host) #}
         <div class="card border-0 rounded-4 shadow-sm">
           <div class="card-body p-4">
             <div class="d-flex align-items-center gap-2 mb-2">
               <span>🎯</span>
               <span class="fw-bold small">Citylove 同行小看板 🏃</span>
             </div>
-            {% if group.host %}
-              <div class="rounded-3 p-3 mb-3" style="background:#f8fff8;font-size:.82rem;line-height:1.7;">
-                恭喜 {{ group.members|length }} 人局成團！本局由
-                <strong>👑 {{ group.host.name }}</strong>
-                擔任主揪，將負責決定打球的時間與地點。
-                <br><br>
-                大家先在下方聊天室自由聊聊，認識一下彼此吧！等
-                {{ group.host.name }} 按下 <strong>📌 幫大家做個總結</strong> 鎖定行程後，就會顯示在這裡唷！🌱
-                <br><br>
-                期待相見！🙌
-              </div>
-              <p class="text-center text-muted mb-0" style="font-size:.72rem;">
-                ⬇️ 在下方聊天室自由發言，行程由主揪 {{ group.host.name }} 決定
-              </p>
-            {% else %}
-              {% set opener_name = group.opener.name if group.opener else '夥伴' %}
-              <div class="rounded-3 p-3 mb-3" style="background:#f8fff8;font-size:.82rem;line-height:1.7;">
-                恭喜 {{ group.members|length }} 人局成團！這局的麥克風我們優先交給
-                <strong>{{ opener_name }}</strong>
-                開球，拋個你想完成的事、想去的地方或美食吧！✨
-                <br><br>
-                如果 {{ opener_name }} 正在忙著拯救世界，大家也別客氣，直接自由敲杯、暢所欲言！
-                喬好時間地點後，任何一人按下 <strong>📌 幫大家做個總結</strong> 鎖定行程就能拿積分唷！🌱
-                <br><br>
-                期待相見！🙌
-              </div>
-              <p class="text-center text-muted mb-0" style="font-size:.72rem;">
-                ⬇️ 在下方聊天室自由發言，隨時按「幫大家做個總結」鎖定行程
-              </p>
-            {% endif %}
+            <div class="rounded-3 p-3" style="background:#f8fff8;font-size:.82rem;line-height:1.7;white-space:pre-wrap;">{{ board_text }}</div>
           </div>
         </div>
       {% endif %}

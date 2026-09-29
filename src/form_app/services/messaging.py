@@ -41,14 +41,39 @@ MESSAGE_TEMPLATE_DEFAULTS = {
         "→ 點此查看 {url}\n"
         "提醒：打球時間地點由大家自行約定，不限任何特定時間和地點"
     ),
+    # Page-content templates (rendered directly on the group chat page, not
+    # pushed via LINE). See PAGE_TEMPLATE_INFO in routes/admin.py for the
+    # admin-facing labels/descriptions and which placeholders each supports.
+    'pickleball_banner_title': "Hi, 歡迎來到城遇匹克球季",
+    'pickleball_banner_body': "本次任務內容如下：\n\n一起約打球吧～",
+    'pickleball_banner_link': "https://join.citylove.tw/pickleball_instructions",
+    'group_open_board_with_host': (
+        "恭喜 {member_count} 人局成團！本局由 {host_name} 擔任主揪，將負責決定打球的時間與地點。\n\n"
+        "大家先在下方聊天室自由聊聊，認識一下彼此吧！等 {host_name} 按下「幫大家做個總結」鎖定行程後，就會顯示在這裡唷！🌱\n\n"
+        "期待相見！🙌\n\n"
+        "⬇️ 在下方聊天室自由發言，行程由主揪 {host_name} 決定"
+    ),
+    'group_open_board_no_host': (
+        "恭喜 {member_count} 人局成團！這局的麥克風我們優先交給 {opener_name}，"
+        "拋個你想完成的事、想去的地方或美食吧！✨\n\n"
+        "如果 {opener_name} 正在忙著拯救世界，大家也別客氣，直接自由敲杯、暢所欲言！"
+        "喬好時間地點後，任何一人按下「幫大家做個總結」鎖定行程就能拿積分唷！🌱\n\n"
+        "期待相見！🙌\n\n"
+        "⬇️ 在下方聊天室自由發言，隨時按「幫大家做個總結」鎖定行程"
+    ),
 }
 
 
-def get_message_template(session, key: str, url: str) -> str:
-    """Loads an admin-editable message template and substitutes `{url}`."""
+def get_message_template(session, key: str, **replacements) -> str:
+    """Loads an admin-editable message/page template and substitutes any
+    `{placeholder}` named in `replacements`, e.g. get_message_template(db,
+    'new_match_default', url=url) or get_message_template(db,
+    'group_open_board_with_host', member_count=4, host_name='小明')."""
     row = session.get(MessageTemplate, key)
     content = row.content if row else MESSAGE_TEMPLATE_DEFAULTS[key]
-    return content.replace('{url}', url)
+    for placeholder, value in replacements.items():
+        content = content.replace('{' + placeholder + '}', str(value))
+    return content
 
 
 # A queued notification for one recipient. `keys` lists the (event_type,
@@ -271,9 +296,9 @@ def collect_new_match_texts(session):
         if (matching.subject and matching.object
                 and has_pickle_ball_affinity(matching.subject)
                 and has_pickle_ball_affinity(matching.object)):
-            text = get_message_template(session, 'new_match_pickleball', url)
+            text = get_message_template(session, 'new_match_pickleball', url=url)
         else:
-            text = get_message_template(session, 'new_match_default', url)
+            text = get_message_template(session, 'new_match_default', url=url)
 
         for member, partner in (
             (matching.subject, matching.object),

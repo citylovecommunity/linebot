@@ -16,6 +16,7 @@ from form_app.models import (
 from form_app.services.security import verify_password, hash_password
 from form_app.services.liff_token import make_liff_token, load_member_token
 from form_app.services.intro_card import generate_intro_card
+from form_app.services.messaging import get_message_template
 from form_app.config import settings
 
 cloudinary.config(
@@ -354,11 +355,30 @@ def group_detail(group_id):
     shared_messages = [m for m in group.messages if m.recipient_id is None and not m.is_broadcast]
     my_notes = [m for m in group.messages if m.recipient_id == current_user.id]
 
+    if group.host:
+        board_text = get_message_template(
+            db, 'group_open_board_with_host',
+            member_count=len(group.members), host_name=group.host.name,
+        )
+    else:
+        board_text = get_message_template(
+            db, 'group_open_board_no_host',
+            member_count=len(group.members),
+            opener_name=group.opener.name if group.opener else '夥伴',
+        )
+    banner_title = get_message_template(db, 'pickleball_banner_title')
+    banner_body = get_message_template(db, 'pickleball_banner_body')
+    banner_link = get_message_template(db, 'pickleball_banner_link')
+
     return render_template('group_chat.html',
                            group=group,
                            my_membership=my_membership,
                            memberships_by_id=memberships_by_id,
                            broadcast=broadcast,
+                           board_text=board_text,
+                           banner_title=banner_title,
+                           banner_body=banner_body,
+                           banner_link=banner_link,
                            messages=shared_messages,
                            my_notes=my_notes,
                            days_remaining=days_remaining,

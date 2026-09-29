@@ -2483,38 +2483,78 @@ MESSAGE_TEMPLATE_INFO = {
     ),
 }
 
+# key -> (label, description) for admin-editable text rendered directly on
+# the group chat page itself (not pushed via LINE). Same underlying
+# MessageTemplate table as MESSAGE_TEMPLATE_INFO, just a different surface.
+PAGE_TEMPLATE_INFO = {
+    'pickleball_banner_title': (
+        '匹克球季橫幅 — 標題',
+        '顯示在每個群組聊天室頂部的季節性橫幅標題。留空則整個橫幅不顯示。',
+    ),
+    'pickleball_banner_body': (
+        '匹克球季橫幅 — 內文',
+        '橫幅按鈕上下方的說明文字。',
+    ),
+    'pickleball_banner_link': (
+        '匹克球季橫幅 — 按鈕連結',
+        '橫幅「查看任務內容」按鈕導向的網址。',
+    ),
+    'group_open_board_with_host': (
+        '同行小看板（已指定主揪）',
+        '群組剛成團、且已指定主揪時，聊天室左側顯示的說明文字。可用 {member_count}、{host_name} 變數。',
+    ),
+    'group_open_board_no_host': (
+        '同行小看板（尚未指定主揪）',
+        '群組剛成團、尚未指定主揪時，聊天室左側顯示的說明文字。可用 {member_count}、{opener_name} 變數。',
+    ),
+}
+
 
 @bp.route('/message-templates', methods=['GET', 'POST'])
 @login_required
 @admin_required
 def message_templates():
     session = get_db()
+    all_info = {**MESSAGE_TEMPLATE_INFO, **PAGE_TEMPLATE_INFO}
 
     if request.method == 'POST':
-        for key in MESSAGE_TEMPLATE_INFO:
+        for key in all_info:
             content = request.form.get(key, '').strip()
-            if not content:
-                continue
             row = session.get(MessageTemplate, key)
+            if not content:
+                if key in MESSAGE_TEMPLATE_INFO:
+                    # LINE wording must never be blanked out accidentally.
+                    continue
+                # Page templates may be intentionally cleared (e.g. to hide
+                # the pickleball banner) — persist the empty value explicitly
+                # so it reads as "hidden" rather than "never customized"
+                # (which would still fall back to the hardcoded default).
             if row:
                 row.content = content
             else:
                 session.add(MessageTemplate(key=key, content=content))
         session.commit()
-        flash('已更新訊息文案', 'success')
+        flash('已更新文案', 'success')
         return redirect(url_for('admin_bp.message_templates'))
 
     rows = {row.key: row.content for row in session.query(MessageTemplate).all()}
-    templates = [
-        {
-            'key': key,
-            'label': label,
-            'description': description,
-            'content': rows.get(key, MESSAGE_TEMPLATE_DEFAULTS[key]),
-        }
-        for key, (label, description) in MESSAGE_TEMPLATE_INFO.items()
-    ]
-    return render_template('admin_message_templates.html', templates=templates)
+
+    def _build(info):
+        return [
+            {
+                'key': key,
+                'label': label,
+                'description': description,
+                'content': rows.get(key, MESSAGE_TEMPLATE_DEFAULTS[key]),
+            }
+            for key, (label, description) in info.items()
+        ]
+
+    return render_template(
+        'admin_message_templates.html',
+        line_templates=_build(MESSAGE_TEMPLATE_INFO),
+        page_templates=_build(PAGE_TEMPLATE_INFO),
+    )
 
 
 @bp.route('/campaigns')
