@@ -3,8 +3,8 @@ import urllib.request
 
 from flask import Blueprint, abort, current_app, request
 from linebot.v3.exceptions import InvalidSignatureError
-from linebot.v3.messaging import (ApiClient, MessagingApi, ReplyMessageRequest,
-                                  TextMessage)
+from linebot.v3.messaging import (ApiClient, ApiException, MessagingApi,
+                                  ReplyMessageRequest, TextMessage)
 from linebot.v3.webhooks import MessageEvent, TextMessageContent
 
 from form_app.config import settings
@@ -50,16 +50,23 @@ def handle_message(event):
         # 4. Pass the MATCH object, not the text string
         reply_msg = run_binding(match, event.source.user_id)
 
-        with ApiClient(line_bot_helper.configuration) as api_client:
-            line_bot_api = MessagingApi(api_client)
-            line_bot_api.reply_message(
-                ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[
-                        TextMessage(text=reply_msg),
-                    ]
+        try:
+            with ApiClient(line_bot_helper.configuration) as api_client:
+                line_bot_api = MessagingApi(api_client)
+                line_bot_api.reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[
+                            TextMessage(text=reply_msg),
+                        ]
+                    )
                 )
-            )
+        except ApiException as e:
+            # Reply token is single-use and expires after ~1 minute, so a
+            # redelivered event (LINE retries on non-2xx) will always fail
+            # here. Swallow it so we still return 200 and stop the retry loop.
+            current_app.logger.warning(
+                f"Failed to reply to user {event.source.user_id}: {e}")
     else:
         current_app.logger.info("Regex did NOT match.")
 
