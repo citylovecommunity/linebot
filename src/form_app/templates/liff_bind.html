@@ -44,6 +44,16 @@
       <button id="recheck-btn" class="btn btn-outline-secondary w-100">我已加入好友，重新檢查</button>
     </div>
 
+    <!-- Opened outside the LINE app: ask the user to scan a QR with their phone -->
+    <div id="not-in-client" class="d-none">
+      <div class="status-icon mb-2">📱</div>
+      <h5 class="fw-bold">請用手機 LINE 掃描</h5>
+      <p class="text-muted small mb-3">請用手機的 LINE App 掃描下方 QR Code，完成綁定。</p>
+      <div id="qrcode" class="d-flex justify-content-center mb-3"></div>
+      <p class="text-muted small mb-1">手機就在身邊？也可以直接點這裡：</p>
+      <a id="open-in-line-btn" class="btn btn-outline-secondary w-100" rel="noopener">在這台裝置的 LINE 開啟</a>
+    </div>
+
     <!-- Result (both flows) -->
     <div id="result" class="d-none">
       <div class="status-icon mb-2" id="result-icon"></div>
@@ -53,11 +63,12 @@
   </div>
 
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script>
     const LIFF_ID = {{ liff_id | tojson }};
     const OA_BASIC_ID = {{ oa_basic_id | tojson }};
 
-    const PANELS = ['loading', 'phone-form', 'not-friend', 'result'];
+    const PANELS = ['loading', 'phone-form', 'not-friend', 'not-in-client', 'result'];
 
     function show(icon, title, msg, color) {
       PANELS.forEach(id => document.getElementById(id).classList.add('d-none'));
@@ -66,6 +77,17 @@
       document.getElementById('result-title').textContent = title;
       document.getElementById('result-title').className = 'fw-bold mt-2 text-' + color;
       document.getElementById('result-msg').textContent = msg;
+    }
+
+    function showNotInClient() {
+      PANELS.forEach(id => document.getElementById(id).classList.add('d-none'));
+      document.getElementById('not-in-client').classList.remove('d-none');
+      document.getElementById('open-in-line-btn').href = location.href;
+      new QRCode(document.getElementById('qrcode'), {
+        text: location.href,
+        width: 180,
+        height: 180,
+      });
     }
 
     function showNotFriend() {
@@ -125,7 +147,7 @@
       }
 
       if (!liff.isInClient()) {
-        show('📱', '請在 LINE 內開啟', '請複製連結，在 LINE App 內貼上並開啟。', 'warning');
+        showNotInClient();
         return;
       }
 
