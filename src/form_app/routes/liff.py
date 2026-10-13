@@ -45,6 +45,10 @@ def bind_callback():
     if existing:
         if existing.user_id == line_user_id:
             return jsonify(ok=True, already_bound=True)
+        if not token:
+            # A typed-in phone number proves nothing about ownership, so it must
+            # not take over a binding; only a signed token may rebind a phone.
+            return jsonify(ok=False, error='phone_already_bound'), 409
         existing.user_id = line_user_id
     else:
         db.add(Line_Info(phone_number=phone_number, user_id=line_user_id))

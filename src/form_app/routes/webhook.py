@@ -178,6 +178,9 @@ def run_binding(match, line_user_id):
         # STRICT RULE: Existing users cannot change numbers
         reply_text = "❌ 您已經綁定過手機，如要更改請洽服務人員。"
 
+    elif not session.query(Member).filter_by(phone_number=target_phone).first():
+        reply_text = f"❌ 查無手機號碼 {target_phone} 的會員資料，請確認號碼是否與報名時相同，或洽服務人員。"
+
     else:
         # --- Step 2: Check if the PHONE is already used by someone else ---
         phone_taken = session.query(Line_Info).filter_by(
@@ -200,4 +203,6 @@ def run_binding(match, line_user_id):
                 session.rollback()
                 current_app.logger.error(f"Database Error: {e}")
                 reply_text = "系統發生錯誤，請稍後再試。"
+    current_app.logger.info(
+        f"Binding result for {line_user_id} / {target_phone}: {reply_text}")
     return reply_text

@@ -79,12 +79,25 @@
       document.getElementById('result-msg').textContent = msg;
     }
 
+    // The LINE deep link for this page. location.href is the raw endpoint
+    // URL, which opens in a plain browser (or a non-LIFF webview), so the
+    // QR code and button must point at liff.line.me instead.
+    function liffUrl() {
+      const params = new URLSearchParams(location.search);
+      let token = params.get('token');
+      if (!token && params.get('liff.state')) {
+        token = new URLSearchParams(params.get('liff.state').replace(/^[^?]*/, '')).get('token');
+      }
+      return 'https://liff.line.me/' + LIFF_ID + (token ? '?token=' + encodeURIComponent(token) : '');
+    }
+
     function showNotInClient() {
       PANELS.forEach(id => document.getElementById(id).classList.add('d-none'));
       document.getElementById('not-in-client').classList.remove('d-none');
-      document.getElementById('open-in-line-btn').href = location.href;
+      const url = liffUrl();
+      document.getElementById('open-in-line-btn').href = url;
       new QRCode(document.getElementById('qrcode'), {
-        text: location.href,
+        text: url,
         width: 180,
         height: 180,
       });
@@ -126,6 +139,8 @@
         show('⏰', '連結已過期', '此連結有效期為 7 天，請重新登入會員中心取得新連結。', 'warning');
       } else if (body.error === 'line_account_already_used') {
         show('⚠️', 'LINE 帳號已被使用', '此 LINE 帳號已綁定其他手機號碼，請聯繫客服處理。', 'warning');
+      } else if (body.error === 'phone_already_bound') {
+        show('⚠️', '此號碼已被綁定', '此手機號碼已綁定其他 LINE 帳號，如需更換請聯繫客服。', 'warning');
       } else if (body.error === 'member_not_found') {
         show('❓', '查無此會員', '找不到此手機號碼的會員資料，請確認號碼後重試，或聯繫客服。', 'danger');
       } else {
