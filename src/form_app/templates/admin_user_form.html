@@ -73,7 +73,8 @@
               </div>
               <div class="col-sm-6">
                 <label class="form-label">電子郵件</label>
-                <input type="email" class="form-control" name="email"
+                {# type="text" so legacy Google Form data (e.g. a phone number) doesn't block saving #}
+                <input type="text" inputmode="email" class="form-control" name="email"
                   value="{{ user.email if user and user.email else '' }}">
               </div>
               <div class="col-sm-6">

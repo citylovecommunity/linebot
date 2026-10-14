@@ -714,7 +714,7 @@ def new_user():
             name=request.form['name'],
             phone_number=request.form['phone_number'],
             gender=request.form['gender'],
-            email=request.form.get('email') or None,
+            email=request.form.get('email', '').strip() or None,
             birthday=birthday,
             height=int(request.form['height']) if request.form.get('height') else None,
             rank=request.form.get('rank') or None,
@@ -767,7 +767,7 @@ def edit_user(user_id):
         user.name = request.form['name']
         user.gender = request.form['gender']
         user.phone_number = request.form['phone_number']
-        user.email = request.form.get('email') or None
+        user.email = request.form.get('email', '').strip() or None
         user.rank = request.form.get('rank') or None
         user.marital_status = request.form.get('marital_status') or None
         user.is_member_active = 'is_active' in request.form
